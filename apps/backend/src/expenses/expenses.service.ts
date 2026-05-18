@@ -10,9 +10,9 @@ export class ExpensesService {
       include: {
         vendor: true,
         user: { select: { name: true, email: true } },
-        approver: { select: { name: true } }
+        approver: { select: { name: true } },
       },
-      orderBy: { date: 'desc' }
+      orderBy: { date: 'desc' },
     });
   }
 
@@ -23,8 +23,8 @@ export class ExpensesService {
         vendor: true,
         user: true,
         approver: true,
-        vendor_payments: true
-      }
+        vendor_payments: true,
+      },
     });
     if (!expense) throw new NotFoundException('Expense not found');
     return expense;
@@ -35,8 +35,8 @@ export class ExpensesService {
       data: {
         ...data,
         user_id: userId,
-        status: 'PENDING'
-      }
+        status: 'PENDING',
+      },
     });
   }
 
@@ -45,14 +45,14 @@ export class ExpensesService {
       where: { id },
       data: {
         status,
-        approved_by: approverId
-      }
+        approved_by: approverId,
+      },
     });
   }
 
   async remove(id: string) {
     return this.prisma.expense.delete({
-      where: { id }
+      where: { id },
     });
   }
 }

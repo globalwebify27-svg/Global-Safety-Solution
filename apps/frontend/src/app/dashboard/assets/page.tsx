@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAuthStore } from "@/store/auth";
 import { API_BASE_URL } from "@/lib/config";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { 
   Monitor, 
@@ -55,6 +56,12 @@ export default function AssetsPage() {
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
+  const [reassignOpen, setReassignOpen] = useState(false);
+  const [maintenanceOpen, setMaintenanceOpen] = useState(false);
+  const [missingOpen, setMissingOpen] = useState(false);
+  const [newAssigneeId, setNewAssigneeId] = useState("");
+  const [actionLoading, setActionLoading] = useState(false);
   
   const token = useAuthStore((state) => state.token);
 
@@ -119,6 +126,97 @@ export default function AssetsPage() {
       console.error(e);
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleReassignAsset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedAsset || !token) return;
+    setActionLoading(true);
+    try {
+      const isPool = newAssigneeId === "";
+      const res = await fetch(`${API_BASE_URL}/assets/${selectedAsset.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          assigned_to: isPool ? null : newAssigneeId,
+          status: isPool ? 'AVAILABLE' : 'IN_USE'
+        })
+      });
+      if (res.ok) {
+        toast.success(`Asset reassigned successfully!`);
+        setReassignOpen(false);
+        fetchData();
+      } else {
+        toast.error("Failed to reassign asset.");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Error reassigning asset.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleScheduleMaintenance = async () => {
+    if (!selectedAsset || !token) return;
+    setActionLoading(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/assets/${selectedAsset.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          status: 'MAINTENANCE',
+          assigned_to: null
+        })
+      });
+      if (res.ok) {
+        toast.success(`Asset marked under maintenance.`);
+        setMaintenanceOpen(false);
+        fetchData();
+      } else {
+        toast.error("Failed to schedule maintenance.");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Error scheduling maintenance.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleReportMissing = async () => {
+    if (!selectedAsset || !token) return;
+    setActionLoading(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/assets/${selectedAsset.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          status: 'RETIRED'
+        })
+      });
+      if (res.ok) {
+        toast.success(`Asset reported as missing/retired.`);
+        setMissingOpen(false);
+        fetchData();
+      } else {
+        toast.error("Failed to report missing.");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Error reporting missing.");
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -277,13 +375,32 @@ export default function AssetsPage() {
                              <MoreVertical className="w-4 h-4" />
                         </DropdownMenuTrigger>
                         <DropdownMenuContent className="bg-card border-border text-foreground min-w-[180px] shadow-2xl rounded-xl p-2">
-                          <DropdownMenuItem className="hover:bg-accent/10 cursor-pointer flex items-center gap-3 py-3 rounded-xl font-bold text-sm">
+                          <DropdownMenuItem 
+                            onClick={() => {
+                              setSelectedAsset(asset);
+                              setNewAssigneeId(asset.assigned_to || "");
+                              setReassignOpen(true);
+                            }}
+                            className="hover:bg-accent/10 cursor-pointer flex items-center gap-3 py-3 rounded-xl font-bold text-sm"
+                          >
                             <ArrowRightLeft className="w-4 h-4 text-muted-foreground" /> Reassign Asset
                           </DropdownMenuItem>
-                          <DropdownMenuItem className="hover:bg-accent/10 cursor-pointer flex items-center gap-3 py-3 rounded-xl font-bold text-sm">
+                          <DropdownMenuItem 
+                            onClick={() => {
+                              setSelectedAsset(asset);
+                              setMaintenanceOpen(true);
+                            }}
+                            className="hover:bg-accent/10 cursor-pointer flex items-center gap-3 py-3 rounded-xl font-bold text-sm"
+                          >
                             <Wrench className="w-4 h-4 text-muted-foreground" /> Schedule Maintenance
                           </DropdownMenuItem>
-                          <DropdownMenuItem className="hover:bg-rose-500/10 text-rose-600 dark:text-rose-400 cursor-pointer flex items-center gap-3 py-3 rounded-xl font-bold text-sm mt-1 border-t border-border">
+                          <DropdownMenuItem 
+                            onClick={() => {
+                              setSelectedAsset(asset);
+                              setMissingOpen(true);
+                            }}
+                            className="hover:bg-rose-500/10 text-rose-600 dark:text-rose-400 cursor-pointer flex items-center gap-3 py-3 rounded-xl font-bold text-sm mt-1 border-t border-border"
+                          >
                             <AlertCircle className="w-4 h-4" /> Report Missing
                           </DropdownMenuItem>
                         </DropdownMenuContent>
@@ -296,6 +413,96 @@ export default function AssetsPage() {
           </table>
         </div>
       </div>
+
+      {/* Reassign Dialog */}
+      <Dialog open={reassignOpen} onOpenChange={setReassignOpen}>
+        <DialogContent className="sm:max-w-[480px] bg-card border-border text-foreground rounded-[2rem] p-6 z-[9999] transform-gpu isolate">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold flex items-center gap-2">
+              <ArrowRightLeft className="w-5 h-5 text-indigo-500" /> Reassign Asset
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground">
+              Change personnel assignment for <strong className="text-foreground">{selectedAsset?.name}</strong> ({selectedAsset?.asset_tag}).
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleReassignAsset} className="space-y-6 mt-4">
+            <div className="space-y-2">
+              <Label>Select Personnel</Label>
+              <select 
+                value={newAssigneeId} 
+                onChange={(e) => setNewAssigneeId(e.target.value)} 
+                className="w-full bg-background border border-border rounded-md h-12 px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+              >
+                <option value="">Return to Central Pool (Available)</option>
+                {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+              </select>
+            </div>
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button type="button" variant="ghost" onClick={() => setReassignOpen(false)} className="rounded-xl font-bold border-0">
+                Cancel
+              </Button>
+              <Button type="submit" disabled={actionLoading} className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl px-6 border-0 shadow-lg shadow-indigo-500/20">
+                {actionLoading ? "Updating..." : "Confirm Reassignment"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Schedule Maintenance Dialog */}
+      <Dialog open={maintenanceOpen} onOpenChange={setMaintenanceOpen}>
+        <DialogContent className="sm:max-w-[480px] bg-card border-border text-foreground rounded-[2rem] p-6 z-[9999] transform-gpu isolate">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold flex items-center gap-2">
+              <Wrench className="w-5 h-5 text-amber-500" /> Schedule Maintenance
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground">
+              Are you sure you want to schedule maintenance for <strong className="text-foreground">{selectedAsset?.name}</strong>?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4 text-sm text-muted-foreground">
+            <p>This action will:</p>
+            <ul className="list-disc pl-5 space-y-1">
+              <li>Set status to <span className="text-amber-500 font-bold">MAINTENANCE</span>.</li>
+              <li>Revoke current personnel assignment and return to Central Pool.</li>
+            </ul>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button type="button" variant="ghost" onClick={() => setMaintenanceOpen(false)} className="rounded-xl font-bold border-0">
+              Cancel
+            </Button>
+            <Button type="button" onClick={handleScheduleMaintenance} disabled={actionLoading} className="bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl px-6 border-0 shadow-lg shadow-amber-500/20">
+              {actionLoading ? "Scheduling..." : "Proceed with Maintenance"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Report Missing Dialog */}
+      <Dialog open={missingOpen} onOpenChange={setMissingOpen}>
+        <DialogContent className="sm:max-w-[480px] bg-card border-border text-foreground rounded-[2rem] p-6 z-[9999] transform-gpu isolate">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold flex items-center gap-2 text-rose-500">
+              <AlertCircle className="w-5 h-5" /> Report Missing / Retired
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground">
+              Are you sure you want to flag <strong className="text-foreground">{selectedAsset?.name}</strong> as missing?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4 text-sm text-muted-foreground">
+            <p className="text-rose-500 font-medium">Warning: This action is an administrative lock.</p>
+            <p>The asset's status will be changed to <span className="text-rose-500 font-bold">RETIRED</span> to reflect that it is no longer active in inventory.</p>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button type="button" variant="ghost" onClick={() => setMissingOpen(false)} className="rounded-xl font-bold border-0">
+              Cancel
+            </Button>
+            <Button type="button" onClick={handleReportMissing} disabled={actionLoading} className="bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl px-6 border-0 shadow-lg shadow-rose-500/20">
+              {actionLoading ? "Reporting..." : "Report Missing"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

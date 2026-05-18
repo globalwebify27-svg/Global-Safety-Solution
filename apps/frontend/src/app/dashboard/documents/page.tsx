@@ -160,6 +160,16 @@ export default function DocumentVaultPage() {
     }
   };
 
+  const handleDownload = (fileUrl: string, name: string) => {
+    const a = window.document.createElement('a');
+    a.href = fileUrl;
+    a.download = name;
+    a.target = '_blank';
+    window.document.body.appendChild(a);
+    a.click();
+    window.document.body.removeChild(a);
+  };
+
   const formatSize = (bytes: number) => {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
@@ -375,21 +385,21 @@ export default function DocumentVaultPage() {
                       <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-blue-600 dark:hover:text-blue-400 hover:bg-accent/10 rounded-xl" onClick={() => window.open(doc.file_url, '_blank')}>
                         <Eye className="w-4 h-4" />
                       </Button>
-                      <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-accent/10 rounded-xl">
+                      <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-accent/10 rounded-xl" onClick={() => handleDownload(doc.file_url, doc.name)}>
                         <Download className="w-4 h-4" />
                       </Button>
                       <DropdownMenu>
-                        <DropdownMenuTrigger render={<Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-foreground hover:bg-accent/10 rounded-xl" />}>
-                             <MoreVertical className="w-4 h-4" />
+                        <DropdownMenuTrigger className="inline-flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent/10 rounded-xl border-0 h-9 w-9 p-0 focus:outline-none cursor-pointer">
+                          <MoreVertical className="w-4 h-4" />
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent className="bg-card border-border text-foreground min-w-[200px] shadow-2xl rounded-2xl p-2">
+                        <DropdownMenuContent align="end" className="bg-card border border-border text-foreground min-w-[200px] shadow-2xl rounded-2xl p-2 z-[9999] transform-gpu isolate">
                           <DropdownMenuItem className="hover:bg-accent/10 cursor-pointer flex items-center gap-3 py-3 rounded-xl font-bold text-sm">
                             <History className="w-4 h-4 text-muted-foreground" /> Version History
                           </DropdownMenuItem>
                           <DropdownMenuItem className="hover:bg-accent/10 cursor-pointer flex items-center gap-3 py-3 rounded-xl font-bold text-sm">
                             <ShieldCheck className="w-4 h-4 text-muted-foreground" /> Security Audit
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleDelete(doc.id)} className="hover:bg-rose-500/10 text-rose-600 dark:text-rose-400 cursor-pointer flex items-center gap-3 py-3 rounded-xl font-bold text-sm mt-1 border-t border-border">
+                          <DropdownMenuItem onClick={() => handleDelete(doc.id)} className="hover:bg-rose-500/10 text-rose-600 dark:text-rose-400 cursor-pointer flex items-center gap-3 py-3 rounded-xl font-bold text-sm mt-1 border-t border-border/50 pt-2">
                             <Trash2 className="w-4 h-4" /> Revoke Access
                           </DropdownMenuItem>
                         </DropdownMenuContent>

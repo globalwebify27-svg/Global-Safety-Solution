@@ -11,10 +11,10 @@ export class RolesGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const requiredRoles = this.reflector.getAllAndOverride<string[]>(ROLES_KEY, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
+    const requiredRoles = this.reflector.getAllAndOverride<string[]>(
+      ROLES_KEY,
+      [context.getHandler(), context.getClass()],
+    );
     if (!requiredRoles) {
       return true;
     }
@@ -22,7 +22,9 @@ export class RolesGuard implements CanActivate {
     const userPayload = request.user;
     if (!userPayload) return false;
 
-    const populatedUser = await this.usersService.findByEmail(userPayload.email);
+    const populatedUser = await this.usersService.findByEmail(
+      userPayload.email,
+    );
     if (!populatedUser) return false;
 
     // Super admin bypass

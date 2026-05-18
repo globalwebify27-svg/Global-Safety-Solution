@@ -1,6 +1,9 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateWorkOrderDto, UpdateWorkOrderDto } from './dto/create-work-order.dto';
+import {
+  CreateWorkOrderDto,
+  UpdateWorkOrderDto,
+} from './dto/create-work-order.dto';
 
 @Injectable()
 export class WorkOrdersService {
@@ -40,12 +43,12 @@ export class WorkOrdersService {
         service_product: {
           include: {
             checklist: true,
-          }
+          },
         },
         inspections: {
           include: {
             items: true,
-          }
+          },
         },
       },
     });

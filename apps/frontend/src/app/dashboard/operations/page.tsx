@@ -20,12 +20,15 @@ import {
   MoreVertical,
   ChevronDown,
   ChevronUp,
-  Briefcase
+  Briefcase,
+  Trash2
 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 
 interface Task {
   id: string;
@@ -177,6 +180,67 @@ export default function OperationsPage() {
 
   const toggleProject = (id: string) => {
     setExpandedProjects(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const handleCompleteProject = async (projId: string) => {
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/projects/${projId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ status: 'COMPLETED' })
+      });
+      if (res.ok) {
+        toast.success("Project marked as completed!");
+        fetchData();
+      } else {
+        toast.error("Failed to update project status.");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Error updating project.");
+    }
+  };
+
+  const handleDeleteProject = async (projId: string) => {
+    if (!token) return;
+    if (!confirm("Are you sure you want to delete this project and all its tasks?")) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/projects/${projId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        toast.success("Project deleted successfully.");
+        fetchData();
+      } else {
+        toast.error("Failed to delete project.");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Error deleting project.");
+    }
+  };
+
+  const handleToggleTaskStatus = async (taskId: string, currentStatus: string) => {
+    if (!token) return;
+    const nextStatus = currentStatus === 'DONE' ? 'TODO' : 'DONE';
+    try {
+      const res = await fetch(`${API_BASE_URL}/tasks/${taskId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ status: nextStatus })
+      });
+      if (res.ok) {
+        toast.success(`Task marked as ${nextStatus === 'DONE' ? 'completed' : 'pending'}!`);
+        fetchData();
+      } else {
+        toast.error("Failed to update task status.");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Error updating task.");
+    }
   };
 
   return (
@@ -399,9 +463,27 @@ export default function OperationsPage() {
                             </form>
                           </DialogContent>
                         </Dialog>
-                        <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground hover:bg-accent/10 rounded-xl border-0">
-                          <MoreVertical className="w-5 h-5" />
-                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger className="inline-flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent/10 rounded-xl border-0 h-10 w-10 p-0 focus:outline-none cursor-pointer">
+                            <MoreVertical className="w-5 h-5" />
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="bg-card border border-border text-foreground min-w-[160px] shadow-2xl rounded-2xl p-2 z-[9999] transform-gpu isolate">
+                            {proj.status !== 'COMPLETED' && (
+                              <DropdownMenuItem 
+                                onClick={() => handleCompleteProject(proj.id)} 
+                                className="hover:bg-accent/10 cursor-pointer flex items-center gap-3 py-2.5 px-3 rounded-xl font-bold text-xs"
+                              >
+                                <CheckCircle2 className="w-4 h-4 text-emerald-500" /> Complete Project
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuItem 
+                              onClick={() => handleDeleteProject(proj.id)} 
+                              className="hover:bg-rose-500/10 text-rose-600 dark:text-rose-400 cursor-pointer flex items-center gap-3 py-2.5 px-3 rounded-xl font-bold text-xs mt-1 border-t border-border/50 pt-2"
+                            >
+                              <Trash2 className="w-4 h-4 text-rose-500" /> Delete Project
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </div>
                   </div>
@@ -444,7 +526,14 @@ export default function OperationsPage() {
                                   )}>
                                     {task.status}
                                   </span>
-                                  <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-500/10 rounded-xl transition-all active:scale-90 border-0">
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    onClick={() => handleToggleTaskStatus(task.id, task.status)}
+                                    className={cn("h-9 w-9 rounded-xl transition-all active:scale-90 border-0", 
+                                      task.status === 'DONE' ? 'text-emerald-500 hover:text-muted-foreground' : 'text-muted-foreground hover:text-emerald-500'
+                                    )}
+                                  >
                                     <CheckCircle2 className="w-4 h-4" />
                                   </Button>
                                 </div>

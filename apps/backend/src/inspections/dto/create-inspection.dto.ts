@@ -1,4 +1,13 @@
-import { IsString, IsUUID, IsDateString, IsOptional, IsDecimal, IsArray, ValidateNested, IsEnum } from 'class-validator';
+import {
+  IsString,
+  IsUUID,
+  IsDateString,
+  IsOptional,
+  IsNumber,
+  IsArray,
+  ValidateNested,
+  IsEnum,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 export enum InspectionStatus {
@@ -45,11 +54,11 @@ export class UpdateInspectionDto {
   status?: InspectionStatus;
 
   @IsOptional()
-  @IsDecimal()
+  @IsNumber()
   lat?: number;
 
   @IsOptional()
-  @IsDecimal()
+  @IsNumber()
   lng?: number;
 
   @IsOptional()

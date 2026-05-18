@@ -1,6 +1,19 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+  Query,
+} from '@nestjs/common';
 import { WorkOrdersService } from './work-orders.service';
-import { CreateWorkOrderDto, UpdateWorkOrderDto } from './dto/create-work-order.dto';
+import {
+  CreateWorkOrderDto,
+  UpdateWorkOrderDto,
+} from './dto/create-work-order.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @Controller('work-orders')
@@ -24,7 +37,10 @@ export class WorkOrdersController {
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateWorkOrderDto: UpdateWorkOrderDto) {
+  update(
+    @Param('id') id: string,
+    @Body() updateWorkOrderDto: UpdateWorkOrderDto,
+  ) {
     return this.workOrdersService.update(id, updateWorkOrderDto);
   }
 

@@ -5,7 +5,13 @@ import { PrismaService } from '../prisma/prisma.service';
 export class NotificationsService {
   constructor(private prisma: PrismaService) {}
 
-  async create(data: { user_id: string; title: string; message: string; type?: string; link?: string }) {
+  async create(data: {
+    user_id: string;
+    title: string;
+    message: string;
+    type?: string;
+    link?: string;
+  }) {
     return this.prisma.notification.create({
       data: {
         ...data,
@@ -41,7 +47,12 @@ export class NotificationsService {
   }
 
   // Helper for broadcast to all admins
-  async notifyAdmins(title: string, message: string, type: string = 'INFO', link?: string) {
+  async notifyAdmins(
+    title: string,
+    message: string,
+    type: string = 'INFO',
+    link?: string,
+  ) {
     const admins = await this.prisma.user.findMany({
       // For now, let's notify the superadmin or anyone with high privilege
       // Assuming email admin@globalsafety.com is the main admin
@@ -59,7 +70,13 @@ export class NotificationsService {
     }
   }
 
-  async notifyUser(user_id: string, title: string, message: string, type: string = 'INFO', link?: string) {
+  async notifyUser(
+    user_id: string,
+    title: string,
+    message: string,
+    type: string = 'INFO',
+    link?: string,
+  ) {
     return this.create({
       user_id,
       title,

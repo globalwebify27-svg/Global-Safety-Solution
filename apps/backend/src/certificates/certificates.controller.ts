@@ -1,6 +1,18 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+} from '@nestjs/common';
 import { CertificatesService } from './certificates.service';
-import { CreateCertificateDto, UpdateCertificateDto } from './dto/create-certificate.dto';
+import {
+  CreateCertificateDto,
+  UpdateCertificateDto,
+} from './dto/create-certificate.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @Controller('certificates')
@@ -24,7 +36,10 @@ export class CertificatesController {
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateCertificateDto: UpdateCertificateDto) {
+  update(
+    @Param('id') id: string,
+    @Body() updateCertificateDto: UpdateCertificateDto,
+  ) {
     return this.certificatesService.update(id, updateCertificateDto);
   }
 

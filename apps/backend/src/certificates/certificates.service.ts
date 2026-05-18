@@ -1,6 +1,9 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateCertificateDto, UpdateCertificateDto } from './dto/create-certificate.dto';
+import {
+  CreateCertificateDto,
+  UpdateCertificateDto,
+} from './dto/create-certificate.dto';
 
 @Injectable()
 export class CertificatesService {
@@ -9,7 +12,7 @@ export class CertificatesService {
   async create(createCertificateDto: CreateCertificateDto) {
     const { issue_date, validity_period, ...rest } = createCertificateDto;
     const issueDate = new Date(issue_date);
-    let expiryDate = new Date(issue_date);
+    const expiryDate = new Date(issue_date);
 
     if (validity_period === '1y') {
       expiryDate.setFullYear(expiryDate.getFullYear() + 1);
@@ -34,7 +37,7 @@ export class CertificatesService {
           include: {
             client: true,
             work_order: true,
-          }
+          },
         },
       },
     });
@@ -47,7 +50,7 @@ export class CertificatesService {
           include: {
             client: true,
             work_order: true,
-          }
+          },
         },
       },
       orderBy: {
@@ -65,7 +68,7 @@ export class CertificatesService {
             client: true,
             work_order: true,
             items: true,
-          }
+          },
         },
       },
     });
@@ -94,7 +97,7 @@ export class CertificatesService {
   async findExpiring(days: number) {
     const targetDate = new Date();
     targetDate.setDate(targetDate.getDate() + days);
-    
+
     // We want certificates where expiry_date is exactly targetDate (approx)
     const startOfDay = new Date(targetDate.setHours(0, 0, 0, 0));
     const endOfDay = new Date(targetDate.setHours(23, 59, 59, 999));
@@ -111,7 +114,7 @@ export class CertificatesService {
         inspection: {
           include: {
             client: true,
-          }
+          },
         },
       },
     });

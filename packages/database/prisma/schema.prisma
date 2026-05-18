@@ -394,7 +394,7 @@ model Quotation {
   lead_id      String?     @db.VarChar(36)
   client_id    String?     @db.VarChar(36)
   quote_number String      @unique @db.VarChar(50)
-  date         DateTime    @default(now()) @db.Date
+  date         DateTime    @default(now()) @db.DateTime(6)
   valid_until  DateTime?   @db.Date
   subtotal     Decimal     @default(0) @db.Decimal(15, 2)
   total_amount Decimal     @default(0) @db.Decimal(15, 2)
@@ -432,7 +432,7 @@ model Invoice {
   client_id      String        @db.VarChar(36)
   quotation_id   String?       @unique @db.VarChar(36)
   invoice_number String        @unique @db.VarChar(50)
-  date           DateTime      @default(now()) @db.Date
+  date           DateTime      @default(now()) @db.DateTime(6)
   due_date       DateTime?     @db.Date
   subtotal       Decimal       @db.Decimal(15, 2)
   tax_amount     Decimal       @default(0) @db.Decimal(15, 2)
@@ -468,7 +468,7 @@ model Payment {
   id             String   @id @default(uuid()) @db.VarChar(36)
   invoice_id     String   @db.VarChar(36)
   amount         Decimal  @db.Decimal(15, 2)
-  payment_date   DateTime @default(now()) @db.Date
+  payment_date   DateTime @default(now()) @db.DateTime(6)
   payment_method String   @db.VarChar(50)
   transaction_id String?  @db.VarChar(100)
   status         String   @default("COMPLETED") @db.VarChar(50)
@@ -571,7 +571,7 @@ model Inspection {
   status         String           @default("SCHEDULED") @db.VarChar(50)
   lat            Decimal?         @db.Decimal(10, 8)
   lng            Decimal?         @db.Decimal(11, 8)
-  remarks        String?
+  remarks        String?          @db.Text
   created_at     DateTime         @default(now()) @db.DateTime(6)
   updated_at     DateTime         @updatedAt @db.DateTime(6)
   items          InspectionItem[]
@@ -621,7 +621,7 @@ model Expense {
   description     String
   amount          Decimal   @db.Decimal(15, 2)
   category        String    @db.VarChar(100)
-  date            DateTime  @default(now()) @db.Date
+  date            DateTime  @default(now()) @db.DateTime(6)
   status          String    @default("PENDING") @db.VarChar(50)
   vendor_id       String?   @db.VarChar(36)
   user_id         String    @db.VarChar(36)
@@ -642,7 +642,7 @@ model VendorPayment {
   vendor_id      String   @db.VarChar(36)
   expense_id     String?  @db.VarChar(36)
   amount         Decimal  @db.Decimal(15, 2)
-  payment_date   DateTime @default(now()) @db.Date
+  payment_date   DateTime @default(now()) @db.DateTime(6)
   payment_method String   @db.VarChar(50)
   transaction_id String?  @db.VarChar(100)
   notes          String?

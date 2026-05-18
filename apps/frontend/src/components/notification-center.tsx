@@ -97,7 +97,7 @@ export function NotificationCenter() {
           </span>
         )}
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-80 sm:w-96 bg-card/95 border-border backdrop-blur-xl shadow-2xl rounded-2xl p-2 z-[100]">
+      <DropdownMenuContent align="end" className="w-80 sm:w-96 bg-card/95 border-border backdrop-blur-xl shadow-2xl rounded-2xl p-2 z-[9999] transform-gpu isolate">
         <div className="flex items-center justify-between px-4 py-3">
           <DropdownMenuLabel className="p-0 text-base font-black tracking-tight">System Alerts</DropdownMenuLabel>
           {unreadCount > 0 && (

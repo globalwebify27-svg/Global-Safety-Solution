@@ -54,6 +54,11 @@ export default function LeadsPage() {
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const token = useAuthStore((state) => state.token);
+  
+  const [openEmailModal, setOpenEmailModal] = useState(false);
+  const [emailSubject, setEmailSubject] = useState("");
+  const [emailMessage, setEmailMessage] = useState("");
+  const [selectedLeadForEmail, setSelectedLeadForEmail] = useState<Lead | null>(null);
 
   const [formData, setFormData] = useState({
     company_name: "",
@@ -135,6 +140,63 @@ export default function LeadsPage() {
         fetchLeads();
       } else {
         toast.error("Conversion failed.");
+      }
+    } catch (e) {
+      toast.error("Network error.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleSendEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!token || !selectedLeadForEmail) return;
+    setSubmitting(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/leads/${selectedLeadForEmail.id}/email`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          subject: emailSubject,
+          message: emailMessage
+        })
+      });
+      if (res.ok) {
+        toast.success("Email sent successfully!");
+        setOpenEmailModal(false);
+        setEmailSubject("");
+        setEmailMessage("");
+      } else {
+        const err = await res.json();
+        toast.error(err.message || "Failed to send email.");
+      }
+    } catch (e) {
+      toast.error("Failed to connect to email server.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleMarkAsLost = async (id: string) => {
+    if (!token) return;
+    setSubmitting(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/leads/${id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ status: 'LOST' })
+      });
+      if (res.ok) {
+        toast.success("Lead marked as LOST successfully.");
+        fetchLeads();
+      } else {
+        toast.error("Failed to update status.");
       }
     } catch (e) {
       toast.error("Network error.");
@@ -392,7 +454,15 @@ export default function LeadsPage() {
                           <MoreVertical className="w-4 h-4" />
                         </DropdownMenuTrigger>
                         <DropdownMenuContent className="bg-card border-border text-foreground min-w-[180px] rounded-2xl shadow-2xl p-2">
-                          <DropdownMenuItem className="hover:bg-accent/10 cursor-pointer flex items-center gap-3 py-3 rounded-xl font-bold text-sm">
+                          <DropdownMenuItem 
+                            onClick={() => {
+                              setSelectedLeadForEmail(lead);
+                              setEmailSubject(`Regarding safety compliance at ${lead.company_name}`);
+                              setEmailMessage(`Dear ${lead.contact_person},\n\nWe wanted to follow up on your recent request for safety compliance solutions...\n\nBest regards,\nGlobal Safety Solution`);
+                              setOpenEmailModal(true);
+                            }}
+                            className="hover:bg-accent/10 cursor-pointer flex items-center gap-3 py-3 rounded-xl font-bold text-sm"
+                          >
                             <Mail className="w-4 h-4 text-muted-foreground" /> Send Email
                           </DropdownMenuItem>
                           <DropdownMenuItem 
@@ -410,9 +480,15 @@ export default function LeadsPage() {
                               <CheckCircle2 className="w-4 h-4" /> Convert to Client
                             </DropdownMenuItem>
                           )}
-                          <DropdownMenuItem className="hover:bg-destructive/10 text-destructive cursor-pointer flex items-center gap-3 py-3 rounded-xl font-bold text-sm mt-1 border-t border-border">
-                            <XCircle className="w-4 h-4" /> Mark as Lost
-                          </DropdownMenuItem>
+                          
+                          {lead.status !== 'WON' && lead.status !== 'LOST' && (
+                            <DropdownMenuItem 
+                              onClick={() => handleMarkAsLost(lead.id)}
+                              className="hover:bg-destructive/10 text-destructive cursor-pointer flex items-center gap-3 py-3 rounded-xl font-bold text-sm mt-1 border-t border-border"
+                            >
+                              <XCircle className="w-4 h-4" /> Mark as Lost
+                            </DropdownMenuItem>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
@@ -423,6 +499,46 @@ export default function LeadsPage() {
           </table>
         </div>
       </div>
+      
+      <Dialog open={openEmailModal} onOpenChange={setOpenEmailModal}>
+        <DialogContent className="sm:max-w-[550px] bg-card border-border text-foreground rounded-[2rem]">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold flex items-center gap-3">
+              <Mail className="w-6 h-6 text-indigo-500" /> Send Email to {selectedLeadForEmail?.contact_person}
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground">
+              Direct message to {selectedLeadForEmail?.email || "N/A"} ({selectedLeadForEmail?.company_name}).
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSendEmail} className="space-y-5 mt-4">
+            <div className="space-y-2">
+              <Label>Subject</Label>
+              <Input 
+                value={emailSubject}
+                onChange={(e) => setEmailSubject(e.target.value)}
+                placeholder="Email Subject"
+                className="bg-background border-border h-11 rounded-xl"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Message</Label>
+              <textarea 
+                className="w-full bg-background border border-border rounded-xl p-3 text-sm min-h-[180px] focus:ring-2 focus:ring-indigo-500 text-foreground"
+                value={emailMessage}
+                onChange={(e) => setEmailMessage(e.target.value)}
+                placeholder="Type your email body here..."
+                required
+              />
+            </div>
+            <DialogFooter>
+              <Button type="submit" disabled={submitting} className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold w-full h-12 shadow-xl shadow-indigo-500/20 rounded-xl mt-2 border-0">
+                {submitting ? "Sending..." : "Dispatch Email"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
 
   );

@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Put, Body, Param, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { HRService } from './hr.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
@@ -18,10 +27,13 @@ export class HRController {
   }
 
   @Get('payroll')
-  getPayrollHistory(@Query('month') month?: string, @Query('year') year?: string) {
+  getPayrollHistory(
+    @Query('month') month?: string,
+    @Query('year') year?: string,
+  ) {
     return this.hrService.getPayrollHistory(
       month ? parseInt(month) : undefined,
-      year ? parseInt(year) : undefined
+      year ? parseInt(year) : undefined,
     );
   }
 
@@ -31,7 +43,10 @@ export class HRController {
   }
 
   @Put('payroll/:id/status')
-  updateStatus(@Param('id') id: string, @Body() data: { status: string; paid_at?: string }) {
+  updateStatus(
+    @Param('id') id: string,
+    @Body() data: { status: string; paid_at?: string },
+  ) {
     return this.hrService.updatePayrollStatus(id, data.status, data.paid_at);
   }
 }

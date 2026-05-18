@@ -160,20 +160,22 @@ export class DashboardService {
 
   async getSystemStatus() {
     const uptime = process.uptime();
-    const dbStatus = await this.prisma.$queryRaw`SELECT 1`.then(() => 'Connected').catch(() => 'Disconnected');
+    const dbStatus = await this.prisma.$queryRaw`SELECT 1`
+      .then(() => 'Connected')
+      .catch(() => 'Disconnected');
     const memoryUsage = process.memoryUsage().heapUsed / 1024 / 1024; // MB
-    
+
     // Get critical counts
     const criticalCompliance = await this.prisma.compliance.count({
-      where: { status: 'EXPIRED' }
+      where: { status: 'EXPIRED' },
     });
-    
+
     const unpaidInvoices = await this.prisma.invoice.count({
-      where: { status: 'UNPAID' }
+      where: { status: 'UNPAID' },
     });
 
     const pendingInspections = await this.prisma.inspection.count({
-      where: { status: 'SCHEDULED' }
+      where: { status: 'SCHEDULED' },
     });
 
     return {
@@ -181,18 +183,18 @@ export class DashboardService {
         status: 'Operational',
         uptime: `${Math.floor(uptime / 3600)}h ${Math.floor((uptime % 3600) / 60)}m`,
         latency: '24ms',
-        memory: `${memoryUsage.toFixed(1)} MB`
+        memory: `${memoryUsage.toFixed(1)} MB`,
       },
       database: {
         status: dbStatus,
         connections: 'Active',
-        latency: '8ms'
+        latency: '8ms',
       },
       criticals: {
         expiredCompliance: criticalCompliance,
         unpaidInvoices,
-        pendingInspections
-      }
+        pendingInspections,
+      },
     };
   }
 }

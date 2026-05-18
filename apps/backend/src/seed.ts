@@ -11,7 +11,7 @@ async function bootstrap() {
   const prisma = app.get(PrismaService);
 
   console.log('Seeding database...');
-  
+
   // 1. Create Super Admin User
   const admin = await usersService.createSuperAdmin();
   console.log('Super Admin user ensured.');

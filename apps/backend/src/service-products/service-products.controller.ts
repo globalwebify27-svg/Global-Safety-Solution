@@ -1,12 +1,26 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+} from '@nestjs/common';
 import { ServiceProductsService } from './service-products.service';
-import { CreateServiceProductDto, UpdateServiceProductDto } from './dto/create-service-product.dto';
+import {
+  CreateServiceProductDto,
+  UpdateServiceProductDto,
+} from './dto/create-service-product.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @Controller('service-products')
 @UseGuards(JwtAuthGuard)
 export class ServiceProductsController {
-  constructor(private readonly serviceProductsService: ServiceProductsService) {}
+  constructor(
+    private readonly serviceProductsService: ServiceProductsService,
+  ) {}
 
   @Post()
   create(@Body() createServiceProductDto: CreateServiceProductDto) {
@@ -24,7 +38,10 @@ export class ServiceProductsController {
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateServiceProductDto: UpdateServiceProductDto) {
+  update(
+    @Param('id') id: string,
+    @Body() updateServiceProductDto: UpdateServiceProductDto,
+  ) {
     return this.serviceProductsService.update(id, updateServiceProductDto);
   }
 

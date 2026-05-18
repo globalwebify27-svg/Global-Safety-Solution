@@ -47,6 +47,8 @@ interface Quotation {
   total_amount: number;
   status: string;
   date: string;
+  lead_id?: string;
+  client_id?: string;
   lead?: { company_name: string };
   client?: { name: string };
 }

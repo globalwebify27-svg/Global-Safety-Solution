@@ -6,7 +6,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 export class InventoryService {
   constructor(
     private readonly prisma: PrismaService,
-    private notificationsService: NotificationsService
+    private notificationsService: NotificationsService,
   ) {}
 
   async findAll() {
@@ -97,7 +97,7 @@ export class InventoryService {
           'Low Stock Alert',
           `Inventory item "${updatedItem.name}" has reached a critical level (${updatedItem.current_stock} ${updatedItem.unit}).`,
           'WARNING',
-          `/dashboard/inventory`
+          `/dashboard/inventory`,
         );
       }
 
