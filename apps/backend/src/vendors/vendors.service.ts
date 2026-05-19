@@ -9,10 +9,10 @@ export class VendorsService {
     return this.prisma.vendor.findMany({
       include: {
         _count: {
-          select: { expenses: true }
-        }
+          select: { expenses: true },
+        },
       },
-      orderBy: { name: 'asc' }
+      orderBy: { name: 'asc' },
     });
   }
 
@@ -21,8 +21,8 @@ export class VendorsService {
       where: { id },
       include: {
         expenses: true,
-        vendor_payments: true
-      }
+        vendor_payments: true,
+      },
     });
     if (!vendor) throw new NotFoundException('Vendor not found');
     return vendor;
@@ -30,20 +30,20 @@ export class VendorsService {
 
   async create(data: any) {
     return this.prisma.vendor.create({
-      data
+      data,
     });
   }
 
   async update(id: string, data: any) {
     return this.prisma.vendor.update({
       where: { id },
-      data
+      data,
     });
   }
 
   async remove(id: string) {
     return this.prisma.vendor.delete({
-      where: { id }
+      where: { id },
     });
   }
 }

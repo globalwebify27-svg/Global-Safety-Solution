@@ -17,10 +17,17 @@ export class MailService {
     });
   }
 
-  async sendMail(to: string, subject: string, text: string, attachments?: any[]) {
+  async sendMail(
+    to: string,
+    subject: string,
+    text: string,
+    attachments?: any[],
+  ) {
     try {
       if (!process.env.SMTP_USER) {
-        this.logger.warn(`SMTP not configured. Email to ${to} would have been: ${subject}`);
+        this.logger.warn(
+          `SMTP not configured. Email to ${to} would have been: ${subject}`,
+        );
         return;
       }
 
@@ -37,10 +44,15 @@ export class MailService {
     }
   }
 
-  async sendInvoice(to: string, clientName: string, invoiceId: string, pdfBuffer: Buffer) {
+  async sendInvoice(
+    to: string,
+    clientName: string,
+    invoiceId: string,
+    pdfBuffer: Buffer,
+  ) {
     const subject = `Invoice for Safety Services - ${invoiceId}`;
     const text = `Dear ${clientName},\n\nPlease find attached the invoice for our services. Thank you for choosing Global Safety Solution.`;
-    
+
     await this.sendMail(to, subject, text, [
       {
         filename: `invoice-${invoiceId.substring(0, 8)}.pdf`,
@@ -49,10 +61,15 @@ export class MailService {
     ]);
   }
 
-  async sendCertificate(to: string, clientName: string, id: string, pdfBuffer: Buffer) {
+  async sendCertificate(
+    to: string,
+    clientName: string,
+    id: string,
+    pdfBuffer: Buffer,
+  ) {
     const subject = `Safety Compliance Certificate - ${id.substring(0, 8)}`;
     const text = `Dear ${clientName},\n\nWe are pleased to inform you that your site inspection is complete. Please find your Safety Compliance Certificate attached.\n\nStay Safe!`;
-    
+
     await this.sendMail(to, subject, text, [
       {
         filename: `safety-certificate-${id.substring(0, 8)}.pdf`,

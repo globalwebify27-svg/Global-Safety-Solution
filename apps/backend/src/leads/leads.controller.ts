@@ -39,4 +39,13 @@ export class LeadsController {
   convertToClient(@Param('id') id: string) {
     return this.leadsService.convertToClient(id);
   }
+
+  @Post(':id/email')
+  sendEmail(
+    @Param('id') id: string,
+    @Body('subject') subject: string,
+    @Body('message') message: string,
+  ) {
+    return this.leadsService.sendEmail(id, subject, message);
+  }
 }

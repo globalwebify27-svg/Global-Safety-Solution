@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Request } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+  Request,
+} from '@nestjs/common';
 import { ExpensesService } from './expenses.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -28,9 +38,9 @@ export class ExpensesController {
   @Patch(':id/status')
   @Roles('SUPER_ADMIN', 'HR_MANAGER')
   updateStatus(
-    @Param('id') id: string, 
+    @Param('id') id: string,
     @Body() data: { status: string },
-    @Request() req: any
+    @Request() req: any,
   ) {
     return this.expensesService.updateStatus(id, data.status, req.user.id);
   }

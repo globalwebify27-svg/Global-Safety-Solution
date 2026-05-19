@@ -51,4 +51,8 @@ export class CreateClientDto {
   @IsOptional()
   @IsBoolean()
   is_active?: boolean;
+
+  @IsOptional()
+  @IsString()
+  assigned_staff_id?: string;
 }

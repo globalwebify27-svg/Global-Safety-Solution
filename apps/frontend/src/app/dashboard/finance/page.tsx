@@ -81,7 +81,7 @@ export default function FinancePage() {
   const [invoiceForm, setInvoiceForm] = useState({
     client_id: "",
     due_date: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    items: [{ description: "", quantity: 1, unit_price: 0 }]
+    items: [{ description: "", quantity: 1, unit_price: "" as any }]
   });
 
   const [paymentForm, setPaymentForm] = useState({
@@ -162,7 +162,7 @@ export default function FinancePage() {
     if (!token || !selectedInvoice) return;
 
     try {
-      const totalAmount = invoiceForm.items.reduce((acc, i) => acc + (i.quantity * i.unit_price), 0);
+      const totalAmount = invoiceForm.items.reduce((acc, i) => acc + (Number(i.quantity || 0) * Number(i.unit_price || 0)), 0);
       const res = await fetch(`${API_BASE_URL}/invoices/${selectedInvoice.id}`, {
         method: 'PATCH',
         headers: {
@@ -175,9 +175,9 @@ export default function FinancePage() {
           total_amount: totalAmount,
           items: invoiceForm.items.map(i => ({
             description: i.description,
-            quantity: i.quantity,
-            unit_price: Number(i.unit_price),
-            total: Number(i.quantity) * Number(i.unit_price)
+            quantity: Number(i.quantity || 0),
+            unit_price: Number(i.unit_price || 0),
+            total: Number(i.quantity || 0) * Number(i.unit_price || 0)
           }))
         })
       });
@@ -271,7 +271,20 @@ export default function FinancePage() {
     if (!token) return;
 
     try {
-      const totalAmount = invoiceForm.items.reduce((acc, i) => acc + (i.quantity * i.unit_price), 0);
+      const totalAmount = invoiceForm.items.reduce((acc, i) => acc + (Number(i.quantity || 0) * Number(i.unit_price || 0)), 0);
+
+      // Prevent duplicate/similar invoices
+      const duplicateInvoice = invoices.find(inv => 
+        inv.client_id === invoiceForm.client_id && 
+        Number(inv.total_amount) === totalAmount &&
+        inv.status !== 'VOID'
+      );
+
+      if (duplicateInvoice) {
+        alert(`Duplicate Invoice Found!\n\nA similar invoice (${duplicateInvoice.invoice_number}) for ₹${totalAmount.toLocaleString()} already exists for this client.\n\nTo prevent duplicate billing, this manual invoice cannot be created.`);
+        return;
+      }
+
       const res = await fetch(`${API_BASE_URL}/invoices`, {
         method: 'POST',
         headers: {
@@ -285,9 +298,9 @@ export default function FinancePage() {
           total_amount: totalAmount,
           items: invoiceForm.items.map(i => ({
             description: i.description,
-            quantity: i.quantity,
-            unit_price: i.unit_price,
-            total: i.quantity * i.unit_price
+            quantity: Number(i.quantity || 0),
+            unit_price: Number(i.unit_price || 0),
+            total: Number(i.quantity || 0) * Number(i.unit_price || 0)
           }))
         })
       });
@@ -309,13 +322,17 @@ export default function FinancePage() {
   const addInvoiceItem = () => {
     setInvoiceForm({
       ...invoiceForm,
-      items: [...invoiceForm.items, { description: "", quantity: 1, unit_price: 0 }]
+      items: [...invoiceForm.items, { description: "", quantity: 1, unit_price: "" as any }]
     });
   };
 
   const updateInvoiceItem = (index: number, field: string, value: any) => {
     const newItems = [...invoiceForm.items];
-    (newItems[index] as any)[field] = field === 'description' ? value : Number(value);
+    if (field === 'description') {
+      (newItems[index] as any)[field] = value;
+    } else {
+      (newItems[index] as any)[field] = value === "" ? "" : Number(value);
+    }
     setInvoiceForm({ ...invoiceForm, items: newItems });
   };
 
@@ -759,7 +776,7 @@ export default function FinancePage() {
             <div className="flex justify-end border-t border-border pt-4">
               <div className="text-right">
                 <p className="text-xs font-black uppercase tracking-widest text-muted-foreground">Total Amount</p>
-                <p className="text-2xl font-black text-foreground">₹{invoiceForm.items.reduce((acc, i) => acc + (i.quantity * i.unit_price), 0).toLocaleString()}</p>
+                <p className="text-2xl font-black text-foreground">₹{invoiceForm.items.reduce((acc, i) => acc + (Number(i.quantity || 0) * Number(i.unit_price || 0)), 0).toLocaleString()}</p>
               </div>
             </div>
 
@@ -942,7 +959,7 @@ export default function FinancePage() {
             <div className="flex justify-end border-t border-border pt-4">
               <div className="text-right">
                 <p className="text-xs font-black uppercase tracking-widest text-muted-foreground">Adjusted Total</p>
-                <p className="text-2xl font-black text-foreground">₹{invoiceForm.items.reduce((acc, i) => acc + (i.quantity * i.unit_price), 0).toLocaleString()}</p>
+                <p className="text-2xl font-black text-foreground">₹{invoiceForm.items.reduce((acc, i) => acc + (Number(i.quantity || 0) * Number(i.unit_price || 0)), 0).toLocaleString()}</p>
               </div>
             </div>
 

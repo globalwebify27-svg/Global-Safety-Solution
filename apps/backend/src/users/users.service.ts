@@ -70,7 +70,9 @@ export class UsersService {
         aadhar_number: data.aadhar_number || undefined,
         pf_number: data.pf_number || undefined,
         esi_number: data.esi_number || undefined,
-        base_salary: data.base_salary ? new Prisma.Decimal(data.base_salary) : undefined,
+        base_salary: data.base_salary
+          ? new Prisma.Decimal(data.base_salary)
+          : undefined,
         emergency_contact_name: data.emergency_contact_name || undefined,
         emergency_contact_phone: data.emergency_contact_phone || undefined,
       },
@@ -100,7 +102,9 @@ export class UsersService {
       data: {
         ...data,
         employee_id: employeeId,
-        base_salary: data.base_salary ? new Prisma.Decimal(data.base_salary) : undefined,
+        base_salary: data.base_salary
+          ? new Prisma.Decimal(data.base_salary)
+          : undefined,
         join_date: data.join_date ? new Date(data.join_date) : new Date(),
       },
     });
@@ -129,13 +133,18 @@ export class UsersService {
     // Calculate attendance percentage for current month
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const monthAttendance = user.attendance.filter(a => new Date(a.created_at) >= startOfMonth);
-    
+    const monthAttendance = user.attendance.filter(
+      (a) => new Date(a.created_at) >= startOfMonth,
+    );
+
     return {
       ...user,
       stats: {
         present_days: monthAttendance.length,
-        attendance_rate: ((monthAttendance.length / now.getDate()) * 100).toFixed(1),
+        attendance_rate: (
+          (monthAttendance.length / now.getDate()) *
+          100
+        ).toFixed(1),
         pending_tasks: user.tasks.length,
       },
     };

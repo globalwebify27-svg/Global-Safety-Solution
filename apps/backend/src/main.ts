@@ -24,7 +24,7 @@ async function bootstrap() {
   });
 
   // Serve static assets
-  app.useStaticAssets(join(__dirname, '..', 'public'), {
+  app.useStaticAssets(join(process.cwd(), 'public'), {
     prefix: '/public',
   });
 

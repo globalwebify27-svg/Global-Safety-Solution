@@ -164,7 +164,7 @@ export default function DashboardLayout({
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col h-screen overflow-hidden relative">
-        <header className="h-16 border-b border-border bg-card/30 flex items-center justify-between lg:justify-end px-4 lg:px-8 backdrop-blur-xl shrink-0 z-40">
+        <header className="h-16 border-b border-border bg-card/30 flex items-center justify-between lg:justify-end px-4 lg:px-8 backdrop-blur-xl shrink-0 relative z-50">
           <button 
             onClick={() => setIsMobileMenuOpen(true)}
             className="lg:hidden p-2 text-muted-foreground hover:text-foreground hover:bg-accent/5 rounded-xl transition-all"

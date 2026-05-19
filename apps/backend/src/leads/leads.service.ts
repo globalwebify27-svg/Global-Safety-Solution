@@ -1,9 +1,17 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { MailService } from '../common/mail/mail.service';
 
 @Injectable()
 export class LeadsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private mailService: MailService,
+  ) {}
 
   async findAll() {
     return this.prisma.lead.findMany({
@@ -13,17 +21,26 @@ export class LeadsService {
   }
 
   async create(data: any) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+    const next_follow_up = data.next_follow_up ? new Date(data.next_follow_up) : null;
     return this.prisma.lead.create({
-      data,
+      data: {
+        ...data,
+        next_follow_up,
+      },
     });
   }
 
   async update(id: string, data: any) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+    let next_follow_up = undefined;
+    if (data.next_follow_up !== undefined) {
+      next_follow_up = data.next_follow_up ? new Date(data.next_follow_up) : null;
+    }
     return this.prisma.lead.update({
       where: { id },
-      data,
+      data: {
+        ...data,
+        ...(next_follow_up !== undefined ? { next_follow_up } : {}),
+      },
     });
   }
 
@@ -40,18 +57,26 @@ export class LeadsService {
     try {
       return await this.prisma.$transaction(async (tx) => {
         // Fetch lead inside transaction
-        const lead = await tx.lead.findUnique({ 
+        const lead = await tx.lead.findUnique({
           where: { id },
         });
-        
+
         if (!lead) throw new NotFoundException('Lead not found');
-        
+
         // Use type casting to bypass temporary IDE stale type issues if necessary
         const leadData = lead as any;
-        
-        // 1. Prevent double conversion
+
+        // 1. Handle pre-existing client association
         if (leadData.client_id) {
-          throw new BadRequestException('Lead has already been converted to a client');
+          // If already linked, ensure the client is active and update lead status to WON
+          await tx.client.update({
+            where: { id: leadData.client_id },
+            data: { is_active: true },
+          });
+          return await tx.lead.update({
+            where: { id },
+            data: { status: 'WON' },
+          });
         }
 
         // 2. Create the Client record
@@ -89,10 +114,24 @@ export class LeadsService {
       });
     } catch (error: any) {
       console.error('[LEAD CONVERSION ERROR]:', error);
-      if (error instanceof NotFoundException || error instanceof BadRequestException) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof BadRequestException
+      ) {
         throw error;
       }
-      throw new BadRequestException(`Conversion failed: ${error.message || 'Internal error'}`);
+      throw new BadRequestException(
+        `Conversion failed: ${error.message || 'Internal error'}`,
+      );
     }
+  }
+
+  async sendEmail(id: string, subject: string, message: string) {
+    const lead = await this.findOne(id);
+    if (!lead.email) {
+      throw new BadRequestException('Lead does not have a registered email address');
+    }
+    await this.mailService.sendMail(lead.email, subject, message);
+    return { success: true, message: 'Email dispatched successfully' };
   }
 }

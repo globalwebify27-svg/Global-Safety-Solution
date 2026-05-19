@@ -7,14 +7,14 @@ export class ClientsService {
 
   async findAll() {
     return this.prisma.client.findMany({
-      include: { contacts: true, compliances: true },
+      include: { contacts: true, compliances: true, assigned_staff: true },
     });
   }
 
   async findOne(id: string) {
     return this.prisma.client.findUnique({
       where: { id },
-      include: { contacts: true, compliances: true },
+      include: { contacts: true, compliances: true, assigned_staff: true },
     });
   }
 

@@ -1,6 +1,9 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateServiceProductDto, UpdateServiceProductDto } from './dto/create-service-product.dto';
+import {
+  CreateServiceProductDto,
+  UpdateServiceProductDto,
+} from './dto/create-service-product.dto';
 
 @Injectable()
 export class ServiceProductsService {
@@ -8,7 +11,7 @@ export class ServiceProductsService {
 
   async create(createServiceProductDto: CreateServiceProductDto) {
     const { checklist, ...productData } = createServiceProductDto;
-    
+
     return this.prisma.serviceProduct.create({
       data: {
         ...productData,

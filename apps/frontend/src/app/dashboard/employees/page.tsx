@@ -463,21 +463,28 @@ export default function EmployeesPage() {
 
       {/* Professional Profile Dialog */}
       <Dialog open={openProfile} onOpenChange={setOpenProfile}>
-        <DialogContent className="sm:max-w-[800px] bg-card border-border text-foreground rounded-[2rem] p-0 overflow-hidden shadow-2xl">
+        <DialogContent className="sm:max-w-[850px] bg-card border border-border text-foreground rounded-[2.5rem] p-0 overflow-hidden shadow-[0_25px_60px_-15px_rgba(0,0,0,0.3)] dark:shadow-2xl">
           {profileData && (
-            <div className="flex flex-col h-[85vh]">
-              {/* Header Cover */}
-              <div className="h-40 bg-gradient-to-r from-emerald-600 to-teal-600 relative shrink-0">
-                 <div className="absolute -bottom-16 left-10 flex items-end gap-6">
-                    <div className="w-32 h-32 rounded-[2rem] bg-card border-4 border-card shadow-2xl flex items-center justify-center">
-                       <Users className="w-16 h-16 text-emerald-600" />
+            <div className="flex flex-col max-h-[90vh] md:max-h-[85vh]">
+              {/* Header Cover Banner */}
+              <div className="h-36 bg-gradient-to-r from-emerald-600 via-teal-600 to-blue-600 relative shrink-0" />
+
+              {/* Profile Header Block with Avatar and Name */}
+              <div className="px-10 pb-6 pt-4 flex flex-col md:flex-row md:items-end justify-between gap-6 bg-card shrink-0 relative border-b border-border/40">
+                 <div className="flex flex-col md:flex-row items-center md:items-end gap-6 text-center md:text-left">
+                    <div className="w-28 h-28 rounded-3xl bg-card border-4 border-card shadow-2xl flex items-center justify-center -mt-16 relative z-10 shrink-0 select-none">
+                       <Users className="w-12 h-12 text-emerald-600" />
                     </div>
-                    <div className="mb-4">
-                       <h2 className="text-3xl font-black tracking-tight">{profileData.name}</h2>
-                       <p className="text-emerald-100 font-bold uppercase tracking-widest text-xs opacity-80">{profileData.designation} • {profileData.department}</p>
+                    <div className="mb-1">
+                       <h2 className="text-3xl font-black tracking-tight text-foreground">{profileData.name}</h2>
+                       <p className="text-muted-foreground font-extrabold uppercase tracking-widest text-[10px] mt-1.5 flex items-center justify-center md:justify-start gap-2">
+                         <span className="text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-md">{profileData.designation || 'Specialist'}</span>
+                         <span className="text-muted-foreground/30">•</span>
+                         <span>{profileData.department || 'Operations'}</span>
+                       </p>
                     </div>
-                  </div>
-                  <div className="absolute bottom-6 right-10 flex gap-2">
+                 </div>
+                 <div className="flex justify-center shrink-0 pb-1">
                      <Button 
                        onClick={() => {
                          setPromoteForm({
@@ -488,111 +495,121 @@ export default function EmployeesPage() {
                          });
                          setOpenPromoteDialog(true);
                        }}
-                       className="bg-white/20 hover:bg-white/30 text-white border-0 backdrop-blur-md rounded-xl font-black text-[10px] uppercase tracking-widest px-6"
+                       className="bg-emerald-600 hover:bg-emerald-500 text-white border-0 shadow-lg shadow-emerald-500/20 rounded-xl font-black text-[10px] uppercase tracking-widest px-6 h-11 transition-all active:scale-95 flex items-center gap-2"
                      >
-                       <Award className="w-4 h-4 mr-2" /> Promote / Hike
+                       <Award className="w-4 h-4" /> Promote / Hike
                      </Button>
-                  </div>
+                 </div>
               </div>
 
-              {/* Tabs */}
-              <div className="flex px-10 border-b border-border bg-card/50 shrink-0">
+              {/* Navigation Tabs */}
+              <div className="flex px-10 border-b border-border bg-muted/20 shrink-0">
                  <button 
                    onClick={() => setProfileTab("overview")}
-                   className={cn("px-6 py-4 text-xs font-black uppercase tracking-widest transition-all border-b-2", 
+                   className={cn("px-6 py-4 text-[10px] font-black uppercase tracking-widest transition-all border-b-2 -mb-px flex items-center gap-2", 
                      profileTab === 'overview' ? "border-emerald-500 text-emerald-600" : "border-transparent text-muted-foreground hover:text-foreground"
                    )}
                  >
-                   Profile Overview
+                   <IdCard className="w-4 h-4" /> Profile Overview
                  </button>
                  <button 
                    onClick={() => setProfileTab("history")}
-                   className={cn("px-6 py-4 text-xs font-black uppercase tracking-widest transition-all border-b-2", 
+                   className={cn("px-6 py-4 text-[10px] font-black uppercase tracking-widest transition-all border-b-2 -mb-px flex items-center gap-2", 
                      profileTab === 'history' ? "border-emerald-500 text-emerald-600" : "border-transparent text-muted-foreground hover:text-foreground"
                    )}
                  >
-                   Career History
+                   <History className="w-4 h-4" /> Career History
                  </button>
               </div>
 
-              {/* Scrollable Content */}
-              <div className="flex-1 p-10 overflow-y-auto scrollbar-hide">
+              {/* Scrollable Content Container */}
+              <div className="flex-1 p-10 overflow-y-auto scrollbar-hide bg-background/30">
                 {profileTab === 'overview' ? (
                   <div className="space-y-10">
-                    <div className="grid grid-cols-3 gap-6">
-                       <div className="bg-accent/5 p-6 rounded-3xl border border-border/50">
-                          <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-2">Employee ID</p>
-                          <p className="text-lg font-mono font-black">{profileData.employee_id}</p>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                       <div className="bg-card border border-border/80 p-6 rounded-[1.5rem] shadow-sm hover:border-emerald-500/20 transition-all flex flex-col justify-between h-28">
+                          <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Employee ID</p>
+                          <p className="text-xl font-mono font-black text-foreground">{profileData.employee_id || 'N/A'}</p>
                        </div>
-                       <div className="bg-accent/5 p-6 rounded-3xl border border-border/50">
-                          <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-2">Joining Date</p>
-                          <p className="text-lg font-black">{new Date(profileData.join_date).toLocaleDateString()}</p>
+                       <div className="bg-card border border-border/80 p-6 rounded-[1.5rem] shadow-sm hover:border-emerald-500/20 transition-all flex flex-col justify-between h-28">
+                          <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Joining Date</p>
+                          <p className="text-xl font-black text-foreground">
+                            {profileData.join_date ? new Date(profileData.join_date).toLocaleDateString([], { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A'}
+                          </p>
                        </div>
-                       <div className="bg-emerald-500/10 p-6 rounded-3xl border border-emerald-500/20">
-                          <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-2">Current Salary</p>
-                          <p className="text-lg font-black text-emerald-700">₹{Number(profileData.base_salary || 0).toLocaleString()}</p>
+                       <div className="bg-emerald-500/5 border border-emerald-500/20 p-6 rounded-[1.5rem] shadow-sm hover:bg-emerald-500/10 transition-all flex flex-col justify-between h-28">
+                          <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Current Salary</p>
+                          <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
+                            ₹{profileData.base_salary ? Number(profileData.base_salary).toLocaleString() : '0'}
+                          </p>
                        </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-10">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                      {/* Left: Identity & Info */}
                       <div className="space-y-6">
-                        <h3 className="text-lg font-black flex items-center gap-2">
-                          <IdCard className="w-5 h-5 text-emerald-500" /> Identity & Compliance
+                        <h3 className="text-lg font-black flex items-center gap-2.5 text-foreground">
+                          <BadgeCheck className="w-5 h-5 text-emerald-500" /> Identity & Compliance
                         </h3>
-                        <div className="space-y-4 bg-accent/5 p-6 rounded-3xl border border-border/50">
-                          <div className="flex justify-between border-b border-border/30 pb-3">
-                             <span className="text-xs font-bold text-muted-foreground">PAN NUMBER</span>
-                             <span className="text-xs font-black uppercase">{profileData.pan_number || 'PENDING'}</span>
+                        <div className="space-y-4 bg-card border border-border p-6 rounded-[1.8rem] shadow-sm">
+                          <div className="flex justify-between border-b border-border/50 pb-3.5 items-center">
+                             <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">PAN Number</span>
+                             <span className="text-xs font-mono font-black uppercase text-foreground">{profileData.pan_number || 'PENDING'}</span>
                           </div>
-                          <div className="flex justify-between border-b border-border/30 pb-3">
-                             <span className="text-xs font-bold text-muted-foreground">AADHAR CARD</span>
-                             <span className="text-xs font-black uppercase">{profileData.aadhar_number || 'PENDING'}</span>
+                          <div className="flex justify-between border-b border-border/50 pb-3.5 items-center">
+                             <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Aadhar Number</span>
+                             <span className="text-xs font-mono font-black text-foreground">{profileData.aadhar_number || 'PENDING'}</span>
                           </div>
-                          <div className="flex justify-between">
-                             <span className="text-xs font-bold text-muted-foreground">JOINING DATE</span>
-                             <span className="text-xs font-black uppercase">{new Date(profileData.join_date).toLocaleDateString()}</span>
+                          <div className="flex justify-between items-center">
+                             <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Appointment Date</span>
+                             <span className="text-xs font-black text-foreground">
+                               {profileData.join_date ? new Date(profileData.join_date).toLocaleDateString([], { day: '2-digit', month: 'long', year: 'numeric' }) : 'N/A'}
+                             </span>
                           </div>
                         </div>
                         
                         <div className="space-y-2">
-                           <h4 className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-2"><MapPin className="w-3 h-3" /> Permanent Address</h4>
-                           <p className="text-sm font-medium text-foreground/80 bg-accent/5 p-4 rounded-2xl border border-border/50 leading-relaxed italic">
+                           <h4 className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-2"><MapPin className="w-3.5 h-3.5 text-rose-500" /> Registered Address</h4>
+                           <p className="text-xs font-bold text-foreground/80 bg-card border border-border p-5 rounded-[1.5rem] leading-relaxed italic shadow-inner">
                              {profileData.address || 'Address details not updated in registry.'}
                            </p>
                         </div>
                       </div>
 
+                      {/* Right: Performance & Logs */}
                       <div className="space-y-6">
-                        <h3 className="text-lg font-black flex items-center gap-2">
-                          <TrendingUp className="w-5 h-5 text-blue-500" /> Performance Stats
+                        <h3 className="text-lg font-black flex items-center gap-2.5 text-foreground">
+                          <TrendingUp className="w-5 h-5 text-blue-500" /> Performance & Analytics
                         </h3>
                         <div className="grid grid-cols-2 gap-4">
-                           <div className="bg-blue-500/10 p-6 rounded-3xl border border-blue-500/20 text-center">
-                              <p className="text-3xl font-black text-blue-600">{profileData.stats.attendance_rate}%</p>
-                              <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest mt-1">Attendance Rate</p>
+                           <div className="bg-blue-500/5 border border-blue-500/20 p-6 rounded-[1.5rem] text-center shadow-sm">
+                              <p className="text-3xl font-black text-blue-600">{profileData.stats?.attendance_rate || 0}%</p>
+                              <p className="text-[9px] font-black text-blue-500 uppercase tracking-widest mt-1.5">Attendance Rate</p>
                            </div>
-                           <div className="bg-amber-500/10 p-6 rounded-3xl border border-amber-500/20 text-center">
-                              <p className="text-3xl font-black text-amber-600">{profileData.stats.present_days}</p>
-                              <p className="text-[10px] font-black text-amber-400 uppercase tracking-widest mt-1">Days Present</p>
+                           <div className="bg-amber-500/5 border border-amber-500/20 p-6 rounded-[1.5rem] text-center shadow-sm">
+                              <p className="text-3xl font-black text-amber-600">{profileData.stats?.present_days || 0}</p>
+                              <p className="text-[9px] font-black text-amber-500 uppercase tracking-widest mt-1.5">Days Present</p>
                            </div>
                         </div>
 
                         <div className="space-y-4">
-                           <p className="text-xs font-black uppercase tracking-widest text-muted-foreground flex items-center justify-between">
-                             Recent Activity Logs
-                             <Clock className="w-4 h-4" />
+                           <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center justify-between">
+                             Recent Attendance Logs
+                             <Clock className="w-4 h-4 text-emerald-500" />
                            </p>
                            <div className="space-y-2">
-                             {profileData.attendance.length > 0 ? profileData.attendance.slice(0, 3).map((a: any, i: number) => (
-                               <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-accent/5 border border-border/30">
+                             {profileData.attendance && profileData.attendance.length > 0 ? profileData.attendance.slice(0, 3).map((a: any, i: number) => (
+                               <div key={i} className="flex items-center justify-between p-3.5 rounded-[1rem] bg-card border border-border/80 hover:border-emerald-500/20 transition-colors shadow-sm">
                                  <div className="flex items-center gap-3">
                                    <div className="w-2 h-2 rounded-full bg-emerald-500" />
-                                   <span className="text-xs font-bold">{new Date(a.date).toLocaleDateString()}</span>
+                                   <span className="text-xs font-bold text-foreground/80">
+                                     {new Date(a.date).toLocaleDateString([], { day: '2-digit', month: 'short', year: 'numeric' })}
+                                   </span>
                                  </div>
-                                 <span className="text-[10px] font-black uppercase tracking-widest text-emerald-500">{a.status}</span>
+                                 <span className="text-[9px] font-black uppercase tracking-widest text-emerald-600 bg-emerald-500/10 px-2.5 py-1 rounded-md">{a.status}</span>
                                </div>
                              )) : (
-                               <p className="text-xs text-muted-foreground italic">No recent logs found.</p>
+                               <p className="text-xs text-muted-foreground italic bg-card border border-border p-4 rounded-xl text-center">No recent attendance logs found.</p>
                              )}
                            </div>
                         </div>
@@ -602,39 +619,41 @@ export default function EmployeesPage() {
                 ) : (
                   <div className="space-y-8">
                     <div className="flex items-center justify-between">
-                       <h3 className="text-xl font-black flex items-center gap-2">
+                       <h3 className="text-xl font-black flex items-center gap-2.5 text-foreground">
                          <History className="w-6 h-6 text-emerald-600" /> Career Journey
                        </h3>
-                       <div className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Growth Timeline</div>
+                       <div className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Growth Timeline</div>
                     </div>
 
                     <div className="relative border-l-2 border-dashed border-border ml-4 space-y-10 py-4">
-                       {profileData.salary_history.length > 0 ? profileData.salary_history.map((h: any, i: number) => (
-                         <div key={i} className="relative pl-10">
-                            <div className="absolute -left-[11px] top-0 w-5 h-5 rounded-full bg-emerald-500 border-4 border-card" />
-                            <div className="bg-card border border-border rounded-3xl p-6 shadow-sm hover:shadow-md transition-shadow">
-                               <div className="flex items-center justify-between mb-4">
-                                  <span className="text-sm font-black text-foreground">{h.designation}</span>
-                                  <span className="text-[10px] font-black uppercase text-emerald-600 bg-emerald-500/10 px-3 py-1 rounded-full">{new Date(h.effective_date).toLocaleDateString()}</span>
-                               </div>
-                               <div className="flex items-end justify-between">
-                                  <div>
-                                     <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Monthly Salary</p>
-                                     <p className="text-2xl font-black text-foreground">₹{Number(h.amount).toLocaleString()}</p>
-                                  </div>
-                                  <div className="text-right">
-                                     <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Reason</p>
-                                     <p className="text-xs font-bold text-emerald-600 italic">{h.reason}</p>
-                                  </div>
-                               </div>
-                            </div>
-                         </div>
+                       {profileData.salary_history && profileData.salary_history.length > 0 ? profileData.salary_history.map((h: any, i: number) => (
+                          <div key={i} className="relative pl-10 group">
+                             <div className="absolute -left-[11px] top-0 w-5 h-5 rounded-full bg-emerald-500 border-4 border-card group-hover:scale-125 transition-transform" />
+                             <div className="bg-card border border-border rounded-[1.8rem] p-6 shadow-sm hover:shadow-md hover:border-emerald-500/20 transition-all">
+                                <div className="flex items-center justify-between mb-4">
+                                   <span className="text-sm font-black text-foreground">{h.designation}</span>
+                                   <span className="text-[9px] font-black uppercase text-emerald-600 bg-emerald-500/10 px-3 py-1.5 rounded-full">
+                                     {new Date(h.effective_date).toLocaleDateString([], { day: '2-digit', month: 'short', year: 'numeric' })}
+                                   </span>
+                                </div>
+                                <div className="flex items-end justify-between">
+                                   <div>
+                                      <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Monthly Salary</p>
+                                      <p className="text-2xl font-black text-foreground">₹{Number(h.amount).toLocaleString()}</p>
+                                   </div>
+                                   <div className="text-right">
+                                      <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Increment Trigger</p>
+                                      <p className="text-xs font-black text-emerald-600 italic">{h.reason}</p>
+                                   </div>
+                                </div>
+                             </div>
+                          </div>
                        )) : (
-                         <div className="pl-10">
-                           <p className="text-sm text-muted-foreground italic bg-accent/5 p-6 rounded-3xl border border-dashed border-border">
-                             Initial appointment records for this employee are pending documentation in the digital vault.
-                           </p>
-                         </div>
+                          <div className="pl-10">
+                            <p className="text-sm text-muted-foreground italic bg-card border border-dashed border-border/80 p-8 rounded-[1.8rem]">
+                              Initial appointment records for this employee are pending documentation in the digital vault.
+                            </p>
+                          </div>
                        )}
                     </div>
                   </div>

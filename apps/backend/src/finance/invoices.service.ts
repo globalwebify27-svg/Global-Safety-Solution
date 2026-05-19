@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -12,7 +12,10 @@ export class InvoicesService {
     });
 
     return invoices.map((invoice) => {
-      const totalPaid = invoice.payments.reduce((sum, p) => sum + Number(p.amount), 0);
+      const totalPaid = invoice.payments.reduce(
+        (sum, p) => sum + Number(p.amount),
+        0,
+      );
       return {
         ...invoice,
         total_paid: totalPaid,
@@ -28,7 +31,10 @@ export class InvoicesService {
     });
     if (!invoice) throw new NotFoundException('Invoice not found');
 
-    const totalPaid = invoice.payments.reduce((sum, p) => sum + Number(p.amount), 0);
+    const totalPaid = invoice.payments.reduce(
+      (sum, p) => sum + Number(p.amount),
+      0,
+    );
     return {
       ...invoice,
       total_paid: totalPaid,
@@ -41,8 +47,28 @@ export class InvoicesService {
 
     // Generate invoice number if not provided (e.g. INV-2026-0001)
     if (!invoiceData.invoice_number) {
-      const count = await this.prisma.invoice.count();
-      invoiceData.invoice_number = `INV-${new Date().getFullYear()}-${(count + 1).toString().padStart(4, '0')}`;
+      const year = new Date().getFullYear();
+      const latestInvoice = await this.prisma.invoice.findFirst({
+        where: {
+          invoice_number: {
+            startsWith: `INV-${year}-`,
+          },
+        },
+        orderBy: {
+          invoice_number: 'desc',
+        },
+      });
+
+      let nextInvSerial = 1;
+      if (latestInvoice) {
+        const parts = latestInvoice.invoice_number.split('-');
+        const lastSerial = parseInt(parts[parts.length - 1], 10);
+        if (!isNaN(lastSerial)) {
+          nextInvSerial = lastSerial + 1;
+        }
+      }
+
+      invoiceData.invoice_number = `INV-${year}-${String(nextInvSerial).padStart(4, '0')}`;
     }
 
     // Server-side financial calculations
@@ -56,6 +82,21 @@ export class InvoicesService {
     const igst = 0;
     const taxAmount = cgst + sgst + igst;
     const totalAmount = subtotal + taxAmount;
+
+    // Check for similar active invoice to prevent duplicates
+    const duplicateInvoice = await this.prisma.invoice.findFirst({
+      where: {
+        client_id: invoiceData.client_id,
+        total_amount: totalAmount,
+        status: { not: 'VOID' },
+      },
+    });
+
+    if (duplicateInvoice) {
+      throw new BadRequestException(
+        `A similar invoice (${duplicateInvoice.invoice_number}) with the total amount of ₹${totalAmount.toLocaleString()} already exists for this client. Creation blocked to prevent duplicates.`,
+      );
+    }
 
     return this.prisma.invoice.create({
       data: {

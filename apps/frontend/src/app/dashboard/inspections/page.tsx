@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useAuthStore } from "@/store/auth";
 import { API_BASE_URL } from "@/lib/config";
 import { 
@@ -18,7 +18,8 @@ import {
   Camera,
   Check,
   X,
-  Download
+  Download,
+  Loader2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
@@ -43,6 +44,9 @@ interface Inspection {
   items: InspectionItem[];
   lat?: number;
   lng?: number;
+  remarks?: string;
+  client_id?: string;
+  project_id?: string;
 }
 
 export default function InspectionsPage() {
@@ -53,6 +57,25 @@ export default function InspectionsPage() {
   const [openSchedule, setOpenSchedule] = useState(false);
   const [openVisit, setOpenVisit] = useState(false);
   const [selectedInspection, setSelectedInspection] = useState<Inspection | null>(null);
+  
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [uploadedPhotoUrls, setUploadedPhotoUrls] = useState<string[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const parseRemarksPhotos = (remarks?: string | null): string[] => {
+    if (!remarks) return [];
+    if (remarks.startsWith("Verification Photos: ")) {
+      try {
+        const parsed = JSON.parse(remarks.replace("Verification Photos: ", ""));
+        if (Array.isArray(parsed)) return parsed;
+      } catch (e) {
+        return remarks.replace("Verification Photos: ", "").split(",").filter(Boolean);
+      }
+    } else if (remarks.startsWith("Verification Photo: ")) {
+      return [remarks.replace("Verification Photo: ", "")];
+    }
+    return [];
+  };
   
   const [scheduleForm, setScheduleForm] = useState({
     client_id: "",
@@ -81,7 +104,22 @@ export default function InspectionsPage() {
       
       if (Array.isArray(iData)) setInspections(iData);
       if (Array.isArray(cData)) setClients(cData);
-      if (Array.isArray(eData)) setEngineers(eData.filter((u: any) => u.designation?.toLowerCase().includes('engineer') || u.name.includes('Admin'))); // Filter for engineers or admin for demo
+      if (Array.isArray(eData)) {
+        let filtered = eData.filter((u: any) => 
+          u.is_active && 
+          (
+            u.designation?.toLowerCase().includes('engineer') || 
+            u.designation?.toLowerCase().includes('dev') ||
+            u.designation?.toLowerCase().includes('technician') ||
+            u.department?.toLowerCase().includes('operations') ||
+            u.name?.toLowerCase().includes('admin')
+          )
+        );
+        if (filtered.length === 0) {
+          filtered = eData.filter((u: any) => u.is_active);
+        }
+        setEngineers(filtered);
+      }
     } catch (e) {
       console.error(e);
     } finally {
@@ -119,7 +157,7 @@ export default function InspectionsPage() {
       if (res.ok) {
         // Update local state
         if (selectedInspection) {
-          const updatedItems = selectedInspection.items.map(item => 
+          const updatedItems = (selectedInspection.items || []).map(item => 
             item.id === itemId ? { ...item, status: status as any, notes } : item
           );
           setSelectedInspection({ ...selectedInspection, items: updatedItems });
@@ -130,37 +168,114 @@ export default function InspectionsPage() {
     }
   };
 
-  const handleCompleteVisit = async () => {
-    if (!token || !selectedInspection) return;
-    
-    // Capture GPS
-    let lat = 0;
-    let lng = 0;
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition((pos) => {
-        lat = pos.coords.latitude;
-        lng = pos.coords.longitude;
-      });
-    }
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0 || !selectedInspection || !token) return;
 
+    setUploadingPhoto(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/inspections/${selectedInspection.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ 
-          status: 'COMPLETED', 
-          completed_date: new Date().toISOString(),
-          lat,
-          lng
-        })
-      });
-      if (res.ok) {
-        setOpenVisit(false);
-        toast.success("Visit marked as completed with site verification");
-        fetchData();
+      const uploadedUrls: string[] = [];
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('name', `Site Visit Verification - ${selectedInspection.client?.name || 'Inspection'} - Photo ${i + 1}`);
+        formData.append('category', 'OTHER');
+        if (selectedInspection.client_id) {
+          formData.append('client_id', selectedInspection.client_id);
+        }
+        if (selectedInspection.project_id) {
+          formData.append('project_id', selectedInspection.project_id);
+        }
+
+        const res = await fetch(`${API_BASE_URL}/documents`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`
+          },
+          body: formData
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          uploadedUrls.push(data.file_url);
+        }
       }
-    } catch (e) {
-      toast.error("Failed to complete visit");
+
+      if (uploadedUrls.length > 0) {
+        setUploadedPhotoUrls(prev => [...prev, ...uploadedUrls]);
+        toast.success(`Successfully uploaded ${uploadedUrls.length} photo(s)!`);
+      } else {
+        toast.error("Failed to upload photo(s).");
+      }
+    } catch (err: any) {
+      toast.error("Error uploading file(s).");
+      console.error(err);
+    } finally {
+      setUploadingPhoto(false);
+      e.target.value = "";
+    }
+  };
+
+  const handleCompleteVisit = async () => {
+    if (!selectedInspection || !token) return;
+    
+    const submit = async (latitude?: number, longitude?: number) => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/inspections/${selectedInspection.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ 
+            status: 'COMPLETED', 
+            completed_date: new Date().toISOString(),
+            lat: latitude,
+            lng: longitude,
+            remarks: uploadedPhotoUrls.length > 0 ? "Verification Photos: " + JSON.stringify(uploadedPhotoUrls) : undefined
+          })
+        });
+        if (res.ok) {
+          setOpenVisit(false);
+          toast.success("Visit marked as completed with site verification");
+          fetchData();
+        } else {
+          const err = await res.json();
+          toast.error(err.message || "Failed to complete visit");
+        }
+      } catch (e) {
+        toast.error("Failed to complete visit due to network error");
+      }
+    };
+
+    if (navigator.geolocation) {
+      let resolved = false;
+      const timer = setTimeout(() => {
+        if (!resolved) {
+          resolved = true;
+          console.log("GPS timeout, submitting without coordinates...");
+          submit();
+        }
+      }, 1500); // Wait at most 1.5 seconds for GPS
+
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          if (!resolved) {
+            resolved = true;
+            clearTimeout(timer);
+            submit(pos.coords.latitude, pos.coords.longitude);
+          }
+        },
+        (err) => {
+          if (!resolved) {
+            resolved = true;
+            clearTimeout(timer);
+            console.warn("GPS capture failed:", err);
+            submit();
+          }
+        },
+        { timeout: 1200, enableHighAccuracy: false }
+      );
+    } else {
+      submit();
     }
   };
 
@@ -359,6 +474,7 @@ export default function InspectionsPage() {
                           className="h-9 px-4 rounded-xl text-xs font-bold text-blue-600 hover:bg-blue-500/10"
                           onClick={() => {
                             setSelectedInspection(i);
+                            setUploadedPhotoUrls(parseRemarksPhotos(i.remarks));
                             setOpenVisit(true);
                           }}
                         >
@@ -389,7 +505,7 @@ export default function InspectionsPage() {
               </DialogHeader>
 
               <div className="space-y-4">
-                {selectedInspection.items.map((item) => (
+                {(selectedInspection?.items || []).map((item) => (
                   <div key={item.id} className="p-5 bg-muted/20 border border-border rounded-2xl space-y-3">
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-foreground">{item.description}</span>
@@ -422,15 +538,72 @@ export default function InspectionsPage() {
                 ))}
               </div>
 
-              <div className="p-4 bg-blue-500/5 border border-blue-500/10 rounded-2xl flex items-center gap-4">
-                <Camera className="w-8 h-8 text-blue-600" />
-                <div className="flex-1">
-                  <p className="text-sm font-bold">Site Verification Required</p>
-                  <p className="text-[10px] text-muted-foreground uppercase">GPS Coordinates will be captured on completion</p>
+              <div className="space-y-4">
+                <div className="p-4 bg-blue-500/5 border border-blue-500/10 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 bg-blue-500/10 rounded-xl">
+                      <Camera className="w-6 h-6 text-blue-600 animate-pulse" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-foreground">Site Verification Photos</p>
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">
+                        Upload multiple verification photos for this visit
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 self-end md:self-auto">
+                    <input 
+                      type="file" 
+                      ref={fileInputRef} 
+                      onChange={handlePhotoUpload} 
+                      accept="image/*" 
+                      className="hidden" 
+                      multiple
+                    />
+                    
+                    {uploadingPhoto ? (
+                      <Button disabled variant="outline" className="rounded-xl h-10 border-blue-500/20 text-blue-600 flex items-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin" /> Uploading...
+                      </Button>
+                    ) : selectedInspection.status !== 'COMPLETED' ? (
+                      <Button 
+                        type="button"
+                        variant="outline" 
+                        onClick={() => fileInputRef.current?.click()}
+                        className="rounded-xl h-10 border-blue-500/20 text-blue-600 hover:bg-blue-500/10 font-bold transition-all"
+                      >
+                        {uploadedPhotoUrls.length > 0 ? "Add More Photos" : "Upload Photos"}
+                      </Button>
+                    ) : null}
+                  </div>
                 </div>
-                <Button variant="outline" className="rounded-xl h-10 border-blue-500/20 text-blue-600">
-                  Upload Photo
-                </Button>
+
+                {uploadedPhotoUrls.length > 0 && (
+                  <div className="grid grid-cols-4 sm:grid-cols-6 gap-3 p-4 bg-muted/20 border border-border/50 rounded-2xl">
+                    {uploadedPhotoUrls.map((url, index) => (
+                      <div key={index} className="relative aspect-square rounded-xl overflow-hidden border border-border group shadow-sm bg-background">
+                        <img 
+                          src={url} 
+                          alt={`Verification preview ${index + 1}`} 
+                          className="w-full h-full object-cover transition-all duration-300 group-hover:scale-110 cursor-pointer" 
+                          onClick={() => window.open(url, '_blank')}
+                        />
+                        {selectedInspection.status !== 'COMPLETED' && (
+                          <button
+                            type="button"
+                            onClick={() => setUploadedPhotoUrls(prev => prev.filter((_, idx) => idx !== index))}
+                            className="absolute top-1.5 right-1.5 bg-rose-500 hover:bg-rose-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow duration-200 cursor-pointer"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-3 h-3">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <DialogFooter className="pt-4 border-t border-border">

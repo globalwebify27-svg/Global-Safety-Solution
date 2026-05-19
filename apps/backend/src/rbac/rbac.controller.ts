@@ -24,7 +24,7 @@ export class RBACController {
   @Post('roles')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('SUPER_ADMIN')
-  createRole(@Body() data: { name: string, description: string }) {
+  createRole(@Body() data: { name: string; description: string }) {
     return this.rbacService.createRole(data);
   }
 
@@ -47,7 +47,7 @@ export class RBACController {
   @Roles('SUPER_ADMIN')
   updateRolePermissions(
     @Param('id') roleId: string,
-    @Body() data: { permissionIds: string[] }
+    @Body() data: { permissionIds: string[] },
   ) {
     return this.rbacService.updateRolePermissions(roleId, data.permissionIds);
   }

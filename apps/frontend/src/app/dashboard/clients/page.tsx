@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useAuthStore } from "@/store/auth";
 import { API_BASE_URL } from "@/lib/config";
 import { Button } from "@/components/ui/button";
-import { Plus, User, Mail, Phone, FileText, Building2, MapPin } from "lucide-react";
+import { Plus, User, Mail, Phone, FileText, Building2, MapPin, Briefcase } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,6 +24,7 @@ interface Client {
 
 export default function ClientsPage() {
   const [clients, setClients] = useState<Client[]>([]);
+  const [staff, setStaff] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const token = useAuthStore((state) => state.token);
@@ -35,7 +36,8 @@ export default function ClientsPage() {
     gst_number: '', 
     pan_number: '', 
     industry: '', 
-    city: '' 
+    city: '',
+    assigned_staff_id: ''
   });
   const [submitting, setSubmitting] = useState(false);
 
@@ -68,6 +70,15 @@ export default function ClientsPage() {
       console.error(e);
       setLoading(false);
     });
+
+    fetch(`${API_BASE_URL}/users`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (Array.isArray(data)) setStaff(data);
+    })
+    .catch(console.error);
   };
 
   const handleCreateClient = async (e: React.FormEvent) => {
@@ -83,12 +94,13 @@ export default function ClientsPage() {
         },
         body: JSON.stringify({
           ...formData,
+          assigned_staff_id: formData.assigned_staff_id || undefined,
           is_active: true
         })
       });
       if (res.ok) {
         setOpen(false);
-        setFormData({ name: '', email: '', phone: '', gst_number: '', pan_number: '', industry: '', city: '' });
+        setFormData({ name: '', email: '', phone: '', gst_number: '', pan_number: '', industry: '', city: '', assigned_staff_id: '' });
         fetchClients(); 
       } else {
         alert("Failed to create client");
@@ -125,10 +137,28 @@ export default function ClientsPage() {
                 {/* Left Column */}
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="name" className="text-foreground/80">Organization Name *</Label>
+                    <Label htmlFor="org_name" className="text-foreground/80">Organization Name *</Label>
                     <div className="relative">
                       <User className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
-                      <Input id="name" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="pl-9 bg-background border-border text-foreground focus:ring-primary placeholder:text-muted-foreground/50" placeholder="Acme Global Inc." required />
+                      <Input id="org_name" name="org_name" autoComplete="off" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="pl-9 bg-background border-border text-foreground focus:ring-primary placeholder:text-muted-foreground/50" placeholder="Acme Global Inc." required />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="assigned_staff" className="text-foreground/80">Assign Staff / Account Manager</Label>
+                    <div className="relative">
+                      <Briefcase className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
+                      <select 
+                        id="assigned_staff"
+                        value={formData.assigned_staff_id}
+                        onChange={(e) => setFormData({...formData, assigned_staff_id: e.target.value})}
+                        className="w-full pl-9 h-10 bg-background border border-border rounded-md text-foreground focus:ring-2 focus:ring-primary focus:outline-none appearance-none"
+                      >
+                        <option value="">Select Staff Member (Optional)</option>
+                        {staff.map((s: any) => (
+                          <option key={s.id} value={s.id}>{s.name} ({s.designation || 'Staff'})</option>
+                        ))}
+                      </select>
                     </div>
                   </div>
                   
