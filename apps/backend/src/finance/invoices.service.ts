@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -82,6 +82,21 @@ export class InvoicesService {
     const igst = 0;
     const taxAmount = cgst + sgst + igst;
     const totalAmount = subtotal + taxAmount;
+
+    // Check for similar active invoice to prevent duplicates
+    const duplicateInvoice = await this.prisma.invoice.findFirst({
+      where: {
+        client_id: invoiceData.client_id,
+        total_amount: totalAmount,
+        status: { not: 'VOID' },
+      },
+    });
+
+    if (duplicateInvoice) {
+      throw new BadRequestException(
+        `A similar invoice (${duplicateInvoice.invoice_number}) with the total amount of ₹${totalAmount.toLocaleString()} already exists for this client. Creation blocked to prevent duplicates.`,
+      );
+    }
 
     return this.prisma.invoice.create({
       data: {

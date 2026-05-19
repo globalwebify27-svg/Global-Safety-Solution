@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/auth";
 import { API_BASE_URL } from "@/lib/config";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Building2, Mail, Phone, MapPin, FileText, ShieldAlert, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, Building2, Mail, Phone, MapPin, FileText, ShieldAlert, CheckCircle2, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface Compliance {
@@ -26,6 +26,11 @@ interface Client {
   city?: string;
   is_active: boolean;
   compliances?: Compliance[];
+  assigned_staff?: {
+    name: string;
+    designation?: string;
+    email?: string;
+  };
 }
 
 export default function ClientProfilePage({ params }: { params: Promise<{ id: string }> }) {
@@ -210,6 +215,33 @@ export default function ClientProfilePage({ params }: { params: Promise<{ id: st
                 </div>
               </div>
             </div>
+          </div>
+
+          <div className="bg-card/40 backdrop-blur-md rounded-3xl border border-border p-8 shadow-sm">
+            <h3 className="text-xl font-bold text-foreground mb-6 flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                <User className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+              </div>
+              Assigned Account Manager
+            </h3>
+            {client.assigned_staff ? (
+              <div className="flex items-center gap-4 p-4 bg-background border border-border rounded-2xl shadow-sm">
+                <div className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-600 dark:text-emerald-400 font-bold text-lg border border-emerald-500/20">
+                  {client.assigned_staff.name.charAt(0).toUpperCase()}
+                </div>
+                <div className="space-y-0.5">
+                  <p className="font-bold text-foreground text-base leading-none">{client.assigned_staff.name}</p>
+                  <p className="text-xs font-medium text-muted-foreground">{client.assigned_staff.designation || 'Staff Member'}</p>
+                  {client.assigned_staff.email && (
+                    <p className="text-[10px] text-muted-foreground/80 font-mono tracking-tight mt-1">{client.assigned_staff.email}</p>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-6 text-center text-muted-foreground bg-muted/20 rounded-2xl border border-dashed border-border">
+                <p className="font-bold uppercase tracking-widest text-[10px]">No staff assigned</p>
+              </div>
+            )}
           </div>
 
           <div className="bg-card/40 backdrop-blur-md rounded-3xl border border-border p-8 flex flex-col items-center justify-center text-center space-y-4 shadow-sm">

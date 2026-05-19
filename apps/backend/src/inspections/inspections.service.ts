@@ -70,7 +70,16 @@ export class InspectionsService {
         ...data,
         ...(completed_date ? { completed_date } : {}),
       },
-      include: { items: true, client: true, engineer: true, work_order: true },
+      include: { 
+        items: true, 
+        client: true, 
+        engineer: true, 
+        work_order: {
+          include: {
+            service_product: true
+          }
+        } 
+      },
     });
 
     // If completed, trigger email and notification
@@ -93,6 +102,22 @@ export class InspectionsService {
               new Date().setFullYear(new Date().getFullYear() + 1),
             ), // Default 1y
             validity_period: '1y',
+            status: 'ACTIVE',
+          },
+        });
+
+        // Automatically sync to Compliance Hub Registry for client tracking & 30-day alerts!
+        const serviceName = inspection.work_order?.service_product?.name || 'Safety Compliance';
+        await this.prisma.compliance.create({
+          data: {
+            client_id: inspection.client_id,
+            compliance_type: serviceName,
+            reference_number: certNo,
+            issue_date: new Date(),
+            expiry_date: new Date(
+              new Date().setFullYear(new Date().getFullYear() + 1),
+            ),
+            renewal_cycle_days: 365,
             status: 'ACTIVE',
           },
         });

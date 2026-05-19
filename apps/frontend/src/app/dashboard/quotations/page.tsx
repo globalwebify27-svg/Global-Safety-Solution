@@ -71,6 +71,7 @@ function QuotationsContent() {
     lead_id: "",
     client_id: "",
     notes: "",
+    apply_gst: true,
     items: [{ description: "", quantity: 1, unit_price: 0 }] as QuoteItem[]
   });
 
@@ -280,7 +281,7 @@ function QuotationsContent() {
       });
       if (res.ok) {
         setOpen(false);
-        setFormData({ lead_id: "", client_id: "", notes: "", items: [{ description: "", quantity: 1, unit_price: 0 }] });
+        setFormData({ lead_id: "", client_id: "", notes: "", apply_gst: true, items: [{ description: "", quantity: 1, unit_price: 0 }] });
         toast.success("Quotation generated successfully!");
         fetchData();
       } else {
@@ -413,20 +414,39 @@ function QuotationsContent() {
                 </div>
               </div>
 
-              <div className="flex flex-col items-end gap-3 border-t border-border pt-6">
+              <div className="flex flex-col items-end gap-3 border-t border-border pt-6 w-full">
+                <div className="flex items-center justify-between w-full pb-2">
+                  <div className="flex items-center gap-2">
+                    <input 
+                      type="checkbox"
+                      id="apply_gst"
+                      checked={formData.apply_gst}
+                      onChange={(e) => setFormData({ ...formData, apply_gst: e.target.checked })}
+                      className="w-4 h-4 text-emerald-600 border-border rounded focus:ring-emerald-500 bg-background accent-emerald-600"
+                    />
+                    <label htmlFor="apply_gst" className="text-xs font-bold uppercase tracking-wider text-muted-foreground cursor-pointer select-none">
+                      Apply 18% GST (9% CGST + 9% SGST)
+                    </label>
+                  </div>
+                </div>
+
                 <div className="flex items-center gap-10 text-muted-foreground">
                   <span className="text-xs font-bold uppercase tracking-widest">Subtotal:</span>
                   <span className="text-lg font-black text-foreground tabular-nums">₹{calculateTotal().toLocaleString()}</span>
                 </div>
-                <div className="flex items-center gap-10 text-muted-foreground">
-                  <span className="text-[10px] font-black uppercase tracking-widest">GST (18%):</span>
-                  <span className="text-sm font-bold text-foreground tabular-nums">₹{(calculateTotal() * 0.18).toLocaleString()}</span>
-                </div>
+                {formData.apply_gst && (
+                  <div className="flex items-center gap-10 text-muted-foreground">
+                    <span className="text-[10px] font-black uppercase tracking-widest">GST (18%):</span>
+                    <span className="text-sm font-bold text-foreground tabular-nums">₹{(calculateTotal() * 0.18).toLocaleString()}</span>
+                  </div>
+                )}
                 <div className="flex items-center gap-10 border-t border-border/50 pt-2">
                   <span className="text-sm font-black uppercase tracking-widest text-emerald-600">Grand Total:</span>
-                  <span className="text-3xl font-black text-foreground tabular-nums">₹{(calculateTotal() * 1.18).toLocaleString()}</span>
+                  <span className="text-3xl font-black text-foreground tabular-nums">₹{(formData.apply_gst ? calculateTotal() * 1.18 : calculateTotal()).toLocaleString()}</span>
                 </div>
-                <p className="text-[10px] text-muted-foreground italic text-right mt-2">GST split (9% CGST + 9% SGST) will be applied on final generation.</p>
+                {formData.apply_gst && (
+                  <p className="text-[10px] text-muted-foreground italic text-right mt-2">GST split (9% CGST + 9% SGST) will be applied on final generation.</p>
+                )}
               </div>
 
               <DialogFooter>

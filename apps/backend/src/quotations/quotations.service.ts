@@ -21,7 +21,7 @@ export class QuotationsService {
   }
 
   async create(data: any) {
-    const { items, ...quoteData } = data;
+    const { items, apply_gst, ...quoteData } = data;
 
     // Clean up empty strings for IDs to prevent Prisma UUID validation errors
     if (quoteData.lead_id === '') quoteData.lead_id = null;
@@ -57,10 +57,10 @@ export class QuotationsService {
       0,
     );
 
-    // GST Calculation (Assume 18% total)
-    // Professional split: CGST 9% + SGST 9% (Assuming intrastate for now)
-    const cgst = subtotal * 0.09;
-    const sgst = subtotal * 0.09;
+    // GST Calculation (Assume 18% total if apply_gst is active)
+    const activeGst = apply_gst !== false;
+    const cgst = activeGst ? subtotal * 0.09 : 0;
+    const sgst = activeGst ? subtotal * 0.09 : 0;
     const igst = 0; // Interstate would be 18% IGST
     const taxAmount = cgst + sgst + igst;
     const totalAmount = subtotal + taxAmount;
@@ -198,6 +198,20 @@ export class QuotationsService {
             );
           }
 
+          // Prevent duplicate/similar invoices for this client
+          const similarInvoice = await tx.invoice.findFirst({
+            where: {
+              client_id: clientId,
+              total_amount: quotation.total_amount,
+              status: { not: 'VOID' },
+            },
+          });
+          if (similarInvoice) {
+            throw new BadRequestException(
+              `A similar invoice (${similarInvoice.invoice_number}) with the total amount of ₹${Number(quotation.total_amount).toLocaleString()} already exists for this client. Conversion blocked to prevent duplicate billing.`,
+            );
+          }
+
           // 1. Update Quotation Status
           await tx.quotation.update({
             where: { id },
@@ -263,6 +277,15 @@ export class QuotationsService {
                 work_order_no: workOrderNo,
                 description: item.description,
                 status: 'PENDING',
+                items: {
+                  create: {
+                    description: item.description,
+                    quantity: Number(item.quantity) || 1,
+                    unit_price: item.unit_price,
+                    gst_rate: 18.00,
+                    total_amount: Number(item.quantity || 1) * Number(item.unit_price),
+                  }
+                }
               },
             });
           }

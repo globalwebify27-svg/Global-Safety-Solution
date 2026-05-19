@@ -422,7 +422,15 @@ export default function DashboardPage() {
 
           <div className="space-y-6 flex-1 overflow-y-auto pr-2 scrollbar-hide">
             {(stats.recentActivity || []).map((item, i) => (
-              <div key={i} className="flex gap-4 group cursor-default">
+              <div 
+                key={i} 
+                className="flex gap-4 group cursor-pointer hover:bg-accent/5 p-2 rounded-xl transition-all"
+                onClick={() => {
+                  if (item.type === 'LEAD') router.push('/dashboard/leads');
+                  else if (item.type === 'CLIENT') router.push('/dashboard/clients');
+                  else if (item.type === 'QUOTE') router.push('/dashboard/quotations');
+                }}
+              >
                 <div className="relative">
                   <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center border transition-all group-hover:scale-110", 
                     item.type === 'LEAD' ? 'bg-blue-500/10 border-blue-500/20 text-blue-500' : 

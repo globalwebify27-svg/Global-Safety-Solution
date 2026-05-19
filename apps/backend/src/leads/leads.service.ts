@@ -66,11 +66,17 @@ export class LeadsService {
         // Use type casting to bypass temporary IDE stale type issues if necessary
         const leadData = lead as any;
 
-        // 1. Prevent double conversion
+        // 1. Handle pre-existing client association
         if (leadData.client_id) {
-          throw new BadRequestException(
-            'Lead has already been converted to a client',
-          );
+          // If already linked, ensure the client is active and update lead status to WON
+          await tx.client.update({
+            where: { id: leadData.client_id },
+            data: { is_active: true },
+          });
+          return await tx.lead.update({
+            where: { id },
+            data: { status: 'WON' },
+          });
         }
 
         // 2. Create the Client record

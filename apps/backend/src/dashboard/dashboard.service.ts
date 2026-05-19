@@ -82,23 +82,27 @@ export class DashboardService {
     const [recentLeads, recentClients, recentQuotations] = await Promise.all([
       this.prisma.lead.findMany({
         take: 5,
-        orderBy: { created_at: 'desc' },
+        orderBy: { updated_at: 'desc' },
         select: {
           id: true,
           company_name: true,
           status: true,
           created_at: true,
+          updated_at: true,
         },
       }),
       this.prisma.client.findMany({
         take: 5,
-        orderBy: { created_at: 'desc' },
-        select: { id: true, name: true, is_active: true, created_at: true },
+        orderBy: { updated_at: 'desc' },
+        select: { id: true, name: true, is_active: true, created_at: true, updated_at: true },
       }),
       this.prisma.quotation.findMany({
         take: 5,
         orderBy: { updated_at: 'desc' },
-        include: { lead: { select: { company_name: true } } },
+        include: { 
+          lead: { select: { company_name: true } },
+          client: { select: { name: true } }
+        },
       }),
     ]);
 
@@ -107,8 +111,14 @@ export class DashboardService {
         id: l.id,
         type: 'LEAD',
         title: l.company_name,
-        detail: `New lead captured: ${l.status}`,
-        date: l.created_at,
+        detail: l.status === 'NEW' 
+          ? 'New lead captured'
+          : l.status === 'WON'
+            ? 'Lead converted: WON'
+            : l.status === 'LOST'
+              ? 'Opportunity closed: LOST'
+              : `Lead status updated: ${l.status}`,
+        date: l.updated_at,
       })),
       ...recentClients.map((c) => ({
         id: c.id,
@@ -117,12 +127,12 @@ export class DashboardService {
         detail: c.is_active
           ? 'Client account activated'
           : 'Client account pending',
-        date: c.created_at,
+        date: c.updated_at,
       })),
       ...recentQuotations.map((q) => ({
         id: q.id,
         type: 'QUOTE',
-        title: q.lead?.company_name || 'Direct Quote',
+        title: q.lead?.company_name || q.client?.name || 'Direct Quote',
         detail: `Quotation ${q.quote_number}: ₹${Number(q.total_amount).toLocaleString()}`,
         date: q.updated_at,
       })),
