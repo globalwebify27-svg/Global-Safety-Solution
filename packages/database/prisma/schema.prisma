@@ -548,6 +548,8 @@ model Document {
   project_id    String?     @db.VarChar(36)
   compliance_id String?     @db.VarChar(36)
   expiry_date   DateTime?   @db.Date
+  test_date     DateTime?   @db.Date
+  notes         String?     @db.Text
   uploaded_by   String?     @db.VarChar(36)
   created_at    DateTime    @default(now()) @db.DateTime(6)
   updated_at    DateTime    @updatedAt @db.DateTime(6)
@@ -602,6 +604,7 @@ model InspectionItem {
   status        String     @default("PENDING") @db.VarChar(50)
   notes         String?
   photo_url     String?
+  expenditure   Decimal?   @default(0) @db.Decimal(15, 2)
   inspection    Inspection @relation(fields: [inspection_id], references: [id], onDelete: Cascade)
 
   @@map("inspection_items")

@@ -12,8 +12,8 @@ import { NotificationCenter } from "@/components/notification-center";
 const navigation = [
   { name: "Overview", href: "/dashboard", icon: Home },
   { name: "Client Management", href: "/dashboard/clients", icon: Users },
-  { name: "Sales Pipeline", href: "/dashboard/leads", icon: Target },
   { name: "Quotation Hub", href: "/dashboard/quotations", icon: FileSpreadsheet },
+  { name: "Sales Pipeline", href: "/dashboard/leads", icon: Target },
   { name: "Finance & Invoices", href: "/dashboard/finance", icon: Banknote },
   { name: "Staff Directory", href: "/dashboard/employees", icon: UserCircle },
   { name: "Payroll Hub", href: "/dashboard/payroll", icon: Banknote },

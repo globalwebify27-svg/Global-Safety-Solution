@@ -47,6 +47,8 @@ export class DocumentsService {
         project_id: data.project_id || null,
         compliance_id: data.compliance_id || null,
         expiry_date: data.expiry_date ? new Date(data.expiry_date) : null,
+        test_date: data.test_date ? new Date(data.test_date) : null,
+        notes: data.notes || null,
         uploaded_by: uploaderId,
       },
     });
