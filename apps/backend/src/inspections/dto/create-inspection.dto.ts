@@ -15,11 +15,16 @@ export enum InspectionStatus {
   IN_PROGRESS = 'IN_PROGRESS',
   COMPLETED = 'COMPLETED',
   CANCELLED = 'CANCELLED',
+  REJECTED = 'REJECTED',
 }
 
 export class CreateInspectionItemDto {
   @IsString()
   description: string;
+
+  @IsOptional()
+  @IsNumber()
+  expenditure?: number;
 }
 
 export class CreateInspectionDto {
@@ -54,6 +59,14 @@ export class UpdateInspectionDto {
   status?: InspectionStatus;
 
   @IsOptional()
+  @IsUUID()
+  engineer_id?: string;
+
+  @IsOptional()
+  @IsDateString()
+  scheduled_date?: string;
+
+  @IsOptional()
   @IsNumber()
   lat?: number;
 
@@ -82,4 +95,8 @@ export class UpdateInspectionItemDto {
   @IsOptional()
   @IsString()
   photo_url?: string;
+
+  @IsOptional()
+  @IsNumber()
+  expenditure?: number;
 }

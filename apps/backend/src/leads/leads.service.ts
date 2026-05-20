@@ -21,7 +21,9 @@ export class LeadsService {
   }
 
   async create(data: any) {
-    const next_follow_up = data.next_follow_up ? new Date(data.next_follow_up) : null;
+    const next_follow_up = data.next_follow_up
+      ? new Date(data.next_follow_up)
+      : null;
     return this.prisma.lead.create({
       data: {
         ...data,
@@ -33,7 +35,9 @@ export class LeadsService {
   async update(id: string, data: any) {
     let next_follow_up = undefined;
     if (data.next_follow_up !== undefined) {
-      next_follow_up = data.next_follow_up ? new Date(data.next_follow_up) : null;
+      next_follow_up = data.next_follow_up
+        ? new Date(data.next_follow_up)
+        : null;
     }
     return this.prisma.lead.update({
       where: { id },
@@ -129,7 +133,9 @@ export class LeadsService {
   async sendEmail(id: string, subject: string, message: string) {
     const lead = await this.findOne(id);
     if (!lead.email) {
-      throw new BadRequestException('Lead does not have a registered email address');
+      throw new BadRequestException(
+        'Lead does not have a registered email address',
+      );
     }
     await this.mailService.sendMail(lead.email, subject, message);
     return { success: true, message: 'Email dispatched successfully' };

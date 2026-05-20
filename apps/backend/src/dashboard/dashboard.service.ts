@@ -94,14 +94,20 @@ export class DashboardService {
       this.prisma.client.findMany({
         take: 5,
         orderBy: { updated_at: 'desc' },
-        select: { id: true, name: true, is_active: true, created_at: true, updated_at: true },
+        select: {
+          id: true,
+          name: true,
+          is_active: true,
+          created_at: true,
+          updated_at: true,
+        },
       }),
       this.prisma.quotation.findMany({
         take: 5,
         orderBy: { updated_at: 'desc' },
-        include: { 
+        include: {
           lead: { select: { company_name: true } },
-          client: { select: { name: true } }
+          client: { select: { name: true } },
         },
       }),
     ]);
@@ -111,13 +117,14 @@ export class DashboardService {
         id: l.id,
         type: 'LEAD',
         title: l.company_name,
-        detail: l.status === 'NEW' 
-          ? 'New lead captured'
-          : l.status === 'WON'
-            ? 'Lead converted: WON'
-            : l.status === 'LOST'
-              ? 'Opportunity closed: LOST'
-              : `Lead status updated: ${l.status}`,
+        detail:
+          l.status === 'NEW'
+            ? 'New lead captured'
+            : l.status === 'WON'
+              ? 'Lead converted: WON'
+              : l.status === 'LOST'
+                ? 'Opportunity closed: LOST'
+                : `Lead status updated: ${l.status}`,
         date: l.updated_at,
       })),
       ...recentClients.map((c) => ({

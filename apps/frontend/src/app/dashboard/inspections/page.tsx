@@ -33,12 +33,14 @@ interface InspectionItem {
   description: string;
   status: 'PENDING' | 'PASS' | 'FAIL' | 'NA';
   notes?: string;
+  expenditure?: number | string;
 }
 
 interface Inspection {
   id: string;
   client: { name: string };
   engineer?: { name: string };
+  engineer_id?: string;
   scheduled_date: string;
   status: string;
   items: InspectionItem[];
@@ -127,6 +129,22 @@ export default function InspectionsPage() {
     }
   };
 
+  const fetchSingleInspection = async (inspectionId: string) => {
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/inspections/${inspectionId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSelectedInspection(data);
+        setInspections(prev => prev.map(i => i.id === inspectionId ? data : i));
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   const handleSchedule = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token) return;
@@ -137,8 +155,14 @@ export default function InspectionsPage() {
         body: JSON.stringify(scheduleForm)
       });
       if (res.ok) {
+        const createdInspection = await res.json();
         setOpenSchedule(false);
-        toast.success("Inspection scheduled successfully");
+        toast.success("Inspection scheduled successfully! Opening site visit checklist...");
+        
+        setSelectedInspection(createdInspection);
+        setUploadedPhotoUrls([]);
+        setOpenVisit(true);
+
         fetchData();
       }
     } catch (e) {
@@ -146,21 +170,21 @@ export default function InspectionsPage() {
     }
   };
 
-  const handleUpdateItem = async (itemId: string, status: string, notes?: string) => {
+  const handleUpdateItem = async (itemId: string, status: string, notes?: string, expenditure?: number | string) => {
     if (!token) return;
     try {
       const res = await fetch(`${API_BASE_URL}/inspections/item/${itemId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ status, notes })
+        body: JSON.stringify({ status, notes, expenditure: expenditure ? Number(expenditure) : 0 })
       });
       if (res.ok) {
-        // Update local state
         if (selectedInspection) {
           const updatedItems = (selectedInspection.items || []).map(item => 
-            item.id === itemId ? { ...item, status: status as any, notes } : item
+            item.id === itemId ? { ...item, status: status as any, notes, expenditure } : item
           );
           setSelectedInspection({ ...selectedInspection, items: updatedItems });
+          await fetchSingleInspection(selectedInspection.id);
         }
       }
     } catch (e) {
@@ -219,14 +243,27 @@ export default function InspectionsPage() {
 
   const handleCompleteVisit = async () => {
     if (!selectedInspection || !token) return;
+
+    // Block sign-off if any checklist item is still PENDING
+    const pendingItems = (selectedInspection.items || []).filter(item => item.status === 'PENDING');
+    if (pendingItems.length > 0) {
+      toast.error(
+        `${pendingItems.length} checklist item${pendingItems.length > 1 ? 's are' : ' is'} still pending. Mark every item ✔ or ✘ before signing off.`,
+        { duration: 4000 }
+      );
+      return;
+    }
     
     const submit = async (latitude?: number, longitude?: number) => {
       try {
+        const hasFailItems = (selectedInspection.items || []).some(item => item.status === 'FAIL');
+        const finalStatus = hasFailItems ? 'REJECTED' : 'COMPLETED';
+
         const res = await fetch(`${API_BASE_URL}/inspections/${selectedInspection.id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
           body: JSON.stringify({ 
-            status: 'COMPLETED', 
+            status: finalStatus, 
             completed_date: new Date().toISOString(),
             lat: latitude,
             lng: longitude,
@@ -235,7 +272,11 @@ export default function InspectionsPage() {
         });
         if (res.ok) {
           setOpenVisit(false);
-          toast.success("Visit marked as completed with site verification");
+          if (finalStatus === 'REJECTED') {
+            toast.warning("Visit submitted and marked as REJECTED due to failed items");
+          } else {
+            toast.success("Visit marked as completed with site verification");
+          }
           fetchData();
         } else {
           const err = await res.json();
@@ -392,9 +433,11 @@ export default function InspectionsPage() {
             <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-600">
               <CheckCircle2 className="w-5 h-5" />
             </div>
-            <span className="text-sm font-bold text-muted-foreground uppercase tracking-wider">Completed</span>
+            <span className="text-sm font-bold text-muted-foreground uppercase tracking-wider">Completed / Rejected</span>
           </div>
-          <p className="text-3xl font-black text-foreground">{inspections.filter(i => i.status === 'COMPLETED').length}</p>
+          <p className="text-3xl font-black text-foreground">
+            {inspections.filter(i => i.status === 'COMPLETED').length} / {inspections.filter(i => i.status === 'REJECTED').length}
+          </p>
         </div>
       </div>
 
@@ -417,6 +460,7 @@ export default function InspectionsPage() {
                 <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Engineer</th>
                 <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Schedule</th>
                 <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Status</th>
+                <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Expenditure</th>
                 <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground text-right">Action</th>
               </tr>
             </thead>
@@ -432,7 +476,7 @@ export default function InspectionsPage() {
                       <div className="flex flex-col">
                         <span className="text-sm font-bold text-foreground group-hover:text-blue-600 transition-colors">{i.client?.name}</span>
                         <span className="text-[10px] text-muted-foreground uppercase mt-1 flex items-center gap-1">
-                          <MapPin className="w-3 h-3" /> Site Verified: {i.lat ? "Yes" : "Pending"}
+                          <MapPin className="w-3 h-3" /> Site Verified: {i.lat || i.status === 'COMPLETED' || i.status === 'REJECTED' ? "Yes" : "Pending"}
                         </span>
                       </div>
                     </td>
@@ -451,35 +495,55 @@ export default function InspectionsPage() {
                     <td className="px-8 py-6">
                       <span className={cn("px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter ring-1", 
                         i.status === 'COMPLETED' ? 'bg-emerald-500/10 text-emerald-600 ring-emerald-500/20' :
+                        i.status === 'REJECTED' ? 'bg-rose-500/10 text-rose-600 ring-rose-500/20' :
                         i.status === 'SCHEDULED' ? 'bg-blue-500/10 text-blue-600 ring-blue-500/20' :
                         'bg-amber-500/10 text-amber-600 ring-amber-500/20'
                       )}>
                         {i.status}
                       </span>
                     </td>
+                    <td className="px-8 py-6">
+                      <span className="text-sm font-bold text-foreground inline-flex items-center gap-1">
+                        ₹{(i.items || []).reduce((acc, curr) => acc + (Number(curr.expenditure) || 0), 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    </td>
                     <td className="px-8 py-6 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        {i.status === 'COMPLETED' && (
+                        {i.status === 'COMPLETED' ? (
+                          <>
+                            <Button 
+                              variant="ghost" 
+                              className="h-9 px-3 rounded-xl text-xs font-bold text-muted-foreground hover:bg-muted/10 flex items-center gap-1"
+                              onClick={() => {
+                                setSelectedInspection(i);
+                                setUploadedPhotoUrls(parseRemarksPhotos(i.remarks));
+                                setOpenVisit(true);
+                              }}
+                            >
+                              Review Checklist
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="icon"
+                              className="h-9 w-9 rounded-xl text-emerald-600 hover:bg-emerald-500/10"
+                              onClick={() => handleDownloadCertificate(i.id)}
+                            >
+                              <Download className="w-4 h-4" />
+                            </Button>
+                          </>
+                        ) : (
                           <Button 
                             variant="ghost" 
-                            size="icon"
-                            className="h-9 w-9 rounded-xl text-emerald-600 hover:bg-emerald-500/10"
-                            onClick={() => handleDownloadCertificate(i.id)}
+                            className="h-9 px-4 rounded-xl text-xs font-bold text-blue-600 hover:bg-blue-500/10"
+                            onClick={() => {
+                              setSelectedInspection(i);
+                              setUploadedPhotoUrls(parseRemarksPhotos(i.remarks));
+                              setOpenVisit(true);
+                            }}
                           >
-                            <Download className="w-4 h-4" />
+                            {i.status === 'REJECTED' ? 'Update Checklist' : 'Start Visit'} <ChevronRight className="w-4 h-4 ml-1" />
                           </Button>
                         )}
-                        <Button 
-                          variant="ghost" 
-                          className="h-9 px-4 rounded-xl text-xs font-bold text-blue-600 hover:bg-blue-500/10"
-                          onClick={() => {
-                            setSelectedInspection(i);
-                            setUploadedPhotoUrls(parseRemarksPhotos(i.remarks));
-                            setOpenVisit(true);
-                          }}
-                        >
-                          {i.status === 'COMPLETED' ? 'View Details' : 'Start Visit'} <ChevronRight className="w-4 h-4 ml-1" />
-                        </Button>
                       </div>
                     </td>
                   </tr>
@@ -504,6 +568,112 @@ export default function InspectionsPage() {
                 </DialogDescription>
               </DialogHeader>
 
+              {/* Sleek inline Audit Management & Settings Bar */}
+              <div className="p-5 bg-blue-500/5 border border-blue-500/10 rounded-2xl space-y-4 shadow-inner">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-black text-blue-600 uppercase tracking-widest">Audit settings & assignment</h4>
+                  <span className={cn("px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-tight ring-1",
+                    selectedInspection.status === 'COMPLETED' ? 'bg-emerald-500/10 text-emerald-600 ring-emerald-500/20' :
+                    selectedInspection.status === 'REJECTED' ? 'bg-rose-500/10 text-rose-600 ring-rose-500/20' :
+                    selectedInspection.status === 'SCHEDULED' ? 'bg-blue-500/10 text-blue-600 ring-blue-500/20' :
+                    'bg-amber-500/10 text-amber-600 ring-amber-500/20'
+                  )}>
+                    CURRENT STATE: {selectedInspection.status}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase">Assign Engineer</label>
+                    <select
+                      value={selectedInspection.engineer_id || ""}
+                      onChange={async (e) => {
+                        const newEngineerId = e.target.value;
+                        if (!token) return;
+                        try {
+                          const res = await fetch(`${API_BASE_URL}/inspections/${selectedInspection.id}`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                            body: JSON.stringify({ engineer_id: newEngineerId || null })
+                          });
+                          if (res.ok) {
+                            toast.success("Engineer reassigned successfully!");
+                            await fetchSingleInspection(selectedInspection.id);
+                          }
+                        } catch (err) {
+                          toast.error("Failed to reassign engineer");
+                        }
+                      }}
+                      className="w-full h-10 px-3 bg-background border border-border rounded-xl text-xs font-semibold focus:outline-none"
+                    >
+                      <option value="">Unassigned</option>
+                      {engineers.map(eng => (
+                        <option key={eng.id} value={eng.id}>{eng.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase">Schedule Date</label>
+                    <input
+                      type="date"
+                      value={selectedInspection.scheduled_date ? selectedInspection.scheduled_date.split('T')[0] : ""}
+                      onChange={async (e) => {
+                        const newDate = e.target.value;
+                        if (!token) return;
+                        try {
+                          const res = await fetch(`${API_BASE_URL}/inspections/${selectedInspection.id}`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                            body: JSON.stringify({ scheduled_date: newDate })
+                          });
+                          if (res.ok) {
+                            toast.success("Inspection rescheduled successfully!");
+                            await fetchSingleInspection(selectedInspection.id);
+                          }
+                        } catch (err) {
+                          toast.error("Failed to reschedule inspection");
+                        }
+                      }}
+                      className="w-full h-10 px-3 bg-background border border-border rounded-xl text-xs font-semibold focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase">Override Status</label>
+                    <select
+                      value={selectedInspection.status}
+                      onChange={async (e) => {
+                        const newStatus = e.target.value;
+                        if (!token) return;
+                        try {
+                          const res = await fetch(`${API_BASE_URL}/inspections/${selectedInspection.id}`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                            body: JSON.stringify({ status: newStatus })
+                          });
+                          if (res.ok) {
+                            toast.success(`Status updated to ${newStatus}!`);
+                            await fetchSingleInspection(selectedInspection.id);
+                          } else {
+                            const err = await res.json();
+                            toast.error(err.message || "Failed to update status");
+                          }
+                        } catch (err) {
+                          toast.error("Failed to update status");
+                        }
+                      }}
+                      className="w-full h-10 px-3 bg-background border border-border rounded-xl text-xs font-bold text-foreground focus:outline-none"
+                    >
+                      <option value="SCHEDULED">SCHEDULED</option>
+                      <option value="IN_PROGRESS">IN_PROGRESS</option>
+                      <option value="COMPLETED">COMPLETED</option>
+                      <option value="REJECTED">REJECTED</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
               <div className="space-y-4">
                 {(selectedInspection?.items || []).map((item) => (
                   <div key={item.id} className="p-5 bg-muted/20 border border-border rounded-2xl space-y-3">
@@ -514,7 +684,7 @@ export default function InspectionsPage() {
                           size="sm" 
                           variant={item.status === 'PASS' ? 'default' : 'outline'} 
                           className={cn("h-8 rounded-lg", item.status === 'PASS' && "bg-emerald-600 hover:bg-emerald-500")}
-                          onClick={() => handleUpdateItem(item.id, 'PASS')}
+                          onClick={() => handleUpdateItem(item.id, 'PASS', item.notes, item.expenditure)}
                         >
                           <Check className="w-4 h-4" />
                         </Button>
@@ -522,18 +692,30 @@ export default function InspectionsPage() {
                           size="sm" 
                           variant={item.status === 'FAIL' ? 'destructive' : 'outline'} 
                           className="h-8 rounded-lg"
-                          onClick={() => handleUpdateItem(item.id, 'FAIL')}
+                          onClick={() => handleUpdateItem(item.id, 'FAIL', item.notes, item.expenditure)}
                         >
                           <X className="w-4 h-4" />
                         </Button>
                       </div>
                     </div>
-                    <Input 
-                      placeholder="Add observations..." 
-                      className="bg-background h-10 text-sm"
-                      value={item.notes || ""}
-                      onChange={(e) => handleUpdateItem(item.id, item.status, e.target.value)}
-                    />
+                    <div className="flex items-center gap-3">
+                      <Input 
+                        placeholder="Add observations..." 
+                        className="bg-background h-10 text-sm flex-1"
+                        value={item.notes || ""}
+                        onChange={(e) => handleUpdateItem(item.id, item.status, e.target.value, item.expenditure)}
+                      />
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-bold text-muted-foreground uppercase">Exp (₹)</span>
+                        <Input
+                          type="number"
+                          placeholder="0.00"
+                          className="bg-background h-10 text-sm w-28"
+                          value={item.expenditure || ""}
+                          onChange={(e) => handleUpdateItem(item.id, item.status, item.notes, e.target.value)}
+                        />
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -608,13 +790,33 @@ export default function InspectionsPage() {
 
               <DialogFooter className="pt-4 border-t border-border">
                 <Button variant="ghost" onClick={() => setOpenVisit(false)}>Discard</Button>
-                <Button 
-                  disabled={selectedInspection.status === 'COMPLETED'}
-                  onClick={handleCompleteVisit}
-                  className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold h-12 px-10 rounded-xl shadow-lg shadow-emerald-500/20"
-                >
-                  {selectedInspection.status === 'COMPLETED' ? 'Already Completed' : 'Complete Audit & Sign Off'}
-                </Button>
+                {(() => {
+                  const pendingCount = (selectedInspection.items || []).filter(it => it.status === 'PENDING').length;
+                  const isAlreadyDone = selectedInspection.status === 'COMPLETED';
+                  const isBlocked = pendingCount > 0;
+                  return (
+                    <Button
+                      disabled={isAlreadyDone || isBlocked}
+                      onClick={handleCompleteVisit}
+                      className={cn(
+                        "text-white font-bold h-12 px-10 rounded-xl shadow-lg transition-all",
+                        isAlreadyDone
+                          ? "bg-muted text-muted-foreground cursor-not-allowed"
+                          : isBlocked
+                            ? "bg-amber-500/80 shadow-amber-500/20 cursor-not-allowed opacity-80"
+                            : "bg-emerald-600 hover:bg-emerald-500 shadow-emerald-500/20"
+                      )}
+                    >
+                      {isAlreadyDone
+                        ? "Already Completed"
+                        : isBlocked
+                          ? `${pendingCount} Item${pendingCount > 1 ? "s" : ""} Pending — Mark All First`
+                          : selectedInspection.status === "REJECTED"
+                            ? "Re-Submit Audit Sign Off"
+                            : "Complete Audit & Sign Off"}
+                    </Button>
+                  );
+                })()}
               </DialogFooter>
             </div>
           )}

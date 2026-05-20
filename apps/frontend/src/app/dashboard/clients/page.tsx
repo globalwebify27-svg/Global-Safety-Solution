@@ -20,11 +20,18 @@ interface Client {
   industry?: string;
   city?: string;
   is_active: boolean;
+  assigned_staff?: {
+    id: string;
+    name: string;
+    email: string;
+    designation?: string;
+  };
 }
 
 export default function ClientsPage() {
   const [clients, setClients] = useState<Client[]>([]);
   const [staff, setStaff] = useState<any[]>([]);
+  const [leads, setLeads] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const token = useAuthStore((state) => state.token);
@@ -77,6 +84,15 @@ export default function ClientsPage() {
     .then(r => r.json())
     .then(data => {
       if (Array.isArray(data)) setStaff(data);
+    })
+    .catch(console.error);
+
+    fetch(`${API_BASE_URL}/leads`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (Array.isArray(data)) setLeads(data);
     })
     .catch(console.error);
   };
@@ -139,13 +155,44 @@ export default function ClientsPage() {
                   <div className="space-y-2">
                     <Label htmlFor="org_name" className="text-foreground/80">Organization Name *</Label>
                     <div className="relative">
-                      <User className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
-                      <Input id="org_name" name="org_name" autoComplete="off" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="pl-9 bg-background border-border text-foreground focus:ring-primary placeholder:text-muted-foreground/50" placeholder="Acme Global Inc." required />
+                      <Building2 className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
+                      <input 
+                        id="org_name" 
+                        name="org_name" 
+                        list="leads-list"
+                        autoComplete="off" 
+                        value={formData.name} 
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          const matchedLead = leads.find(l => l.company_name === val);
+                          if (matchedLead) {
+                            setFormData({
+                              ...formData,
+                              name: val,
+                              email: matchedLead.email || formData.email,
+                              phone: matchedLead.phone || formData.phone,
+                              industry: matchedLead.source || formData.industry,
+                            });
+                          } else {
+                            setFormData({...formData, name: val});
+                          }
+                        }} 
+                        className="w-full pl-9 h-10 bg-background border border-border rounded-md text-foreground focus:ring-2 focus:ring-primary focus:outline-none placeholder:text-muted-foreground/50" 
+                        placeholder="Acme Global Inc." 
+                        required 
+                      />
+                      <datalist id="leads-list">
+                        {leads.map((l) => (
+                          <option key={l.id} value={l.company_name}>
+                            {l.contact_person ? `${l.company_name} (${l.contact_person})` : l.company_name}
+                          </option>
+                        ))}
+                      </datalist>
                     </div>
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="assigned_staff" className="text-foreground/80">Assign Staff / Account Manager</Label>
+                    <Label htmlFor="assigned_staff" className="text-foreground/80">Assigned Safety Officer</Label>
                     <div className="relative">
                       <Briefcase className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
                       <select 
@@ -154,9 +201,9 @@ export default function ClientsPage() {
                         onChange={(e) => setFormData({...formData, assigned_staff_id: e.target.value})}
                         className="w-full pl-9 h-10 bg-background border border-border rounded-md text-foreground focus:ring-2 focus:ring-primary focus:outline-none appearance-none"
                       >
-                        <option value="">Select Staff Member (Optional)</option>
+                        <option value="">Select Safety Officer (Optional)</option>
                         {staff.map((s: any) => (
-                          <option key={s.id} value={s.id}>{s.name} ({s.designation || 'Staff'})</option>
+                          <option key={s.id} value={s.id}>{s.name} ({s.designation || 'Safety Officer'})</option>
                         ))}
                       </select>
                     </div>
@@ -235,6 +282,7 @@ export default function ClientsPage() {
           <thead className="bg-muted text-muted-foreground text-sm">
             <tr>
               <th className="px-6 py-4 border-b border-border">Client Enterprise</th>
+              <th className="px-6 py-4 border-b border-border">Assigned Officer</th>
               <th className="px-6 py-4 border-b border-border">Contact Info</th>
               <th className="px-6 py-4 border-b border-border">Compliance ID (GST)</th>
               <th className="px-6 py-4 border-b border-border">Status</th>
@@ -243,15 +291,25 @@ export default function ClientsPage() {
           </thead>
           <tbody className="divide-y divide-border text-sm">
             {loading ? (
-               <tr><td colSpan={5} className="px-6 py-8 text-center text-muted-foreground">Loading clients...</td></tr>
+               <tr><td colSpan={6} className="px-6 py-8 text-center text-muted-foreground">Loading clients...</td></tr>
             ) : clients.length === 0 ? (
-              <tr><td colSpan={5} className="px-6 py-8 text-center text-muted-foreground">No enterprise clients found in the registry.</td></tr>
+               <tr><td colSpan={6} className="px-6 py-8 text-center text-muted-foreground">No enterprise clients found in the registry.</td></tr>
             ) : (
               clients.map((c) => (
                 <tr key={c.id} className="hover:bg-accent/5 transition-colors group">
                   <td className="px-6 py-4">
                     <div className="text-foreground font-semibold">{c.name}</div>
                     <div className="text-muted-foreground text-xs mt-1">{c.industry || 'General Industry'} • {c.city || 'No Location'}</div>
+                  </td>
+                  <td className="px-6 py-4">
+                    {c.assigned_staff ? (
+                      <div>
+                        <div className="text-foreground font-semibold">{c.assigned_staff.name}</div>
+                        <div className="text-muted-foreground text-xs mt-1">{c.assigned_staff.designation || 'Safety Officer'}</div>
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground/60 italic">Unassigned</span>
+                    )}
                   </td>
                   <td className="px-6 py-4">
                     <div className="text-foreground/80">{c.email || 'No email provided'}</div>

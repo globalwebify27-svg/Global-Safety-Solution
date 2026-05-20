@@ -17,10 +17,17 @@ export class PublicCertificatesController {
       // Map it dynamically to matches standard certificate interface format
       return {
         id: compliance.id,
-        certificate_number: compliance.reference_number || `GSS-REG-${compliance.id.substring(0, 5).toUpperCase()}`,
+        certificate_number:
+          compliance.reference_number ||
+          `GSS-REG-${compliance.id.substring(0, 5).toUpperCase()}`,
         issue_date: compliance.issue_date || compliance.created_at,
         expiry_date: compliance.expiry_date || new Date(),
-        validity_period: compliance.renewal_cycle_days === 365 ? '1y' : compliance.renewal_cycle_days === 1095 ? '3y' : '1y',
+        validity_period:
+          compliance.renewal_cycle_days === 365
+            ? '1y'
+            : compliance.renewal_cycle_days === 1095
+              ? '3y'
+              : '1y',
         remarks: `Verification of Safety Status: ${compliance.status}`,
         inspection: {
           client: {
@@ -28,8 +35,8 @@ export class PublicCertificatesController {
           },
           work_order: {
             work_order_no: `WO-${compliance.compliance_type.substring(0, 3).toUpperCase()}`,
-          }
-        }
+          },
+        },
       };
     }
 
@@ -41,13 +48,15 @@ export class PublicCertificatesController {
           include: {
             client: true,
             work_order: true,
-          }
-        }
-      }
+          },
+        },
+      },
     });
 
     if (!cert) {
-      throw new NotFoundException('Safety certificate or compliance record not found');
+      throw new NotFoundException(
+        'Safety certificate or compliance record not found',
+      );
     }
 
     return cert;

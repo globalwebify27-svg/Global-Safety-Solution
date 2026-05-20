@@ -1,4 +1,8 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 
@@ -7,7 +11,7 @@ export class QuotationsService {
   constructor(
     private prisma: PrismaService,
     private notificationsService: NotificationsService,
-  ) { }
+  ) {}
 
   async findAll() {
     return this.prisma.quotation.findMany({
@@ -282,10 +286,11 @@ export class QuotationsService {
                     description: item.description,
                     quantity: Number(item.quantity) || 1,
                     unit_price: item.unit_price,
-                    gst_rate: 18.00,
-                    total_amount: Number(item.quantity || 1) * Number(item.unit_price),
-                  }
-                }
+                    gst_rate: 18.0,
+                    total_amount:
+                      Number(item.quantity || 1) * Number(item.unit_price),
+                  },
+                },
               },
             });
           }
@@ -351,7 +356,10 @@ export class QuotationsService {
         { timeout: 15000 },
       );
     } catch (error: any) {
-      if (error instanceof BadRequestException || error instanceof NotFoundException) {
+      if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException
+      ) {
         throw error;
       }
       throw new BadRequestException(error.message || 'Conversion failed.');

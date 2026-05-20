@@ -63,22 +63,44 @@ export class InspectionsService {
   }
 
   async update(id: string, data: UpdateInspectionDto) {
-    const completed_date = data.completed_date ? new Date(data.completed_date) : undefined;
+    const completed_date = data.completed_date
+      ? new Date(data.completed_date)
+      : undefined;
+    const scheduled_date = data.scheduled_date
+      ? new Date(data.scheduled_date)
+      : undefined;
+
+    // If status is changed away from COMPLETED, clean up existing certificate & compliance
+    if (data.status && data.status !== 'COMPLETED') {
+      const cert = await this.prisma.certificate.findUnique({
+        where: { inspection_id: id }
+      });
+      if (cert) {
+        await this.prisma.compliance.deleteMany({
+          where: { reference_number: cert.certificate_no }
+        });
+        await this.prisma.certificate.delete({
+          where: { id: cert.id }
+        });
+      }
+    }
+
     const inspection = await this.prisma.inspection.update({
       where: { id },
       data: {
         ...data,
         ...(completed_date ? { completed_date } : {}),
+        ...(scheduled_date ? { scheduled_date } : {}),
       },
-      include: { 
-        items: true, 
-        client: true, 
-        engineer: true, 
+      include: {
+        items: true,
+        client: true,
+        engineer: true,
         work_order: {
           include: {
-            service_product: true
-          }
-        } 
+            service_product: true,
+          },
+        },
       },
     });
 
@@ -107,7 +129,8 @@ export class InspectionsService {
         });
 
         // Automatically sync to Compliance Hub Registry for client tracking & 30-day alerts!
-        const serviceName = inspection.work_order?.service_product?.name || 'Safety Compliance';
+        const serviceName =
+          inspection.work_order?.service_product?.name || 'Safety Compliance';
         await this.prisma.compliance.create({
           data: {
             client_id: inspection.client_id,
@@ -147,11 +170,65 @@ export class InspectionsService {
     return inspection;
   }
 
+  async autoUpdateInspectionStatus(inspectionId: string) {
+    const inspection = await this.prisma.inspection.findUnique({
+      where: { id: inspectionId },
+      include: { items: true },
+    });
+
+    if (!inspection) return;
+
+    // Don't auto-update if status is CANCELLED
+    if (inspection.status === 'CANCELLED') return;
+
+    const items = inspection.items || [];
+
+    // Guard: if there are no items at all, never auto-complete
+    if (items.length === 0) return;
+
+    const pendingItems = items.filter(item => item.status === 'PENDING');
+    const failItems = items.filter(item => item.status === 'FAIL');
+    const resolvedItems = items.filter(
+      item => item.status === 'PASS' || item.status === 'FAIL' || item.status === 'NA',
+    );
+
+    let newStatus = inspection.status;
+
+    if (pendingItems.length > 0) {
+      // There are still unresolved items — must be IN_PROGRESS (or stay as-is if already there)
+      if (
+        inspection.status === 'COMPLETED' ||
+        inspection.status === 'REJECTED' ||
+        inspection.status === 'SCHEDULED'
+      ) {
+        newStatus = 'IN_PROGRESS';
+      }
+      // If already IN_PROGRESS with pending items, no change needed
+    } else if (resolvedItems.length === items.length) {
+      // ALL items are explicitly resolved (PASS / FAIL / NA) — no PENDING remaining
+      if (failItems.length > 0) {
+        newStatus = 'REJECTED';
+      } else {
+        newStatus = 'COMPLETED';
+      }
+    }
+    // else: mixed edge-case — leave status as-is
+
+    if (newStatus !== inspection.status) {
+      await this.update(inspectionId, { status: newStatus as any });
+    }
+  }
+
   async updateItem(itemId: string, data: UpdateInspectionItemDto) {
-    return this.prisma.inspectionItem.update({
+    const updatedItem = await this.prisma.inspectionItem.update({
       where: { id: itemId },
       data,
     });
+
+    // Automatically recalculate and update parent inspection status in real-time
+    await this.autoUpdateInspectionStatus(updatedItem.inspection_id);
+
+    return updatedItem;
   }
 
   async findByEngineer(engineerId: string) {
@@ -344,7 +421,7 @@ export class InspectionsService {
 
       // Details Grid
       const gridY = 380;
-      
+
       // Row 1: Inspection ID & Assigned Engineer
       doc.fontSize(10).font('Helvetica-Bold').text('Inspection ID:', 80, gridY);
       doc
@@ -361,13 +438,21 @@ export class InspectionsService {
       doc.font('Helvetica-Bold').text('Scheduled Date:', 80, row2Y);
       doc
         .font('Helvetica')
-        .text(new Date(inspection.scheduled_date).toLocaleDateString(), 170, row2Y);
+        .text(
+          new Date(inspection.scheduled_date).toLocaleDateString(),
+          170,
+          row2Y,
+        );
 
       doc.font('Helvetica-Bold').text('Conducted On:', 320, row2Y);
       doc
         .font('Helvetica')
         .text(
-          new Date(inspection.completed_date || inspection.certificate?.issue_date || new Date()).toLocaleDateString(),
+          new Date(
+            inspection.completed_date ||
+              inspection.certificate?.issue_date ||
+              new Date(),
+          ).toLocaleDateString(),
           430,
           row2Y,
         );
