@@ -28,18 +28,7 @@ export class QuotationsController {
 
   @Post('lead/:leadId')
   quickQuote(@Param('leadId') leadId: string) {
-    return this.quotationsService.create({
-      lead_id: leadId,
-      items: [
-        {
-          description: "General Service / Software Provision",
-          quantity: 1,
-          unit_price: 20000
-        }
-      ],
-      apply_gst: false,
-      notes: ""
-    });
+    return this.quotationsService.quickQuote(leadId);
   }
 
   @Get(':id')

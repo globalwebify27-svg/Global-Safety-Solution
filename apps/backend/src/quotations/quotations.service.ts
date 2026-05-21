@@ -115,6 +115,28 @@ export class QuotationsService {
     return quotation;
   }
 
+  async quickQuote(leadId: string) {
+    const lead = await this.prisma.lead.findUnique({ where: { id: leadId } });
+    if (!lead) throw new NotFoundException('Lead not found');
+
+    let amount = Number(lead.expected_value) || 20000;
+
+    // For quick quote, we generate a quote equivalent to the expected deal value.
+    // Assuming the amount is inclusive of 18% GST (if GST applies), but let's just make the unit_price equal to amount to match the expected value directly (no GST).
+    return this.create({
+      lead_id: leadId,
+      items: [
+        {
+          description: `Custom Proposal for ${lead.company_name}`,
+          quantity: 1,
+          unit_price: amount
+        }
+      ],
+      apply_gst: false,
+      notes: "Auto-generated quick quote based on lead expectations."
+    });
+  }
+
   async findOne(id: string) {
     return this.prisma.quotation.findUnique({
       where: { id },

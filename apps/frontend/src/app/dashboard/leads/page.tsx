@@ -116,6 +116,7 @@ export default function LeadsPage() {
     source: "Website",
     notes: "",
     closure_probability: 50,
+    expected_value: "",
     next_follow_up: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
   });
 
@@ -144,13 +145,18 @@ export default function LeadsPage() {
     if (!token) return;
     setSubmitting(true);
     try {
+      const payload = {
+        ...formData,
+        expected_value: formData.expected_value === "" ? 20000 : Number(formData.expected_value),
+        closure_probability: formData.closure_probability === "" ? 50 : Number(formData.closure_probability)
+      };
       const res = await fetch(`${API_BASE_URL}/leads`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(payload)
       });
       if (res.ok) {
         setOpen(false);
@@ -162,6 +168,7 @@ export default function LeadsPage() {
           source: "Website", 
           notes: "",
           closure_probability: 50,
+          expected_value: "",
           next_follow_up: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
         });
         toast.success("Lead captured successfully!");
@@ -351,31 +358,20 @@ export default function LeadsPage() {
                   />
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label>Lead Source</Label>
-                <select 
-                  className="w-full bg-background border border-border rounded-xl h-11 px-3 text-sm focus:ring-2 focus:ring-indigo-500 text-foreground"
-                  value={formData.source}
-                  onChange={(e) => setFormData({...formData, source: e.target.value})}
-                >
-                  <option>Website</option>
-                  <option>Referral</option>
-                  <option>LinkedIn</option>
-                  <option>Cold Call</option>
-                  <option>Event</option>
-                </select>
-              </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Closure Probability (%)</Label>
-                  <Input 
-                    type="number"
-                    min="0"
-                    max="100"
-                    value={formData.closure_probability}
-                    onChange={(e) => setFormData({...formData, closure_probability: Number(e.target.value)})}
-                    className="bg-background border-border h-11 rounded-xl"
-                  />
+                  <Label>Lead Source</Label>
+                  <select 
+                    className="w-full bg-background border border-border rounded-xl h-11 px-3 text-sm focus:ring-2 focus:ring-indigo-500 text-foreground"
+                    value={formData.source}
+                    onChange={(e) => setFormData({...formData, source: e.target.value})}
+                  >
+                    <option>Website</option>
+                    <option>Referral</option>
+                    <option>LinkedIn</option>
+                    <option>Cold Call</option>
+                    <option>Event</option>
+                  </select>
                 </div>
                 <div className="space-y-2">
                   <Label>Next Follow-up</Label>
@@ -383,6 +379,32 @@ export default function LeadsPage() {
                     type="date"
                     value={formData.next_follow_up}
                     onChange={(e) => setFormData({...formData, next_follow_up: e.target.value})}
+                    className="bg-background border-border h-11 rounded-xl"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Expected Deal Value (₹)</Label>
+                  <Input 
+                    type="number"
+                    min="0"
+                    value={formData.expected_value}
+                    onChange={(e) => setFormData({...formData, expected_value: e.target.value === "" ? "" : Number(e.target.value)})}
+                    placeholder="20000"
+                    className="bg-background border-border h-11 rounded-xl"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Closure Probability (%)</Label>
+                  <Input 
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={formData.closure_probability}
+                    onChange={(e) => setFormData({...formData, closure_probability: e.target.value === "" ? "" : Number(e.target.value)})}
+                    placeholder="50"
                     className="bg-background border-border h-11 rounded-xl"
                   />
                 </div>

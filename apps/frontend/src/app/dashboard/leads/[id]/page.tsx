@@ -8,8 +8,16 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Activity, Phone, Mail, CheckCircle, Clock, Plus, History, ArrowLeft, MoreVertical, FileText, Banknote, TrendingDown, TrendingUp, CheckCircle2 } from "lucide-react";
+import { Activity, Phone, Mail, CheckCircle, Clock, Plus, History, ArrowLeft, MoreVertical, FileText, Banknote, TrendingDown, TrendingUp, CheckCircle2, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuTrigger 
+} from "@/components/ui/dropdown-menu";
 
 export default function LeadDetailsPage() {
   const params = useParams();
@@ -20,6 +28,18 @@ export default function LeadDetailsPage() {
   const [loading, setLoading] = useState(true);
   const [activityNote, setActivityNote] = useState("");
   const [activityType, setActivityType] = useState("NOTE");
+
+  const [openEditModal, setOpenEditModal] = useState(false);
+  const [editFormData, setEditFormData] = useState({
+    company_name: "",
+    contact_person: "",
+    email: "",
+    phone: "",
+    source: "",
+    expected_value: 0,
+    closure_probability: 0,
+    notes: ""
+  });
 
   const token = useAuthStore((state) => state.token);
 
@@ -92,6 +112,89 @@ export default function LeadDetailsPage() {
     }
   };
 
+  const handleOpenEdit = () => {
+    setEditFormData({
+      company_name: lead.company_name || "",
+      contact_person: lead.contact_person || "",
+      email: lead.email || "",
+      phone: lead.phone || "",
+      source: lead.source || "Website",
+      expected_value: Number(lead.expected_value) || "",
+      closure_probability: lead.closure_probability || "",
+      notes: lead.notes || ""
+    });
+    setOpenEditModal(true);
+  };
+
+  const handleUpdateLead = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!token || !leadId) return;
+    try {
+      const payload = {
+        ...editFormData,
+        expected_value: editFormData.expected_value === "" ? 0 : Number(editFormData.expected_value),
+        closure_probability: editFormData.closure_probability === "" ? 0 : Number(editFormData.closure_probability)
+      };
+      const res = await fetch(`${API_BASE_URL}/leads/${leadId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+      if (res.ok) {
+        toast.success("Lead details updated");
+        setOpenEditModal(false);
+        fetchLeadDetails();
+      } else {
+        toast.error("Failed to update lead details");
+      }
+    } catch (e) {
+      toast.error("Network error");
+    }
+  };
+
+  const handleConvertToClient = async () => {
+    if (!token || !leadId) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/leads/${leadId}/convert`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        toast.success("Lead successfully converted to Client!");
+        fetchLeadDetails();
+      } else {
+        toast.error("Conversion failed.");
+      }
+    } catch (e) {
+      toast.error("Network error.");
+    }
+  };
+
+  const handleMarkAsLost = async () => {
+    if (!token || !leadId) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/leads/${leadId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ status: 'LOST' })
+      });
+      if (res.ok) {
+        toast.success("Lead marked as LOST successfully.");
+        fetchLeadDetails();
+      } else {
+        toast.error("Failed to update status.");
+      }
+    } catch (e) {
+      toast.error("Network error.");
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'NEW': return 'bg-blue-500/10 text-blue-400 ring-blue-500/20';
@@ -141,9 +244,40 @@ export default function LeadDetailsPage() {
           <Button onClick={generateQuote} className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold h-12 px-6 rounded-2xl shadow-xl shadow-indigo-500/20 transition-all border-0">
             <Plus className="w-5 h-5 mr-2" /> Quick Quote
           </Button>
-          <Button variant="outline" className="h-12 w-12 rounded-2xl p-0 flex items-center justify-center border-border text-muted-foreground hover:text-foreground">
-            <MoreVertical className="w-5 h-5" />
-          </Button>
+          
+          <DropdownMenu>
+            <DropdownMenuTrigger render={
+              <Button variant="outline" className="h-12 w-12 rounded-2xl p-0 flex items-center justify-center border-border text-muted-foreground hover:text-foreground" />
+            }>
+              <MoreVertical className="w-5 h-5" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="bg-card border-border text-foreground min-w-[180px] rounded-2xl shadow-2xl p-2">
+              <DropdownMenuItem 
+                onClick={handleOpenEdit}
+                className="hover:bg-accent/10 cursor-pointer flex items-center gap-3 py-3 rounded-xl font-bold text-sm"
+              >
+                <FileText className="w-4 h-4 text-muted-foreground" /> Edit Details
+              </DropdownMenuItem>
+              
+              {lead.status !== 'WON' && (
+                <DropdownMenuItem 
+                  onClick={handleConvertToClient}
+                  className="hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 cursor-pointer flex items-center gap-3 py-3 rounded-xl font-bold text-sm"
+                >
+                  <CheckCircle2 className="w-4 h-4" /> Convert to Client
+                </DropdownMenuItem>
+              )}
+              
+              {lead.status !== 'WON' && lead.status !== 'LOST' && (
+                <DropdownMenuItem 
+                  onClick={handleMarkAsLost}
+                  className="hover:bg-destructive/10 text-destructive cursor-pointer flex items-center gap-3 py-3 rounded-xl font-bold text-sm mt-1 border-t border-border"
+                >
+                  <XCircle className="w-4 h-4" /> Mark as Lost
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -368,6 +502,93 @@ export default function LeadDetailsPage() {
            </div>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={openEditModal} onOpenChange={setOpenEditModal}>
+        <DialogContent className="sm:max-w-[600px] bg-card border-border text-foreground rounded-[2rem]">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold">Edit Opportunity Details</DialogTitle>
+            <DialogDescription className="text-muted-foreground">Modify expected deal parameters and primary contacts.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleUpdateLead} className="space-y-4 mt-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Company Name</Label>
+                <Input 
+                  value={editFormData.company_name}
+                  onChange={(e) => setEditFormData({...editFormData, company_name: e.target.value})}
+                  className="bg-background border-border h-11 rounded-xl"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Contact Person</Label>
+                <Input 
+                  value={editFormData.contact_person}
+                  onChange={(e) => setEditFormData({...editFormData, contact_person: e.target.value})}
+                  className="bg-background border-border h-11 rounded-xl"
+                  required
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Email Address</Label>
+                <Input 
+                  type="email"
+                  value={editFormData.email}
+                  onChange={(e) => setEditFormData({...editFormData, email: e.target.value})}
+                  className="bg-background border-border h-11 rounded-xl"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Phone Number</Label>
+                <Input 
+                  value={editFormData.phone}
+                  onChange={(e) => setEditFormData({...editFormData, phone: e.target.value})}
+                  className="bg-background border-border h-11 rounded-xl"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Expected Deal Value (₹)</Label>
+                <Input 
+                  type="number"
+                  min="0"
+                  value={editFormData.expected_value}
+                  onChange={(e) => setEditFormData({...editFormData, expected_value: e.target.value === "" ? "" : Number(e.target.value)})}
+                  className="bg-background border-border h-11 rounded-xl"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Closure Probability (%)</Label>
+                <Input 
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={editFormData.closure_probability}
+                  onChange={(e) => setEditFormData({...editFormData, closure_probability: e.target.value === "" ? "" : Number(e.target.value)})}
+                  className="bg-background border-border h-11 rounded-xl"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Notes</Label>
+              <textarea 
+                className="w-full bg-background border border-border rounded-xl p-3 text-sm min-h-[100px] focus:ring-2 focus:ring-indigo-500 text-foreground"
+                value={editFormData.notes}
+                onChange={(e) => setEditFormData({...editFormData, notes: e.target.value})}
+              />
+            </div>
+            <DialogFooter>
+              <Button type="submit" className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold w-full h-12 shadow-xl shadow-indigo-500/20 rounded-xl mt-4 border-0">
+                Save Changes
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
