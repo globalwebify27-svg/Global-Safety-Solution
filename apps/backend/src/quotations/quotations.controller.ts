@@ -14,7 +14,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 @Controller('quotations')
 @UseGuards(JwtAuthGuard)
 export class QuotationsController {
-  constructor(private readonly quotationsService: QuotationsService) {}
+  constructor(private readonly quotationsService: QuotationsService) { }
 
   @Get()
   findAll() {
@@ -24,6 +24,22 @@ export class QuotationsController {
   @Post()
   create(@Body() data: any) {
     return this.quotationsService.create(data);
+  }
+
+  @Post('lead/:leadId')
+  quickQuote(@Param('leadId') leadId: string) {
+    return this.quotationsService.create({
+      lead_id: leadId,
+      items: [
+        {
+          description: "General Service / Software Provision",
+          quantity: 1,
+          unit_price: 20000
+        }
+      ],
+      apply_gst: false,
+      notes: ""
+    });
   }
 
   @Get(':id')

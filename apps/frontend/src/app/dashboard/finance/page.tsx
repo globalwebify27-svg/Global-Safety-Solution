@@ -65,6 +65,7 @@ interface Invoice {
   payments: any[];
   total_paid?: number;
   balance_due?: number;
+  notes?: string | null;
 }
 
 export default function FinancePage() {
@@ -81,6 +82,7 @@ export default function FinancePage() {
   const [invoiceForm, setInvoiceForm] = useState({
     client_id: "",
     due_date: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    notes: "",
     items: [{ description: "", quantity: 1, unit_price: "" as any }]
   });
 
@@ -173,6 +175,7 @@ export default function FinancePage() {
           due_date: new Date(invoiceForm.due_date).toISOString(),
           subtotal: totalAmount,
           total_amount: totalAmount,
+          notes: invoiceForm.notes,
           items: invoiceForm.items.map(i => ({
             description: i.description,
             quantity: Number(i.quantity || 0),
@@ -296,6 +299,7 @@ export default function FinancePage() {
           due_date: new Date(invoiceForm.due_date).toISOString(),
           subtotal: totalAmount,
           total_amount: totalAmount,
+          notes: invoiceForm.notes,
           items: invoiceForm.items.map(i => ({
             description: i.description,
             quantity: Number(i.quantity || 0),
@@ -310,6 +314,7 @@ export default function FinancePage() {
         setInvoiceForm({
           client_id: "",
           due_date: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          notes: "",
           items: [{ description: "", quantity: 1, unit_price: 0 }]
         });
         fetchInvoices();
@@ -370,6 +375,27 @@ export default function FinancePage() {
       bg: "bg-rose-500/10" 
     },
   ];
+
+  const getPaymentTypeFromInvoice = (invoice: Invoice) => {
+    let allNotes = (invoice.notes || "").toLowerCase();
+    if (invoice.payments && invoice.payments.length > 0) {
+      allNotes += " " + invoice.payments.map(p => p.notes || "").join(" ").toLowerCase();
+    }
+    
+    if (!allNotes.trim()) return { label: 'PENDING', color: 'bg-muted text-muted-foreground ring-border' };
+    
+    if (allNotes.includes('completed') || allNotes.includes('full')) {
+      return { label: 'FULL PAYMENT', color: 'bg-emerald-500/10 text-emerald-600 ring-emerald-500/20' };
+    }
+    if (allNotes.includes('advance')) {
+      return { label: 'ADVANCE', color: 'bg-indigo-500/10 text-indigo-600 ring-indigo-500/20' };
+    }
+    if (allNotes.includes('partial')) {
+      return { label: 'PARTIAL', color: 'bg-amber-500/10 text-amber-600 ring-amber-500/20' };
+    }
+    
+    return { label: 'PENDING', color: 'bg-muted text-muted-foreground ring-border' };
+  };
 
   return (
     <div className="space-y-8 pb-10">
@@ -444,6 +470,7 @@ export default function FinancePage() {
                 <th className="px-8 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground border-b border-border">Total Amount</th>
                 <th className="px-8 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground border-b border-border">Paid / Due</th>
                 <th className="px-8 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground border-b border-border">Status</th>
+                <th className="px-8 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground border-b border-border">Payment Type</th>
                 <th className="px-8 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground border-b border-border text-right">Actions</th>
               </tr>
             </thead>
@@ -522,6 +549,13 @@ export default function FinancePage() {
                         {invoice.status}
                       </span>
                     </td>
+                    <td className="px-8 py-6">
+                      <span className={cn("px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-tighter shadow-sm ring-1", 
+                        getPaymentTypeFromInvoice(invoice).color
+                      )}>
+                        {getPaymentTypeFromInvoice(invoice).label}
+                      </span>
+                    </td>
                     <td className="px-8 py-6 text-right">
                       <div className="flex items-center justify-end gap-2">
                         {invoice.status !== 'PAID' && (
@@ -567,6 +601,7 @@ export default function FinancePage() {
                                  setInvoiceForm({
                                    client_id: invoice.client_id,
                                    due_date: new Date(invoice.due_date).toISOString().split('T')[0],
+                                   notes: invoice.notes || "",
                                    items: invoice.items.map(i => ({
                                      description: i.description,
                                      quantity: i.quantity,
@@ -714,6 +749,20 @@ export default function FinancePage() {
                   className="h-11 bg-background border-border font-bold"
                 />
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Payment Type</Label>
+              <select 
+                value={invoiceForm.notes}
+                onChange={(e) => setInvoiceForm({...invoiceForm, notes: e.target.value})}
+                className="w-full h-11 px-4 bg-background border border-border rounded-xl text-sm font-bold focus:ring-2 focus:ring-emerald-500 focus:outline-none appearance-none"
+              >
+                <option value="">Pending / None</option>
+                <option value="Advance">Advance</option>
+                <option value="Partial">Partial</option>
+                <option value="Full Payment">Full Payment</option>
+              </select>
             </div>
 
             <div className="space-y-4">
@@ -897,6 +946,20 @@ export default function FinancePage() {
                   className="h-11 bg-background border-border font-bold"
                 />
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Payment Type</Label>
+              <select 
+                value={invoiceForm.notes}
+                onChange={(e) => setInvoiceForm({...invoiceForm, notes: e.target.value})}
+                className="w-full h-11 px-4 bg-background border border-border rounded-xl text-sm font-bold focus:ring-2 focus:ring-blue-500 focus:outline-none appearance-none"
+              >
+                <option value="">Pending / None</option>
+                <option value="Advance">Advance</option>
+                <option value="Partial">Partial</option>
+                <option value="Full Payment">Full Payment</option>
+              </select>
             </div>
 
             <div className="space-y-4">

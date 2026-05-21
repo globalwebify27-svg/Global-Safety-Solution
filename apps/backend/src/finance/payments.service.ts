@@ -46,6 +46,32 @@ export class PaymentsService {
       data: { status },
     });
 
+    // Auto-Credit Lead Ledger if invoice is linked to a Quotation/Lead
+    if (invoice.quotation_id) {
+      const quotation = await this.prisma.quotation.findUnique({
+        where: { id: invoice.quotation_id },
+        select: { lead_id: true, quote_number: true }
+      });
+
+      if (quotation && quotation.lead_id) {
+        const lastTx = await this.prisma.leadTransaction.findFirst({
+          where: { lead_id: quotation.lead_id },
+          orderBy: { created_at: 'desc' }
+        });
+        const currentBalance = (lastTx ? Number(lastTx.balance) : 0) + Number(amount);
+
+        await this.prisma.leadTransaction.create({
+          data: {
+            lead_id: quotation.lead_id,
+            description: `Auto-generated: Payment recorded for Invoice against ${quotation.quote_number}`,
+            type: 'CREDIT',
+            amount: amount,
+            balance: currentBalance,
+          }
+        });
+      }
+    }
+
     return payment;
   }
 

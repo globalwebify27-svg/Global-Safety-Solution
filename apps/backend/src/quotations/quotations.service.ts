@@ -11,7 +11,7 @@ export class QuotationsService {
   constructor(
     private prisma: PrismaService,
     private notificationsService: NotificationsService,
-  ) {}
+  ) { }
 
   async findAll() {
     return this.prisma.quotation.findMany({
@@ -91,6 +91,20 @@ export class QuotationsService {
       include: { items: true, lead: true, client: true },
     });
 
+    // Auto-update the Lead to PROPOSAL status and update expected_value
+    if (quotation.lead_id) {
+      const lead = await this.prisma.lead.findUnique({ where: { id: quotation.lead_id } });
+      if (lead) {
+        await this.prisma.lead.update({
+          where: { id: lead.id },
+          data: {
+            status: lead.status === 'NEW' || lead.status === 'CONTACTED' || lead.status === 'QUALIFIED' ? 'PROPOSAL' : lead.status,
+            expected_value: Number(lead.expected_value) < totalAmount ? totalAmount : lead.expected_value
+          }
+        });
+      }
+    }
+
     await this.notificationsService.notifyAdmins(
       'New Quotation Created',
       `Quotation ${quoteNumber} has been generated for ${totalAmount.toLocaleString()} INR.`,
@@ -109,6 +123,34 @@ export class QuotationsService {
   }
 
   async updateStatus(id: string, status: string) {
+    const quotation = await this.prisma.quotation.findUnique({ where: { id } });
+    if (!quotation) throw new NotFoundException('Quotation not found');
+
+    if (status === 'ACCEPTED' && quotation.status !== 'ACCEPTED' && quotation.lead_id) {
+      // Auto-Debit Lead Ledger
+      const lastTx = await this.prisma.leadTransaction.findFirst({
+        where: { lead_id: quotation.lead_id },
+        orderBy: { created_at: 'desc' }
+      });
+      const currentBalance = (lastTx ? Number(lastTx.balance) : 0) - Number(quotation.total_amount);
+      
+      await this.prisma.leadTransaction.create({
+        data: {
+          lead_id: quotation.lead_id,
+          description: `Auto-generated: Quotation ${quotation.quote_number} Accepted`,
+          type: 'DEBIT',
+          amount: quotation.total_amount,
+          balance: currentBalance,
+        }
+      });
+
+      // Automatically move the Lead to WON in the Sales Pipeline
+      await this.prisma.lead.update({
+        where: { id: quotation.lead_id },
+        data: { status: 'WON' }
+      });
+    }
+
     return this.prisma.quotation.update({
       where: { id },
       data: { status },
@@ -221,6 +263,25 @@ export class QuotationsService {
             where: { id },
             data: { status: 'ACCEPTED' },
           });
+
+          // 1.5 Log Debit if it has a lead
+          if (quotation.status !== 'ACCEPTED' && quotation.lead_id) {
+            const currentBalanceRecord = await tx.leadTransaction.findFirst({
+              where: { lead_id: quotation.lead_id },
+              orderBy: { created_at: 'desc' }
+            });
+            const currentBalance = currentBalanceRecord ? currentBalanceRecord.balance : 0;
+            
+            await tx.leadTransaction.create({
+              data: {
+                lead_id: quotation.lead_id,
+                description: `Auto-generated: Quotation ${quotation.quote_number} Converted to Invoice`,
+                type: 'DEBIT',
+                amount: quotation.total_amount,
+                balance: currentBalance,
+              }
+            });
+          }
 
           // 2. Create Project
           const project = await tx.project.create({

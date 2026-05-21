@@ -11,7 +11,7 @@ export class LeadsService {
   constructor(
     private prisma: PrismaService,
     private mailService: MailService,
-  ) {}
+  ) { }
 
   async findAll() {
     return this.prisma.lead.findMany({
@@ -51,7 +51,10 @@ export class LeadsService {
   async findOne(id: string) {
     const lead = await this.prisma.lead.findUnique({
       where: { id },
-      include: { quotations: true },
+      include: { 
+        quotations: true,
+        transactions: { orderBy: { created_at: 'desc' } }
+      },
     });
     if (!lead) throw new NotFoundException('Lead not found');
     return lead;
@@ -139,5 +142,61 @@ export class LeadsService {
     }
     await this.mailService.sendMail(lead.email, subject, message);
     return { success: true, message: 'Email dispatched successfully' };
+  }
+
+  async addTransaction(leadId: string, data: any, userId: string) {
+    const amount = Number(data.amount);
+    
+    // Calculate new balance
+    const lastTx = await this.prisma.leadTransaction.findFirst({
+      where: { lead_id: leadId },
+      orderBy: { created_at: 'desc' }
+    });
+    
+    let currentBalance = lastTx ? Number(lastTx.balance) : 0;
+    if (data.type === 'CREDIT') {
+      currentBalance += amount;
+    } else {
+      currentBalance -= amount;
+    }
+
+    const tx = await this.prisma.leadTransaction.create({
+      data: {
+        lead_id: leadId,
+        description: data.description,
+        type: data.type,
+        amount: amount,
+        balance: currentBalance,
+      }
+    });
+
+    // Log the audit
+    await this.prisma.auditLog.create({
+      data: {
+        entity_type: 'LEAD_TRANSACTION',
+        entity_id: leadId,
+        action: 'CREATED',
+        new_data: { description: data.description, amount, type: data.type },
+        user_id: userId
+      }
+    });
+
+    return tx;
+  }
+
+  async getPipelineMetrics() {
+    const leads = await this.prisma.lead.findMany();
+    const total = leads.length;
+    const stages: Record<string, number> = { NEW: 0, CONTACTED: 0, QUALIFIED: 0, PROPOSAL: 0, WON: 0, LOST: 0 };
+    let pipelineValue = 0;
+    
+    leads.forEach(l => {
+      if (stages[l.status] !== undefined) {
+        stages[l.status]++;
+      }
+      pipelineValue += Number(l.expected_value || 0);
+    });
+
+    return { total, stages, pipelineValue };
   }
 }

@@ -274,12 +274,18 @@ export default function AssetsPage() {
                   </select>
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label>Assign to Personnel</Label>
-                <select value={formData.assigned_to} onChange={(e) => setFormData({...formData, assigned_to: e.target.value})} className="w-full bg-background border border-border rounded-md h-10 px-3 text-sm text-foreground">
-                  <option value="">Keep in Central Pool</option>
-                  {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-                </select>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Assign to Personnel</Label>
+                  <select value={formData.assigned_to} onChange={(e) => setFormData({...formData, assigned_to: e.target.value})} className="w-full bg-background border border-border rounded-md h-10 px-3 text-sm text-foreground">
+                    <option value="">Keep in Central Pool</option>
+                    {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Purchase Date</Label>
+                  <Input type="date" value={formData.purchase_date} onChange={(e) => setFormData({...formData, purchase_date: e.target.value})} className="bg-background border-border text-foreground" />
+                </div>
               </div>
               <DialogFooter className="pt-4">
                 <Button type="submit" disabled={submitting} className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold w-full h-12 shadow-xl shadow-indigo-500/20 border-0">
@@ -318,6 +324,7 @@ export default function AssetsPage() {
                 <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-widest">Serial Number</th>
                 <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-widest">Assignment</th>
                 <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-widest">Status</th>
+                <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-widest">Purchase Date</th>
                 <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-widest text-right">Actions</th>
               </tr>
             </thead>
@@ -367,6 +374,9 @@ export default function AssetsPage() {
                     <span className={cn("px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter ring-1", getStatusStyle(asset.status))}>
                       {asset.status.replace('_', ' ')}
                     </span>
+                  </td>
+                  <td className="px-6 py-5 text-sm font-medium text-foreground">
+                    {asset.purchase_date ? new Date(asset.purchase_date).toLocaleDateString() : 'N/A'}
                   </td>
                   <td className="px-6 py-5 text-right">
                     <div className="flex items-center justify-end gap-2">

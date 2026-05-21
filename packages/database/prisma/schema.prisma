@@ -388,10 +388,27 @@ model Lead {
   client_id           String?     @db.VarChar(36)
   client              Client?     @relation(fields: [client_id], references: [id])
   closure_probability Int?        @default(0)
+  expected_value      Decimal?    @default(0) @db.Decimal(15, 2)
   next_follow_up      DateTime?   @db.DateTime(6)
   quotations          Quotation[]
+  transactions        LeadTransaction[]
 
   @@map("leads")
+}
+
+model LeadTransaction {
+  id          String   @id @default(uuid()) @db.VarChar(36)
+  lead_id     String   @db.VarChar(36)
+  date        DateTime @default(now()) @db.DateTime(6)
+  description String
+  type        String   @db.VarChar(20) // "CREDIT" (Money In) or "DEBIT" (Money Out/Billed)
+  amount      Decimal  @db.Decimal(15, 2)
+  balance     Decimal  @db.Decimal(15, 2) // Running balance after transaction
+  created_at  DateTime @default(now()) @db.DateTime(6)
+  
+  lead        Lead     @relation(fields: [lead_id], references: [id], onDelete: Cascade)
+
+  @@map("lead_transactions")
 }
 
 model Quotation {
