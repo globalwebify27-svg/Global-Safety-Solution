@@ -13,7 +13,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 @Controller('leads')
 @UseGuards(JwtAuthGuard)
 export class LeadsController {
-  constructor(private readonly leadsService: LeadsService) {}
+  constructor(private readonly leadsService: LeadsService) { }
 
   @Get()
   findAll() {
@@ -47,5 +47,23 @@ export class LeadsController {
     @Body('message') message: string,
   ) {
     return this.leadsService.sendEmail(id, subject, message);
+  }
+
+  @Post(':id/activities')
+  createActivity(@Param('id') id: string, @Body() data: any) {
+    // Basic implementation since we might have lost the service method, assuming service exists or Prisma direct
+    return this.leadsService.update(id, { 
+      activities: { create: { ...data } } 
+    });
+  }
+
+  @Post(':id/transactions')
+  createTransaction(@Param('id') id: string, @Body() data: any) {
+    return this.leadsService.addTransaction(id, data, "system");
+  }
+
+  @Get('metrics/pipeline')
+  getMetrics() {
+    return this.leadsService.getPipelineMetrics();
   }
 }

@@ -520,7 +520,7 @@ export default function LeadsPage() {
                         <Button 
                           variant="ghost" 
                           size="icon" 
-                          onClick={() => { setSelectedLeadForView(lead); setOpenViewModal(true); }}
+                          onClick={() => router.push(`/dashboard/leads/${lead.id}`)}
                           className="text-muted-foreground hover:text-foreground hover:bg-accent/10 rounded-2xl w-10 h-10"
                           title="View Lead Details"
                         >
@@ -609,10 +609,7 @@ export default function LeadsPage() {
                         e.dataTransfer.setData("text/plain", lead.id);
                         e.dataTransfer.effectAllowed = "move";
                       }}
-                      onClick={() => {
-                        setSelectedLeadForView(lead);
-                        setOpenViewModal(true);
-                      }}
+                      onClick={() => router.push(`/dashboard/leads/${lead.id}`)}
                       className="group bg-card/60 hover:bg-card border border-border/80 hover:border-indigo-500/40 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all duration-300 cursor-grab active:cursor-grabbing relative overflow-hidden"
                     >
                       <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -703,101 +700,7 @@ export default function LeadsPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={openViewModal} onOpenChange={setOpenViewModal}>
-        <DialogContent className="sm:max-w-[650px] bg-card border-border text-foreground rounded-[2.5rem] p-8 shadow-2xl">
-          <DialogHeader className="border-b border-border pb-4">
-            <DialogTitle className="text-2xl font-black tracking-tight text-foreground flex items-center justify-between">
-              <span>{selectedLeadForView?.company_name}</span>
-              <span className={cn("px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest ring-1", selectedLeadForView ? getStatusColor(selectedLeadForView.status) : "")}>
-                {selectedLeadForView?.status}
-              </span>
-            </DialogTitle>
-            <DialogDescription className="text-muted-foreground font-semibold">
-              Sales Lead Profile & Intel Card
-            </DialogDescription>
-          </DialogHeader>
 
-          {selectedLeadForView && (
-            <div className="space-y-6 mt-6">
-              {/* Profile Details Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <div className="space-y-1">
-                    <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block">Primary Contact</span>
-                    <span className="font-bold text-foreground text-base block">{selectedLeadForView.contact_person}</span>
-                  </div>
-                  <div className="space-y-1">
-                    <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block">Communication Channels</span>
-                    <span className="text-sm font-medium text-foreground block">{selectedLeadForView.email || "No email provided"}</span>
-                    <span className="text-xs font-semibold text-muted-foreground block">{selectedLeadForView.phone || "No phone number"}</span>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="space-y-1">
-                    <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block">Lead Origin / Source</span>
-                    <span className="font-bold text-foreground text-base block">{selectedLeadForView.source || "Website"}</span>
-                  </div>
-                  <div className="space-y-1">
-                    <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block">Closure Probability</span>
-                    <div className="flex items-center gap-3 mt-1">
-                      <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-                        <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${selectedLeadForView.closure_probability || 0}%` }} />
-                      </div>
-                      <span className="text-xs font-bold text-foreground">{selectedLeadForView.closure_probability || 0}%</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Follow-up & Financial Info */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-muted/20 border border-border rounded-2xl">
-                <div>
-                  <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block">Next Follow-up Action</span>
-                  <span className="font-bold text-foreground text-sm mt-0.5 block">
-                    {selectedLeadForView.next_follow_up 
-                      ? new Date(selectedLeadForView.next_follow_up).toLocaleDateString([], { day: '2-digit', month: 'long', year: 'numeric' })
-                      : "No follow-up action set"}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block">Active Quotes Value</span>
-                  <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-base mt-0.5 block">
-                    ₹{(selectedLeadForView.quotations?.reduce((acc, q) => acc + Number(q.total_amount), 0) || 0).toLocaleString('en-IN')}
-                  </span>
-                </div>
-              </div>
-
-              {/* Lead Notes Section */}
-              <div className="space-y-2 border-t border-border pt-4">
-                <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block">Opportunity Notes & History</span>
-                <div className="p-4 bg-card/60 border border-border/80 rounded-2xl max-h-[160px] overflow-y-auto text-xs text-foreground/80 leading-relaxed italic">
-                  {selectedLeadForView.notes || "No background details recorded for this sales opportunity."}
-                </div>
-              </div>
-
-              <DialogFooter className="border-t border-border pt-6 gap-2">
-                <Button 
-                  variant="ghost" 
-                  onClick={() => setOpenViewModal(false)}
-                  className="text-muted-foreground hover:text-foreground hover:bg-accent/10 rounded-xl"
-                >
-                  Close Profile
-                </Button>
-                <Button 
-                  onClick={() => {
-                    setOpenViewModal(false);
-                    router.push(`/dashboard/quotations?leadId=${selectedLeadForView.id}`);
-                  }}
-                  className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl px-5 border-0 shadow-lg shadow-indigo-500/10"
-                >
-                  Configure Quotation
-                </Button>
-              </DialogFooter>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
 
   );
