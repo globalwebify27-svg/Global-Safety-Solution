@@ -7,7 +7,9 @@
     "dev": "turbo run dev",
     "build": "turbo run build",
     "start": "turbo run start",
-    "lint": "turbo run lint"
+    "lint": "turbo run lint",
+    "postinstall": "npm run generate --workspace=@repo/database",
+    "render:build": "npm run db:push --workspace=@repo/database && turbo run build"
   },
   "workspaces": [
     "apps/*",
