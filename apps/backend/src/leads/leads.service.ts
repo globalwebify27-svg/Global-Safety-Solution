@@ -24,12 +24,25 @@ export class LeadsService {
     const next_follow_up = data.next_follow_up
       ? new Date(data.next_follow_up)
       : null;
-    return this.prisma.lead.create({
+    const lead = await this.prisma.lead.create({
       data: {
         ...data,
         next_follow_up,
       },
     });
+
+    // Log the audit
+    await this.prisma.auditLog.create({
+      data: {
+        entity_type: 'LEAD',
+        entity_id: lead.id,
+        action: 'CREATED',
+        new_data: { company_name: lead.company_name, contact_person: lead.contact_person, expected_value: lead.expected_value },
+        user_id: 'System'
+      }
+    });
+
+    return lead;
   }
 
   async update(id: string, data: any) {
@@ -39,13 +52,26 @@ export class LeadsService {
         ? new Date(data.next_follow_up)
         : null;
     }
-    return this.prisma.lead.update({
+    const updatedLead = await this.prisma.lead.update({
       where: { id },
       data: {
         ...data,
         ...(next_follow_up !== undefined ? { next_follow_up } : {}),
       },
     });
+
+    // Log the audit
+    await this.prisma.auditLog.create({
+      data: {
+        entity_type: 'LEAD',
+        entity_id: id,
+        action: 'UPDATED',
+        new_data: { ...data },
+        user_id: 'System'
+      }
+    });
+
+    return updatedLead;
   }
 
   async findOne(id: string) {
@@ -53,11 +79,22 @@ export class LeadsService {
       where: { id },
       include: { 
         quotations: true,
-        transactions: { orderBy: { created_at: 'desc' } }
+        transactions: { orderBy: { created_at: 'desc' } },
+        activities: { orderBy: { date: 'desc' } },
+        documents: { orderBy: { created_at: 'desc' } },
       },
     });
     if (!lead) throw new NotFoundException('Lead not found');
-    return lead;
+
+    const auditLogs = await this.prisma.auditLog.findMany({
+      where: { entity_id: id },
+      orderBy: { created_at: 'desc' }
+    });
+
+    return {
+      ...lead,
+      auditLogs
+    };
   }
 
   async convertToClient(id: string) {
@@ -111,13 +148,26 @@ export class LeadsService {
         });
 
         // 4. Update the Lead with the new client_id and mark as WON
-        return await tx.lead.update({
+        const wonLead = await tx.lead.update({
           where: { id },
           data: {
             client_id: createdClientId,
             status: 'WON',
           },
         });
+
+        // Log the audit
+        await tx.auditLog.create({
+          data: {
+            entity_type: 'LEAD',
+            entity_id: id,
+            action: 'CONVERTED_TO_CLIENT',
+            new_data: { client_id: createdClientId, status: 'WON' },
+            user_id: 'System'
+          }
+        });
+
+        return wonLead;
       });
     } catch (error: any) {
       console.error('[LEAD CONVERSION ERROR]:', error);
@@ -141,6 +191,18 @@ export class LeadsService {
       );
     }
     await this.mailService.sendMail(lead.email, subject, message);
+
+    // Log the audit
+    await this.prisma.auditLog.create({
+      data: {
+        entity_type: 'LEAD',
+        entity_id: id,
+        action: 'EMAIL_DISPATCHED',
+        new_data: { subject, recipient: lead.email },
+        user_id: 'System'
+      }
+    });
+
     return { success: true, message: 'Email dispatched successfully' };
   }
 

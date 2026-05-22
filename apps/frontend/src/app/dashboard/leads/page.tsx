@@ -46,7 +46,7 @@ interface Lead {
   created_at: string;
   closure_probability?: number;
   next_follow_up?: string;
-  quotations?: Array<{ total_amount: number }>;
+  quotations?: Array<{ id: string; total_amount: number; status: string; created_at: string; date?: string }>;
   notes?: string;
 }
 
@@ -78,6 +78,24 @@ export default function LeadsPage() {
   const [openViewModal, setOpenViewModal] = useState(false);
   const [selectedLeadForView, setSelectedLeadForView] = useState<Lead | null>(null);
   const [viewMode, setViewMode] = useState<"table" | "kanban">("table");
+
+  const getLeadActiveQuoteValue = (leadObj: any) => {
+    if (!leadObj?.quotations || leadObj.quotations.length === 0) return 0;
+    
+    // Filter out void/cancelled/deleted quotations if any exist
+    const validQuotes = leadObj.quotations.filter((q: any) => q.status !== 'VOID');
+    if (validQuotes.length === 0) return 0;
+    
+    // 1. If there's an ACCEPTED quotation, that is the definitive active value.
+    const accepted = validQuotes.find((q: any) => q.status === 'ACCEPTED');
+    if (accepted) return Number(accepted.total_amount);
+    
+    // 2. If not, pick the latest quote (by created_at or date)
+    const sorted = [...validQuotes].sort(
+      (a: any, b: any) => new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime()
+    );
+    return Number(sorted[0]?.total_amount || 0);
+  };
 
   const handleMoveLead = async (leadId: string, newStatus: string) => {
     if (!token) return;
@@ -456,7 +474,7 @@ export default function LeadsPage() {
           { 
             label: "Pipeline Value", 
             value: `₹${(leads.reduce((acc, lead) => 
-              acc + (lead.quotations?.reduce((sum, q) => sum + Number(q.total_amount), 0) || 0), 0) / 100000).toFixed(1)}L`, 
+              acc + getLeadActiveQuoteValue(lead), 0) / 100000).toFixed(1)}L`, 
             icon: TrendingUp, 
             color: "text-blue-600 dark:text-blue-400", 
             bg: "bg-blue-500/10" 

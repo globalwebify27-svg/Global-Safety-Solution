@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Activity, Phone, Mail, CheckCircle, Clock, Plus, History, ArrowLeft, MoreVertical, FileText, Banknote, TrendingDown, TrendingUp, CheckCircle2, XCircle } from "lucide-react";
+import { Activity, Phone, Mail, CheckCircle, Clock, Plus, History, ArrowLeft, MoreVertical, FileText, Banknote, TrendingDown, TrendingUp, CheckCircle2, XCircle, Download, Trash2, Paperclip } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -52,6 +52,129 @@ export default function LeadDetailsPage() {
 
   const { token, logout } = useAuthStore();
   const [hydrated, setHydrated] = useState(false);
+
+  // Document management state
+  const [docFile, setDocFile] = useState<File | null>(null);
+  const [docName, setDocName] = useState("");
+  const [docCategory, setDocCategory] = useState("PROPOSAL");
+  const [docNotes, setDocNotes] = useState("");
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+
+  const handleUploadDocument = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!token || !leadId || !docFile) {
+      toast.error("Please select a file to upload.");
+      return;
+    }
+    setUploadingDoc(true);
+
+    const formData = new FormData();
+    formData.append('file', docFile);
+    formData.append('name', docName || docFile.name);
+    formData.append('category', docCategory);
+    formData.append('file_type', docFile.name.split('.').pop()?.toUpperCase() || 'PDF');
+    formData.append('lead_id', leadId);
+    formData.append('notes', docNotes);
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/documents`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`
+        },
+        body: formData
+      });
+      if (res.ok) {
+        toast.success("Document uploaded successfully!");
+        setDocFile(null);
+        setDocName("");
+        setDocCategory("PROPOSAL");
+        setDocNotes("");
+        fetchLeadDetails();
+      } else {
+        toast.error("Failed to upload document");
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Error uploading document");
+    } finally {
+      setUploadingDoc(false);
+    }
+  };
+
+  const handleDeleteDocument = async (id: string) => {
+    if (!token) return;
+    if (!confirm("Are you sure you want to permanently delete this document?")) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/documents/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        toast.success("Document deleted successfully!");
+        fetchLeadDetails();
+      } else {
+        toast.error("Failed to delete document");
+      }
+    } catch (e) {
+      console.error(e);
+      toast.error("Error deleting document");
+    }
+  };
+
+  const handleDownloadDocument = async (fileUrl: string, name: string) => {
+    try {
+      const response = await fetch(fileUrl);
+      if (!response.ok) throw new Error("Failed to fetch file");
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => window.URL.revokeObjectURL(blobUrl), 100);
+    } catch (e) {
+      toast.error("Failed to download file");
+    }
+  };
+
+  const formatBytes = (bytes: number, decimals = 2) => {
+    if (!+bytes) return '0 Bytes';
+    const k = 1024;
+    const dm = decimals < 0 ? 0 : decimals;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
+  };
+
+  const getCategoryColor = (category: string) => {
+    switch (category) {
+      case 'PROPOSAL': return 'bg-indigo-500/10 text-indigo-400 ring-indigo-500/20';
+      case 'CONTRACT': return 'bg-emerald-500/10 text-emerald-400 ring-emerald-500/20';
+      case 'COMPLIANCE': return 'bg-purple-500/10 text-purple-400 ring-purple-500/20';
+      default: return 'bg-amber-500/10 text-amber-400 ring-amber-500/20';
+    }
+  };
+
+  const getLeadActiveQuoteValue = (leadObj: any) => {
+    if (!leadObj?.quotations || leadObj.quotations.length === 0) return 0;
+    
+    // Filter out void/cancelled/deleted quotations if any exist
+    const validQuotes = leadObj.quotations.filter((q: any) => q.status !== 'VOID');
+    if (validQuotes.length === 0) return 0;
+    
+    // 1. If there's an ACCEPTED quotation, that is the definitive active value.
+    const accepted = validQuotes.find((q: any) => q.status === 'ACCEPTED');
+    if (accepted) return Number(accepted.total_amount);
+    
+    // 2. If not, pick the latest quote (by created_at or date)
+    const sorted = [...validQuotes].sort(
+      (a: any, b: any) => new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime()
+    );
+    return Number(sorted[0]?.total_amount || 0);
+  };
 
   useEffect(() => {
     setHydrated(true);
@@ -319,7 +442,7 @@ export default function LeadDetailsPage() {
             <div className="bg-card/40 border border-border rounded-[2rem] p-6 backdrop-blur-md shadow-sm">
               <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Active Quotes Value</p>
               <p className="text-4xl font-black text-indigo-500 mt-2">
-                ₹{(lead.quotations?.reduce((acc: number, q: any) => acc + Number(q.total_amount), 0) || 0).toLocaleString()}
+                ₹{getLeadActiveQuoteValue(lead).toLocaleString()}
               </p>
             </div>
             <div className="bg-card/40 border border-border rounded-[2rem] p-6 backdrop-blur-md shadow-sm">
@@ -486,9 +609,145 @@ export default function LeadDetailsPage() {
         </TabsContent>
 
         <TabsContent value="documents" className="animate-in fade-in slide-in-from-bottom-2 duration-500">
-           <div className="text-center p-12 bg-card/20 rounded-[2rem] border border-dashed border-border text-muted-foreground italic font-medium">
-             No documents, proposals, or contracts attached yet.
-           </div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Upload Document Form */}
+            <div className="bg-card/40 border border-border rounded-[2rem] p-6 backdrop-blur-md shadow-sm h-fit">
+              <h3 className="text-lg font-black tracking-tight mb-4 flex items-center gap-2">
+                <Paperclip className="w-5 h-5 text-indigo-500" /> Attach Document
+              </h3>
+              <form onSubmit={handleUploadDocument} className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Select File</Label>
+                  <div className="relative group cursor-pointer border border-dashed border-border hover:border-indigo-500/50 rounded-xl p-4 text-center bg-background/50 hover:bg-background transition-all">
+                    <input 
+                      type="file" 
+                      onChange={(e) => {
+                        const file = e.target.files?.[0] || null;
+                        setDocFile(file);
+                        if (file && !docName) {
+                          setDocName(file.name.replace(/\.[^/.]+$/, ""));
+                        }
+                      }}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                      required
+                    />
+                    <div className="space-y-1">
+                      <Paperclip className="w-8 h-8 text-muted-foreground group-hover:text-indigo-500 mx-auto transition-colors" />
+                      <p className="text-xs font-bold text-foreground">
+                        {docFile ? docFile.name : "Click to select a file"}
+                      </p>
+                      <p className="text-[10px] text-muted-foreground">
+                        {docFile ? formatBytes(docFile.size) : "PDF, DOCX, Image up to 10MB"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Document Name</Label>
+                  <Input 
+                    value={docName}
+                    onChange={(e) => setDocName(e.target.value)}
+                    placeholder="e.g. Service Proposal"
+                    className="bg-background border-border rounded-xl h-11"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Category</Label>
+                  <select 
+                    value={docCategory}
+                    onChange={(e) => setDocCategory(e.target.value)}
+                    className="w-full bg-background border border-border rounded-xl h-11 px-3 text-sm font-bold text-foreground"
+                  >
+                    <option value="PROPOSAL">Proposal</option>
+                    <option value="CONTRACT">Contract</option>
+                    <option value="COMPLIANCE">Compliance</option>
+                    <option value="OTHER">Other Attachment</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Notes (Optional)</Label>
+                  <textarea 
+                    value={docNotes}
+                    onChange={(e) => setDocNotes(e.target.value)}
+                    placeholder="Add optional notes or descriptions..."
+                    className="w-full bg-background border border-border rounded-xl p-3 text-sm min-h-[80px] focus:ring-2 focus:ring-indigo-500 text-foreground"
+                  />
+                </div>
+
+                <Button 
+                  type="submit" 
+                  disabled={uploadingDoc}
+                  className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold w-full h-11 rounded-xl shadow-lg border-0 transition-all"
+                >
+                  {uploadingDoc ? "Uploading..." : "Upload Document"}
+                </Button>
+              </form>
+            </div>
+
+            {/* Documents List */}
+            <div className="lg:col-span-2 bg-card/40 border border-border rounded-[2rem] p-6 backdrop-blur-md shadow-sm">
+              <h3 className="text-lg font-black tracking-tight mb-4 flex items-center gap-2">
+                <FileText className="w-5 h-5 text-indigo-500" /> Associated Documents
+              </h3>
+              
+              <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
+                {lead.documents?.map((doc: any) => (
+                  <div key={doc.id} className="bg-card/60 border border-border p-5 rounded-2xl flex items-start gap-4 shadow-sm hover:bg-card hover:border-indigo-500/30 transition-all">
+                    <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center shrink-0">
+                      <FileText className="w-5 h-5 text-indigo-500" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-bold text-sm text-foreground truncate">{doc.name}</span>
+                        <span className={cn("px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest ring-1", getCategoryColor(doc.category))}>
+                          {doc.category}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3 text-[10px] text-muted-foreground font-bold mt-1">
+                        <span>{formatBytes(doc.file_size)}</span>
+                        <span>•</span>
+                        <span>{doc.file_type}</span>
+                        <span>•</span>
+                        <span>{new Date(doc.created_at).toLocaleDateString()}</span>
+                      </div>
+                      {doc.notes && (
+                        <p className="text-xs text-muted-foreground italic mt-2 bg-muted/20 p-2 rounded-lg border border-border/30">
+                          {doc.notes}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Button 
+                        size="icon" 
+                        variant="ghost" 
+                        onClick={() => handleDownloadDocument(doc.file_url, doc.name)}
+                        className="w-8 h-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted"
+                      >
+                        <Download className="w-4 h-4" />
+                      </Button>
+                      <Button 
+                        size="icon" 
+                        variant="ghost" 
+                        onClick={() => handleDeleteDocument(doc.id)}
+                        className="w-8 h-8 rounded-lg text-rose-500 hover:text-rose-400 hover:bg-rose-500/10"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+                {!lead.documents?.length && (
+                  <div className="text-center py-12 text-muted-foreground italic border border-dashed border-border rounded-2xl bg-card/10">
+                    No documents uploaded. Select a file on the left to upload.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         </TabsContent>
 
         <TabsContent value="audit" className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">

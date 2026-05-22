@@ -31,8 +31,9 @@ export class DocumentsController {
     @Query('category') category?: string,
     @Query('client_id') client_id?: string,
     @Query('project_id') project_id?: string,
+    @Query('lead_id') lead_id?: string,
   ) {
-    return this.documentsService.findAll({ category, client_id, project_id });
+    return this.documentsService.findAll({ category, client_id, project_id, lead_id });
   }
 
   @Get(':id')
@@ -63,6 +64,7 @@ export class DocumentsController {
     }),
   )
   create(@UploadedFile() file: any, @Body() data: any, @Req() req: any) {
+    console.log('CREATE DOCUMENT BODY:', data);
     const fileUrl = file
       ? `http://127.0.0.1:3001/public/${data.category || 'OTHER'}/${file.filename}`
       : data.file_url;

@@ -392,6 +392,8 @@ model Lead {
   next_follow_up      DateTime?   @db.DateTime(6)
   quotations          Quotation[]
   transactions        LeadTransaction[]
+  activities     LeadActivity[]
+  documents      Document[]
 
   @@map("leads")
 }
@@ -409,6 +411,20 @@ model LeadTransaction {
   lead        Lead     @relation(fields: [lead_id], references: [id], onDelete: Cascade)
 
   @@map("lead_transactions")
+}
+
+model LeadActivity {
+  id          String   @id @default(uuid()) @db.VarChar(36)
+  lead_id     String   @db.VarChar(36)
+  type        String   @db.VarChar(50) // "NOTE", "CALL", "EMAIL", "MEETING"
+  subject     String   @db.VarChar(255)
+  description String   @db.Text
+  date        DateTime @default(now()) @db.DateTime(6)
+  created_at  DateTime @default(now()) @db.DateTime(6)
+
+  lead        Lead     @relation(fields: [lead_id], references: [id], onDelete: Cascade)
+
+  @@map("lead_activities")
 }
 
 model Quotation {
@@ -561,6 +577,7 @@ model Document {
   file_type     String      @db.VarChar(50)
   file_size     Int
   category      String      @db.VarChar(100)
+  lead_id       String?     @db.VarChar(36)
   client_id     String?     @db.VarChar(36)
   project_id    String?     @db.VarChar(36)
   compliance_id String?     @db.VarChar(36)
@@ -570,6 +587,7 @@ model Document {
   uploaded_by   String?     @db.VarChar(36)
   created_at    DateTime    @default(now()) @db.DateTime(6)
   updated_at    DateTime    @updatedAt @db.DateTime(6)
+  lead          Lead?       @relation(fields: [lead_id], references: [id])
   client        Client?     @relation(fields: [client_id], references: [id])
   compliance    Compliance? @relation(fields: [compliance_id], references: [id])
   project       Project?    @relation(fields: [project_id], references: [id])

@@ -10,6 +10,31 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
+interface Task {
+  id: string;
+  title: string;
+  status: string;
+}
+
+interface WorkOrder {
+  id: string;
+  work_order_no: string;
+  status: string;
+}
+
+interface Project {
+  id: string;
+  name: string;
+  status: string;
+  tasks?: Task[];
+  work_orders?: WorkOrder[];
+}
+
+interface Inspection {
+  id: string;
+  status: string;
+}
+
 interface Client {
   id: string;
   name: string;
@@ -26,6 +51,62 @@ interface Client {
     email: string;
     designation?: string;
   };
+  projects?: Project[];
+  inspections?: Inspection[];
+}
+
+function getClientWorkStats(client: Client) {
+  let done = 0;
+  let pending = 0;
+
+  // 1. Projects
+  if (client.projects) {
+    client.projects.forEach((p) => {
+      if (p.status === 'COMPLETED') {
+        done++;
+      } else {
+        pending++;
+      }
+
+      // 2. Tasks
+      if (p.tasks) {
+        p.tasks.forEach((t) => {
+          if (t.status === 'DONE') {
+            done++;
+          } else {
+            pending++;
+          }
+        });
+      }
+
+      // 3. Work Orders
+      if (p.work_orders) {
+        p.work_orders.forEach((w) => {
+          if (w.status === 'COMPLETED') {
+            done++;
+          } else {
+            pending++;
+          }
+        });
+      }
+    });
+  }
+
+  // 4. Inspections
+  if (client.inspections) {
+    client.inspections.forEach((i) => {
+      if (i.status === 'COMPLETED') {
+        done++;
+      } else {
+        pending++;
+      }
+    });
+  }
+
+  const total = done + pending;
+  const percentage = total > 0 ? Math.round((done / total) * 100) : 0;
+
+  return { done, pending, total, percentage };
 }
 
 export default function ClientsPage() {
@@ -285,17 +366,18 @@ export default function ClientsPage() {
               <th className="px-6 py-4 border-b border-border">Assigned Officer</th>
               <th className="px-6 py-4 border-b border-border">Contact Info</th>
               <th className="px-6 py-4 border-b border-border">Compliance ID (GST)</th>
+              <th className="px-6 py-4 border-b border-border">Work Progress</th>
               <th className="px-6 py-4 border-b border-border">Status</th>
               <th className="px-6 py-4 border-b border-border text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border text-sm">
             {loading ? (
-               <tr><td colSpan={6} className="px-6 py-8 text-center text-muted-foreground">Loading clients...</td></tr>
+               <tr><td colSpan={7} className="px-6 py-8 text-center text-muted-foreground">Loading clients...</td></tr>
             ) : clients.length === 0 ? (
-               <tr><td colSpan={6} className="px-6 py-8 text-center text-muted-foreground">No enterprise clients found in the registry.</td></tr>
+               <tr><td colSpan={7} className="px-6 py-8 text-center text-muted-foreground">No enterprise clients found in the registry.</td></tr>
             ) : (
-              clients.map((c) => (
+               clients.map((c) => (
                 <tr key={c.id} className="hover:bg-accent/5 transition-colors group">
                   <td className="px-6 py-4">
                     <div className="text-foreground font-semibold">{c.name}</div>
@@ -317,6 +399,36 @@ export default function ClientsPage() {
                   </td>
                   <td className="px-6 py-4">
                     <div className="text-muted-foreground uppercase tracking-widest text-xs font-mono">{c.gst_number || '--'}</div>
+                  </td>
+                  <td className="px-6 py-4 min-w-[200px]">
+                    {(() => {
+                      const { done, pending, total, percentage } = getClientWorkStats(c);
+                      if (total === 0) {
+                        return (
+                          <div className="text-muted-foreground/60 text-xs italic flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/30"></span>
+                            No Active Work
+                          </div>
+                        );
+                      }
+                      return (
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between text-xs font-bold text-foreground">
+                            <span>{percentage}% Complete</span>
+                            <span className="text-muted-foreground font-mono">{done}/{total} Done</span>
+                          </div>
+                          <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-gradient-to-r from-blue-500 to-emerald-500 transition-all duration-500" 
+                              style={{ width: `${percentage}%` }}
+                            />
+                          </div>
+                          <div className="text-[10px] text-muted-foreground/80 font-medium">
+                            {done} completed • {pending} pending
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </td>
                   <td className="px-6 py-4">
                     <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 ring-1 ring-emerald-500/20 shadow-lg shadow-emerald-500/10">
