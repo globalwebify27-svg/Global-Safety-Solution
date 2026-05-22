@@ -51,15 +51,20 @@ export default function LeadDetailsPage() {
   });
 
   const { token, logout } = useAuthStore();
+  const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    if (leadId && token) {
+    setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (hydrated && leadId && token) {
       fetchLeadDetails();
     }
-  }, [leadId, token]);
+  }, [hydrated, leadId, token]);
 
   const fetchLeadDetails = async () => {
-    if (!token || !leadId) return;
+    if (!hydrated || !token || !leadId) return;
     setLoading(true);
     try {
       const res = await fetch(`${API_BASE_URL}/leads/${leadId}`, {

@@ -51,15 +51,21 @@ export default function DashboardLayout({
     );
   });
 
-  // Redirect to login if token is missing
-  useEffect(() => {
-    if (!token) {
-      router.push("/login");
-    }
-  }, [token, router]);
+  const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    if (token) {
+    setHydrated(true);
+  }, []);
+
+  // Redirect to login if token is missing (only after store hydration is complete)
+  useEffect(() => {
+    if (hydrated && !token) {
+      router.push("/login");
+    }
+  }, [hydrated, token, router]);
+
+  useEffect(() => {
+    if (hydrated && token) {
       fetch(`${API_BASE_URL}/settings`, {
         headers: { Authorization: `Bearer ${token}` }
       })
@@ -76,7 +82,7 @@ export default function DashboardLayout({
       })
       .catch(e => console.error(e));
     }
-  }, [token, logout, router]);
+  }, [hydrated, token, logout, router]);
 
   // Close mobile menu when navigating
   useEffect(() => {

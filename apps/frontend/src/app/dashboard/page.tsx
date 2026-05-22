@@ -91,8 +91,14 @@ export default function DashboardPage() {
   const [isStatusOpen, setIsStatusOpen] = useState(false);
   const [isQuickActionOpen, setIsQuickActionOpen] = useState(false);
   const { token, logout } = useAuthStore();
+  const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
+    setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
     if (!token) {
       setLoading(false);
       return;
@@ -116,7 +122,7 @@ export default function DashboardPage() {
       console.error(err);
       setLoading(false);
     });
-  }, [token, logout, router]);
+  }, [hydrated, token, logout, router]);
 
   const fetchSystemStatus = async () => {
     if (!token) return;

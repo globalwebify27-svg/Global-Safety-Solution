@@ -65,6 +65,11 @@ export default function LeadsPage() {
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const { token, logout } = useAuthStore();
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
   
   const [openEmailModal, setOpenEmailModal] = useState(false);
   const [emailSubject, setEmailSubject] = useState("");
@@ -131,11 +136,13 @@ export default function LeadsPage() {
   });
 
   useEffect(() => {
-    fetchLeads();
-  }, [token]);
+    if (hydrated) {
+      fetchLeads();
+    }
+  }, [hydrated, token]);
 
   const fetchLeads = async () => {
-    if (!token) return;
+    if (!hydrated || !token) return;
     setLoading(true);
     try {
       const res = await fetch(`${API_BASE_URL}/leads`, {
