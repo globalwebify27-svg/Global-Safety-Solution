@@ -5,7 +5,7 @@ import { useAuthStore } from "@/store/auth";
 import { API_BASE_URL } from "@/lib/config";
 import { LogOut, Home, Users, FolderKanban, ShieldCheck, Settings, BadgeCheck, UserCircle, Target, FileSpreadsheet, Package, Monitor, FolderLock, Menu, X, Banknote, ClipboardCheck } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { NotificationCenter } from "@/components/notification-center";
 
@@ -37,6 +37,7 @@ export default function DashboardLayout({
   const [orgName, setOrgName] = useState("");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const pathname = usePathname();
+  const router = useRouter();
   const { logout, token, user } = useAuthStore();
 
   const filteredNavigation = navigation.filter(item => {
@@ -50,18 +51,32 @@ export default function DashboardLayout({
     );
   });
 
+  // Redirect to login if token is missing
+  useEffect(() => {
+    if (!token) {
+      router.push("/login");
+    }
+  }, [token, router]);
+
   useEffect(() => {
     if (token) {
       fetch(`${API_BASE_URL}/settings`, {
         headers: { Authorization: `Bearer ${token}` }
       })
-      .then(r => r.json())
+      .then(r => {
+        if (r.status === 401) {
+          logout();
+          router.push("/login");
+          return null;
+        }
+        return r.json();
+      })
       .then(data => {
-        if (data.company_name) setOrgName(data.company_name);
+        if (data && data.company_name) setOrgName(data.company_name);
       })
       .catch(e => console.error(e));
     }
-  }, [token]);
+  }, [token, logout, router]);
 
   // Close mobile menu when navigating
   useEffect(() => {

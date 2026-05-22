@@ -64,7 +64,7 @@ export default function LeadsPage() {
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const token = useAuthStore((state) => state.token);
+  const { token, logout } = useAuthStore();
   
   const [openEmailModal, setOpenEmailModal] = useState(false);
   const [emailSubject, setEmailSubject] = useState("");
@@ -141,6 +141,11 @@ export default function LeadsPage() {
       const res = await fetch(`${API_BASE_URL}/leads`, {
         headers: { Authorization: `Bearer ${token}` }
       });
+      if (res.status === 401) {
+        logout();
+        router.push("/login");
+        return;
+      }
       const data = await res.json();
       if (Array.isArray(data)) setLeads(data);
     } catch (e) {

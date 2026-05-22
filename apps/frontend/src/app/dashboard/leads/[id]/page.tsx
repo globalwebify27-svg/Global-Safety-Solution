@@ -50,7 +50,7 @@ export default function LeadDetailsPage() {
     notes: ""
   });
 
-  const token = useAuthStore((state) => state.token);
+  const { token, logout } = useAuthStore();
 
   useEffect(() => {
     if (leadId && token) {
@@ -65,6 +65,11 @@ export default function LeadDetailsPage() {
       const res = await fetch(`${API_BASE_URL}/leads/${leadId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
+      if (res.status === 401) {
+        logout();
+        router.push("/login");
+        return;
+      }
       if (res.ok) {
         const data = await res.json();
         setLead(data);

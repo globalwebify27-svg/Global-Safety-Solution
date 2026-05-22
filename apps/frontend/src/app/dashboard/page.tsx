@@ -90,20 +90,33 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [isStatusOpen, setIsStatusOpen] = useState(false);
   const [isQuickActionOpen, setIsQuickActionOpen] = useState(false);
-  const token = useAuthStore((state) => state.token);
+  const { token, logout } = useAuthStore();
 
   useEffect(() => {
-    if (!token) return;
+    if (!token) {
+      setLoading(false);
+      return;
+    }
     fetch(`${API_BASE_URL}/dashboard/stats`, {
       headers: { Authorization: `Bearer ${token}` }
     })
-    .then(r => r.json())
+    .then(r => {
+      if (r.status === 401) {
+        logout();
+        router.push("/login");
+        throw new Error("Unauthorized");
+      }
+      return r.json();
+    })
     .then(data => {
-      if(data.activeProjects !== undefined) setStats(data);
+      if(data && data.activeProjects !== undefined) setStats(data);
       setLoading(false);
     })
-    .catch(() => setLoading(false));
-  }, [token]);
+    .catch((err) => {
+      console.error(err);
+      setLoading(false);
+    });
+  }, [token, logout, router]);
 
   const fetchSystemStatus = async () => {
     if (!token) return;
