@@ -108,7 +108,17 @@ export default function LeadsPage() {
     }
   };
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    company_name: string;
+    contact_person: string;
+    email: string;
+    phone: string;
+    source: string;
+    notes: string;
+    closure_probability: number | "";
+    expected_value: number | "";
+    next_follow_up: string;
+  }>({
     company_name: "",
     contact_person: "",
     email: "",

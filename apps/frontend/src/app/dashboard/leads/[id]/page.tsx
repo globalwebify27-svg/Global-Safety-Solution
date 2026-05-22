@@ -30,14 +30,23 @@ export default function LeadDetailsPage() {
   const [activityType, setActivityType] = useState("NOTE");
 
   const [openEditModal, setOpenEditModal] = useState(false);
-  const [editFormData, setEditFormData] = useState({
+  const [editFormData, setEditFormData] = useState<{
+    company_name: string;
+    contact_person: string;
+    email: string;
+    phone: string;
+    source: string;
+    expected_value: number | "";
+    closure_probability: number | "";
+    notes: string;
+  }>({
     company_name: "",
     contact_person: "",
     email: "",
     phone: "",
     source: "",
-    expected_value: 0,
-    closure_probability: 0,
+    expected_value: "",
+    closure_probability: "",
     notes: ""
   });
 
