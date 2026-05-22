@@ -1,1 +1,2 @@
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001';
+// Hardcoded for production to ensure Vercel doesn't fall back to localhost
+export const API_BASE_URL = 'https://global-safety-solution.onrender.com';
