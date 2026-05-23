@@ -26,7 +26,8 @@ import {
   Clock,
   ExternalLink,
   History,
-  Award
+  Award,
+  Pencil
 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -448,8 +449,8 @@ export default function EmployeesPage() {
                         <DropdownMenuItem onClick={() => fetchProfile(emp.id)} className="flex items-center gap-3 p-3 rounded-xl cursor-pointer focus:bg-emerald-500/10 focus:text-emerald-500 font-bold text-sm">
                           <IdCard className="w-4 h-4" /> View Full Profile
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => openEdit(emp)} className="flex items-center gap-3 p-3 rounded-xl cursor-pointer focus:bg-blue-500/10 focus:text-blue-500 font-bold text-sm">
-                          <ExternalLink className="w-4 h-4" /> Modify Credentials
+                        <DropdownMenuItem onClick={() => openEdit(emp)} className="flex items-center gap-3 p-3 rounded-xl cursor-pointer focus:bg-blue-500/10 focus:text-blue-500 text-blue-600 dark:text-blue-400 font-bold text-sm">
+                          <Pencil className="w-4 h-4" /> Edit Employee
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
