@@ -81,7 +81,11 @@ export default function FinancePage() {
   
   const [invoiceForm, setInvoiceForm] = useState({
     client_id: "",
+    invoice_number: "",
+    invoice_date: new Date().toISOString().split('T')[0],
     due_date: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    po_number: "",
+    po_date: "",
     notes: "",
     items: [{ description: "", quantity: 1, unit_price: "" as any }]
   });
@@ -165,24 +169,26 @@ export default function FinancePage() {
 
     try {
       const totalAmount = invoiceForm.items.reduce((acc, i) => acc + (Number(i.quantity || 0) * Number(i.unit_price || 0)), 0);
+      const payload: any = {
+        due_date: new Date(invoiceForm.due_date).toISOString(),
+        subtotal: totalAmount,
+        total_amount: totalAmount,
+        notes: invoiceForm.notes,
+        items: invoiceForm.items.map(i => ({
+          description: i.description,
+          quantity: Number(i.quantity || 0),
+          unit_price: Number(i.unit_price || 0),
+          total: Number(i.quantity || 0) * Number(i.unit_price || 0)
+        }))
+      };
+      if (invoiceForm.po_number) payload.po_number = invoiceForm.po_number;
+      if (invoiceForm.po_date) payload.po_date = new Date(invoiceForm.po_date).toISOString();
+      if (invoiceForm.invoice_date) payload.date = new Date(invoiceForm.invoice_date).toISOString();
+
       const res = await fetch(`${API_BASE_URL}/invoices/${selectedInvoice.id}`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          due_date: new Date(invoiceForm.due_date).toISOString(),
-          subtotal: totalAmount,
-          total_amount: totalAmount,
-          notes: invoiceForm.notes,
-          items: invoiceForm.items.map(i => ({
-            description: i.description,
-            quantity: Number(i.quantity || 0),
-            unit_price: Number(i.unit_price || 0),
-            total: Number(i.quantity || 0) * Number(i.unit_price || 0)
-          }))
-        })
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(payload)
       });
 
       if (res.ok) {
@@ -276,44 +282,55 @@ export default function FinancePage() {
     try {
       const totalAmount = invoiceForm.items.reduce((acc, i) => acc + (Number(i.quantity || 0) * Number(i.unit_price || 0)), 0);
 
-      // Prevent duplicate/similar invoices
-      const duplicateInvoice = invoices.find(inv => 
-        inv.client_id === invoiceForm.client_id && 
-        Number(inv.total_amount) === totalAmount &&
-        inv.status !== 'VOID'
-      );
+      const payload: any = {
+        client_id: invoiceForm.client_id,
+        due_date: new Date(invoiceForm.due_date).toISOString(),
+        subtotal: totalAmount,
+        total_amount: totalAmount,
+        notes: invoiceForm.notes,
+        items: invoiceForm.items.map(i => ({
+          description: i.description,
+          quantity: Number(i.quantity || 0),
+          unit_price: Number(i.unit_price || 0),
+          total: Number(i.quantity || 0) * Number(i.unit_price || 0)
+        }))
+      };
+      // Manual invoice number override
+      if (invoiceForm.invoice_number.trim()) payload.invoice_number = invoiceForm.invoice_number.trim();
+      // Manual invoice date override
+      if (invoiceForm.invoice_date) payload.date = new Date(invoiceForm.invoice_date).toISOString();
+      // PO details
+      if (invoiceForm.po_number.trim()) payload.po_number = invoiceForm.po_number.trim();
+      if (invoiceForm.po_date) payload.po_date = new Date(invoiceForm.po_date).toISOString();
 
-      if (duplicateInvoice) {
-        alert(`Duplicate Invoice Found!\n\nA similar invoice (${duplicateInvoice.invoice_number}) for ₹${totalAmount.toLocaleString()} already exists for this client.\n\nTo prevent duplicate billing, this manual invoice cannot be created.`);
-        return;
+      // Prevent duplicate/similar invoices (only if no manual invoice_number given)
+      if (!invoiceForm.invoice_number.trim()) {
+        const duplicateInvoice = invoices.find(inv => 
+          inv.client_id === invoiceForm.client_id && 
+          Number(inv.total_amount) === totalAmount &&
+          inv.status !== 'VOID'
+        );
+        if (duplicateInvoice) {
+          alert(`Duplicate Invoice Found!\n\nA similar invoice (${duplicateInvoice.invoice_number}) for ₹${totalAmount.toLocaleString()} already exists for this client.`);
+          return;
+        }
       }
 
       const res = await fetch(`${API_BASE_URL}/invoices`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          client_id: invoiceForm.client_id,
-          due_date: new Date(invoiceForm.due_date).toISOString(),
-          subtotal: totalAmount,
-          total_amount: totalAmount,
-          notes: invoiceForm.notes,
-          items: invoiceForm.items.map(i => ({
-            description: i.description,
-            quantity: Number(i.quantity || 0),
-            unit_price: Number(i.unit_price || 0),
-            total: Number(i.quantity || 0) * Number(i.unit_price || 0)
-          }))
-        })
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(payload)
       });
 
       if (res.ok) {
         setOpenNewInvoiceDialog(false);
         setInvoiceForm({
           client_id: "",
+          invoice_number: "",
+          invoice_date: new Date().toISOString().split('T')[0],
           due_date: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          po_number: "",
+          po_date: "",
           notes: "",
           items: [{ description: "", quantity: 1, unit_price: 0 }]
         });
@@ -502,6 +519,11 @@ export default function FinancePage() {
                         <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mt-1">
                           {invoice.date ? new Date(invoice.date).toLocaleDateString() : 'N/A'}
                         </span>
+                        {(invoice as any).po_number && (
+                          <span className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider mt-0.5">
+                            PO: {(invoice as any).po_number}
+                          </span>
+                        )}
                       </div>
                     </td>
                     <td className="px-8 py-6">
@@ -600,7 +622,11 @@ export default function FinancePage() {
                                  setSelectedInvoice(invoice);
                                  setInvoiceForm({
                                    client_id: invoice.client_id,
+                                   invoice_number: invoice.invoice_number,
+                                   invoice_date: invoice.date ? new Date(invoice.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
                                    due_date: new Date(invoice.due_date).toISOString().split('T')[0],
+                                   po_number: (invoice as any).po_number || "",
+                                   po_date: (invoice as any).po_date ? new Date((invoice as any).po_date).toISOString().split('T')[0] : "",
                                    notes: invoice.notes || "",
                                    items: invoice.items.map(i => ({
                                      description: i.description,
@@ -751,6 +777,50 @@ export default function FinancePage() {
               </div>
             </div>
 
+            {/* Manual Invoice No. & Date */}
+            <div className="grid grid-cols-2 gap-4 bg-muted/20 p-4 rounded-2xl border border-border/50">
+              <div className="space-y-2">
+                <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Invoice No. <span className="text-emerald-500">(Manual)</span></Label>
+                <Input 
+                  value={invoiceForm.invoice_number}
+                  onChange={(e) => setInvoiceForm({...invoiceForm, invoice_number: e.target.value})}
+                  placeholder="Auto-generated if empty"
+                  className="h-11 bg-background border-border font-mono font-bold"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Invoice Date</Label>
+                <Input 
+                  type="date"
+                  value={invoiceForm.invoice_date}
+                  onChange={(e) => setInvoiceForm({...invoiceForm, invoice_date: e.target.value})}
+                  className="h-11 bg-background border-border font-bold"
+                />
+              </div>
+            </div>
+
+            {/* P.O. Details */}
+            <div className="grid grid-cols-2 gap-4 bg-indigo-500/5 p-4 rounded-2xl border border-indigo-500/20">
+              <div className="space-y-2">
+                <Label className="text-xs font-black uppercase tracking-widest text-indigo-500">P.O. Number</Label>
+                <Input 
+                  value={invoiceForm.po_number}
+                  onChange={(e) => setInvoiceForm({...invoiceForm, po_number: e.target.value})}
+                  placeholder="e.g. PO-2026-001"
+                  className="h-11 bg-background border-border font-mono font-bold focus:ring-indigo-500"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs font-black uppercase tracking-widest text-indigo-500">P.O. Date</Label>
+                <Input 
+                  type="date"
+                  value={invoiceForm.po_date}
+                  onChange={(e) => setInvoiceForm({...invoiceForm, po_date: e.target.value})}
+                  className="h-11 bg-background border-border font-bold focus:ring-indigo-500"
+                />
+              </div>
+            </div>
+
             <div className="space-y-2">
               <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Payment Type</Label>
               <select 
@@ -864,6 +934,12 @@ export default function FinancePage() {
                 <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Invoice Timeline</p>
                 <p className="text-xs font-bold text-foreground">Issued: {selectedInvoice ? new Date(selectedInvoice.date).toLocaleDateString() : ''}</p>
                 <p className="text-xs font-bold text-rose-500">Due: {selectedInvoice ? new Date(selectedInvoice.due_date).toLocaleDateString() : ''}</p>
+                {(selectedInvoice as any)?.po_number && (
+                  <p className="text-xs font-bold text-indigo-600">PO No: {(selectedInvoice as any).po_number}</p>
+                )}
+                {(selectedInvoice as any)?.po_date && (
+                  <p className="text-xs font-bold text-indigo-500">PO Date: {new Date((selectedInvoice as any).po_date).toLocaleDateString()}</p>
+                )}
               </div>
             </div>
 
@@ -944,6 +1020,49 @@ export default function FinancePage() {
                   value={invoiceForm.due_date}
                   onChange={(e) => setInvoiceForm({...invoiceForm, due_date: e.target.value})}
                   className="h-11 bg-background border-border font-bold"
+                />
+              </div>
+            </div>
+
+            {/* Manual Invoice No. & Date override */}
+            <div className="grid grid-cols-2 gap-4 bg-muted/20 p-4 rounded-2xl border border-border/50">
+              <div className="space-y-2">
+                <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Invoice No.</Label>
+                <Input 
+                  value={invoiceForm.invoice_number}
+                  onChange={(e) => setInvoiceForm({...invoiceForm, invoice_number: e.target.value})}
+                  className="h-11 bg-background border-border font-mono font-bold"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Invoice Date</Label>
+                <Input 
+                  type="date"
+                  value={invoiceForm.invoice_date}
+                  onChange={(e) => setInvoiceForm({...invoiceForm, invoice_date: e.target.value})}
+                  className="h-11 bg-background border-border font-bold"
+                />
+              </div>
+            </div>
+
+            {/* P.O. Details */}
+            <div className="grid grid-cols-2 gap-4 bg-indigo-500/5 p-4 rounded-2xl border border-indigo-500/20">
+              <div className="space-y-2">
+                <Label className="text-xs font-black uppercase tracking-widest text-indigo-500">P.O. Number</Label>
+                <Input 
+                  value={invoiceForm.po_number}
+                  onChange={(e) => setInvoiceForm({...invoiceForm, po_number: e.target.value})}
+                  placeholder="e.g. PO-2026-001"
+                  className="h-11 bg-background border-border font-mono font-bold focus:ring-indigo-500"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs font-black uppercase tracking-widest text-indigo-500">P.O. Date</Label>
+                <Input 
+                  type="date"
+                  value={invoiceForm.po_date}
+                  onChange={(e) => setInvoiceForm({...invoiceForm, po_date: e.target.value})}
+                  className="h-11 bg-background border-border font-bold focus:ring-indigo-500"
                 />
               </div>
             </div>
