@@ -435,6 +435,7 @@ model Quotation {
   date         DateTime    @default(now()) @db.DateTime(6)
   valid_until  DateTime?   @db.Date
   subtotal     Decimal     @default(0) @db.Decimal(15, 2)
+  discount     Decimal     @default(0) @db.Decimal(15, 2)
   total_amount Decimal     @default(0) @db.Decimal(15, 2)
   tax_amount   Decimal     @default(0) @db.Decimal(15, 2)
   cgst         Decimal     @default(0) @db.Decimal(15, 2)
@@ -473,6 +474,7 @@ model Invoice {
   date           DateTime      @default(now()) @db.DateTime(6)
   due_date       DateTime?     @db.Date
   subtotal       Decimal       @db.Decimal(15, 2)
+  discount       Decimal       @default(0) @db.Decimal(15, 2)
   tax_amount     Decimal       @default(0) @db.Decimal(15, 2)
   cgst           Decimal       @default(0) @db.Decimal(15, 2)
   sgst           Decimal       @default(0) @db.Decimal(15, 2)

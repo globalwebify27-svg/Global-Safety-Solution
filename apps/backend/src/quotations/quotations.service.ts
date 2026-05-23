@@ -61,19 +61,23 @@ export class QuotationsService {
       0,
     );
 
+    const discount = Number(quoteData.discount) || 0;
+    const taxableValue = Math.max(0, subtotal - discount);
+
     // GST Calculation (Assume 18% total if apply_gst is active)
     const activeGst = apply_gst !== false;
-    const cgst = activeGst ? subtotal * 0.09 : 0;
-    const sgst = activeGst ? subtotal * 0.09 : 0;
+    const cgst = activeGst ? taxableValue * 0.09 : 0;
+    const sgst = activeGst ? taxableValue * 0.09 : 0;
     const igst = 0; // Interstate would be 18% IGST
     const taxAmount = cgst + sgst + igst;
-    const totalAmount = subtotal + taxAmount;
+    const totalAmount = taxableValue + taxAmount;
 
     const quotation = await this.prisma.quotation.create({
       data: {
         ...quoteData,
         quote_number: quoteNumber,
         subtotal: subtotal,
+        discount: discount,
         total_amount: totalAmount,
         tax_amount: taxAmount,
         cgst,
@@ -176,6 +180,62 @@ export class QuotationsService {
     return this.prisma.quotation.update({
       where: { id },
       data: { status },
+    });
+  }
+
+  async update(id: string, data: any) {
+    const { items, apply_gst, ...quoteData } = data;
+
+    if (quoteData.lead_id === '') quoteData.lead_id = null;
+    if (quoteData.client_id === '') quoteData.client_id = null;
+
+    // Calculate totals on server-side for integrity
+    const subtotal = items.reduce(
+      (acc: number, item: any) =>
+        acc + Number(item.unit_price) * Number(item.quantity),
+      0,
+    );
+
+    const discount = Number(quoteData.discount) || 0;
+    const taxableValue = Math.max(0, subtotal - discount);
+
+    // GST Calculation (Assume 18% total if apply_gst is active)
+    const activeGst = apply_gst !== false;
+    const cgst = activeGst ? taxableValue * 0.09 : 0;
+    const sgst = activeGst ? taxableValue * 0.09 : 0;
+    const igst = 0; // Interstate would be 18% IGST
+    const taxAmount = cgst + sgst + igst;
+    const totalAmount = taxableValue + taxAmount;
+
+    return this.prisma.$transaction(async (tx) => {
+      // Delete existing line items
+      await tx.quoteItem.deleteMany({
+        where: { quotation_id: id }
+      });
+
+      // Update quotation and create new line items
+      return tx.quotation.update({
+        where: { id },
+        data: {
+          ...quoteData,
+          subtotal: subtotal,
+          discount: discount,
+          total_amount: totalAmount,
+          tax_amount: taxAmount,
+          cgst,
+          sgst,
+          igst,
+          items: {
+            create: items.map((item: any) => ({
+              description: item.description,
+              quantity: Number(item.quantity),
+              unit_price: Number(item.unit_price),
+              total: Number(item.quantity) * Number(item.unit_price),
+            })),
+          },
+        },
+        include: { items: true, lead: true, client: true },
+      });
     });
   }
 
@@ -407,6 +467,7 @@ export class QuotationsService {
               quotation_id: quotation.id,
               invoice_number: invoiceNumber,
               subtotal: quotation.subtotal,
+              discount: quotation.discount,
               tax_amount: quotation.tax_amount,
               cgst: quotation.cgst,
               sgst: quotation.sgst,

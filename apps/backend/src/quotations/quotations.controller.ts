@@ -41,6 +41,11 @@ export class QuotationsController {
     return this.quotationsService.updateStatus(id, status);
   }
 
+  @Patch(':id')
+  update(@Param('id') id: string, @Body() data: any) {
+    return this.quotationsService.update(id, data);
+  }
+
   @Post(':id/convert')
   convert(@Param('id') id: string) {
     return this.quotationsService.convertToProjectAndInvoice(id);

@@ -67,13 +67,61 @@ function QuotationsContent() {
   const [submitting, setSubmitting] = useState(false);
   const token = useAuthStore((state) => state.token);
 
+  const [editMode, setEditMode] = useState(false);
+  const [editQuoteId, setEditQuoteId] = useState<string | null>(null);
+
   const [formData, setFormData] = useState({
     lead_id: "",
     client_id: "",
     notes: "",
     apply_gst: true,
+    discount_type: "flat", // "flat" or "percent"
+    discount_value: 0,
     items: [{ description: "", quantity: 1, unit_price: 0 }] as QuoteItem[]
   });
+
+  const calculateDiscountAmount = () => {
+    const subtotal = calculateTotal();
+    if (formData.discount_type === 'percent') {
+      return (subtotal * (formData.discount_value || 0)) / 100;
+    }
+    return formData.discount_value || 0;
+  };
+
+  const handleEditQuotation = (quote: any) => {
+    setEditMode(true);
+    setEditQuoteId(quote.id);
+    
+    // Determine the discount type and value from the quotation data
+    const totalItemsAmount = quote.items.reduce((acc: number, item: any) => acc + (Number(item.quantity) * Number(item.unit_price)), 0);
+    const savedDiscount = Number(quote.discount) || 0;
+    
+    let discountType = "flat";
+    let discountValue = savedDiscount;
+    
+    if (savedDiscount > 0 && totalItemsAmount > 0) {
+      const calculatedPct = Math.round((savedDiscount / totalItemsAmount) * 100);
+      if (Math.abs((totalItemsAmount * calculatedPct / 100) - savedDiscount) < 0.01) {
+        discountType = "percent";
+        discountValue = calculatedPct;
+      }
+    }
+
+    setFormData({
+      lead_id: quote.lead_id || "",
+      client_id: quote.client_id || "",
+      notes: quote.notes || "",
+      apply_gst: Number(quote.tax_amount) > 0,
+      discount_type: discountType,
+      discount_value: discountValue,
+      items: quote.items.map((item: any) => ({
+        description: item.description,
+        quantity: item.quantity,
+        unit_price: Number(item.unit_price)
+      }))
+    });
+    setOpen(true);
+  };
 
   useEffect(() => {
     fetchData();
@@ -270,22 +318,43 @@ function QuotationsContent() {
       return;
     }
     setSubmitting(true);
+
+    const payload = {
+      lead_id: formData.lead_id || undefined,
+      client_id: formData.client_id || undefined,
+      notes: formData.notes,
+      apply_gst: formData.apply_gst,
+      discount: calculateDiscountAmount(),
+      items: formData.items
+    };
+
     try {
-      const res = await fetch(`${API_BASE_URL}/quotations`, {
-        method: 'POST',
+      const url = editMode 
+        ? `${API_BASE_URL}/quotations/${editQuoteId}` 
+        : `${API_BASE_URL}/quotations`;
+      const method = editMode ? 'PATCH' : 'POST';
+
+      const res = await fetch(url, {
+        method,
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(payload)
       });
       if (res.ok) {
         setOpen(false);
-        setFormData({ lead_id: "", client_id: "", notes: "", apply_gst: true, items: [{ description: "", quantity: 1, unit_price: 0 }] });
-        toast.success("Quotation generated successfully!");
+        setFormData({ lead_id: "", client_id: "", notes: "", apply_gst: true, discount_type: "flat", discount_value: 0, items: [{ description: "", quantity: 1, unit_price: 0 }] });
+        setEditMode(false);
+        setEditQuoteId(null);
+        toast.success(editMode ? "Proposal updated successfully!" : "Quotation generated successfully!");
         fetchData();
       } else {
-        toast.error("Failed to generate quotation.");
+        const errData = await res.json().catch(() => ({}));
+        const errMsg = errData.message 
+          ? (Array.isArray(errData.message) ? errData.message.join(", ") : errData.message)
+          : (editMode ? "Failed to update quotation." : "Failed to generate quotation.");
+        toast.error(errMsg);
       }
     } catch (e) {
       toast.error("Network error occurred.");
@@ -315,14 +384,21 @@ function QuotationsContent() {
           <p className="text-muted-foreground font-medium text-sm lg:text-base">Generate and manage professional business proposals with ease.</p>
         </div>
 
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog open={open} onOpenChange={(isOpen) => {
+          setOpen(isOpen);
+          if (!isOpen) {
+            setFormData({ lead_id: "", client_id: "", notes: "", apply_gst: true, discount_type: "flat", discount_value: 0, items: [{ description: "", quantity: 1, unit_price: 0 }] });
+            setEditMode(false);
+            setEditQuoteId(null);
+          }
+        }}>
           <DialogTrigger render={<Button className="inline-flex items-center justify-center rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold shadow-xl shadow-emerald-500/20 px-8 h-12 transition-all active:scale-95 text-sm lg:text-base border-0" />}>
             <Plus className="w-5 h-5 mr-2" /> Draft New Proposal
           </DialogTrigger>
           <DialogContent className="sm:max-w-[800px] bg-card border-border text-foreground max-h-[90vh] overflow-y-auto rounded-[2rem]">
             <DialogHeader>
-              <DialogTitle className="text-2xl font-bold">Create Professional Quotation</DialogTitle>
-              <DialogDescription className="text-muted-foreground">Define scope, pricing, and terms for the client.</DialogDescription>
+              <DialogTitle className="text-2xl font-bold">{editMode ? "Edit Professional Proposal" : "Create Professional Quotation"}</DialogTitle>
+              <DialogDescription className="text-muted-foreground">Define scope, pricing, terms, and commercial discounts for the client.</DialogDescription>
             </DialogHeader>
             <form onSubmit={handleCreateQuotation} className="space-y-6 mt-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -366,9 +442,6 @@ function QuotationsContent() {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <Label className="text-lg font-bold text-foreground">Line Items</Label>
-                  <Button type="button" onClick={addItem} variant="ghost" size="sm" className="text-emerald-600 hover:text-emerald-500 hover:bg-emerald-500/10">
-                    <Plus className="w-4 h-4 mr-1" /> Add Row
-                  </Button>
                 </div>
                 
                 <div className="space-y-3">
@@ -412,46 +485,104 @@ function QuotationsContent() {
                     </div>
                   ))}
                 </div>
+
+                <div className="flex justify-start">
+                  <Button type="button" onClick={addItem} variant="ghost" size="sm" className="text-emerald-600 hover:text-emerald-500 hover:bg-emerald-500/10 font-bold rounded-xl h-9 px-3">
+                    <Plus className="w-4 h-4 mr-1" /> Add Item Row
+                  </Button>
+                </div>
               </div>
 
-              <div className="flex flex-col items-end gap-3 border-t border-border pt-6 w-full">
-                <div className="flex items-center justify-between w-full pb-2">
+              {/* Terms & Notes */}
+              <div className="space-y-2">
+                <Label className="text-foreground/80">Terms & Special Notes</Label>
+                <textarea
+                  className="w-full bg-background border border-border rounded-xl p-3 text-sm focus:ring-2 focus:ring-emerald-500 text-foreground min-h-[80px] focus:outline-none"
+                  placeholder="Standard validities, milestone payments, etc."
+                  value={formData.notes}
+                  onChange={(e) => setFormData({...formData, notes: e.target.value})}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 border-t border-border pt-6 w-full">
+                {/* Left Side: Tax & Discount Controls */}
+                <div className="space-y-4">
                   <div className="flex items-center gap-2">
                     <input 
                       type="checkbox"
                       id="apply_gst"
                       checked={formData.apply_gst}
                       onChange={(e) => setFormData({ ...formData, apply_gst: e.target.checked })}
-                      className="w-4 h-4 text-emerald-600 border-border rounded focus:ring-emerald-500 bg-background accent-emerald-600"
+                      className="w-4 h-4 text-emerald-600 border-border rounded focus:ring-emerald-500 bg-background accent-emerald-600 cursor-pointer"
                     />
                     <label htmlFor="apply_gst" className="text-xs font-bold uppercase tracking-wider text-muted-foreground cursor-pointer select-none">
                       Apply 18% GST (9% CGST + 9% SGST)
                     </label>
                   </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Apply Commercial Discount</Label>
+                    <div className="flex gap-2">
+                      <select
+                        className="bg-background border border-border rounded-xl h-10 px-2 text-xs focus:ring-2 focus:ring-emerald-500 text-foreground focus:outline-none"
+                        value={formData.discount_type}
+                        onChange={(e) => setFormData({ ...formData, discount_type: e.target.value, discount_value: 0 })}
+                      >
+                        <option value="flat">Flat (₹)</option>
+                        <option value="percent">Percentage (%)</option>
+                      </select>
+                      <Input
+                        type="number"
+                        placeholder="Discount value..."
+                        value={formData.discount_value === 0 ? "" : formData.discount_value.toString()}
+                        onChange={(e) => setFormData({ ...formData, discount_value: Math.max(0, parseFloat(e.target.value) || 0) })}
+                        className="bg-background border-border h-10 text-sm rounded-lg text-foreground w-full"
+                      />
+                    </div>
+                  </div>
                 </div>
 
-                <div className="flex items-center gap-10 text-muted-foreground">
-                  <span className="text-xs font-bold uppercase tracking-widest">Subtotal:</span>
-                  <span className="text-lg font-black text-foreground tabular-nums">₹{calculateTotal().toLocaleString()}</span>
-                </div>
-                {formData.apply_gst && (
-                  <div className="flex items-center gap-10 text-muted-foreground">
-                    <span className="text-[10px] font-black uppercase tracking-widest">GST (18%):</span>
-                    <span className="text-sm font-bold text-foreground tabular-nums">₹{(calculateTotal() * 0.18).toLocaleString()}</span>
+                {/* Right Side: Financial Breakdown */}
+                <div className="flex flex-col items-end gap-2.5">
+                  <div className="flex items-center gap-10 text-muted-foreground text-sm">
+                    <span className="font-bold uppercase tracking-widest text-[10px]">Gross Subtotal:</span>
+                    <span className="font-bold text-foreground tabular-nums">₹{calculateTotal().toLocaleString()}</span>
                   </div>
-                )}
-                <div className="flex items-center gap-10 border-t border-border/50 pt-2">
-                  <span className="text-sm font-black uppercase tracking-widest text-emerald-600">Grand Total:</span>
-                  <span className="text-3xl font-black text-foreground tabular-nums">₹{(formData.apply_gst ? calculateTotal() * 1.18 : calculateTotal()).toLocaleString()}</span>
+                  {calculateDiscountAmount() > 0 && (
+                    <div className="flex items-center gap-10 text-rose-500 text-sm">
+                      <span className="font-bold uppercase tracking-widest text-[10px]">Discount Applied:</span>
+                      <span className="font-black tabular-nums">-₹{calculateDiscountAmount().toLocaleString()}</span>
+                    </div>
+                  )}
+                  
+                  <div className="flex items-center gap-10 text-muted-foreground text-sm font-semibold border-t border-border/30 pt-1.5 w-full justify-end">
+                    <span className="font-bold uppercase tracking-widest text-[10px]">Taxable Value:</span>
+                    <span className="font-black text-foreground tabular-nums">₹{Math.max(0, calculateTotal() - calculateDiscountAmount()).toLocaleString()}</span>
+                  </div>
+
+                  {formData.apply_gst && (
+                    <div className="flex items-center gap-10 text-muted-foreground text-sm">
+                      <span className="font-bold uppercase tracking-widest text-[10px]">GST (18%):</span>
+                      <span className="font-bold text-foreground tabular-nums">₹{(Math.max(0, calculateTotal() - calculateDiscountAmount()) * 0.18).toLocaleString()}</span>
+                    </div>
+                  )}
+                  
+                  <div className="flex items-center gap-10 border-t-2 border-border pt-2 w-full justify-end">
+                    <span className="text-sm font-black uppercase tracking-widest text-emerald-600">Grand Total:</span>
+                    <span className="text-3xl font-black text-foreground tabular-nums">
+                      ₹{(
+                        Math.max(0, calculateTotal() - calculateDiscountAmount()) * (formData.apply_gst ? 1.18 : 1)
+                      ).toLocaleString()}
+                    </span>
+                  </div>
                 </div>
-                {formData.apply_gst && (
-                  <p className="text-[10px] text-muted-foreground italic text-right mt-2">GST split (9% CGST + 9% SGST) will be applied on final generation.</p>
-                )}
               </div>
 
               <DialogFooter>
                 <Button type="submit" disabled={submitting} className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold w-full h-12 shadow-xl shadow-emerald-500/20 rounded-xl border-0">
-                  {submitting ? "Generating Proposal..." : "Finalize & Send Quotation"}
+                  {submitting 
+                    ? (editMode ? "Updating Proposal..." : "Generating Proposal...") 
+                    : (editMode ? "Update & Save Proposal" : "Finalize & Send Quotation")}
                 </Button>
               </DialogFooter>
             </form>
@@ -527,9 +658,14 @@ function QuotationsContent() {
                             <FileText className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> View Details
                           </DropdownMenuItem>
                           {q.status === 'DRAFT' && (
-                            <DropdownMenuItem onClick={() => handleUpdateStatus(q.id, 'SENT')} className="hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 cursor-pointer flex items-center gap-3 py-3 rounded-xl font-bold text-sm">
-                              <CheckCircle2 className="w-4 h-4" /> Mark as Sent
-                            </DropdownMenuItem>
+                            <>
+                              <DropdownMenuItem onClick={() => handleEditQuotation(q)} className="hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 cursor-pointer flex items-center gap-3 py-3 rounded-xl font-bold text-sm">
+                                <Calculator className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> Edit Proposal
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleUpdateStatus(q.id, 'SENT')} className="hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 cursor-pointer flex items-center gap-3 py-3 rounded-xl font-bold text-sm">
+                                <CheckCircle2 className="w-4 h-4" /> Mark as Sent
+                              </DropdownMenuItem>
+                            </>
                           )}
                           {q.status === 'SENT' && (
                              <DropdownMenuItem onClick={() => handleUpdateStatus(q.id, 'ACCEPTED')} className="hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 cursor-pointer flex items-center gap-3 py-3 rounded-xl font-bold text-sm">
@@ -607,10 +743,30 @@ function QuotationsContent() {
                         </tr>
                       ))}
                     </tbody>
-                    <tfoot className="bg-muted/50 font-black">
+                    <tfoot className="bg-muted/50 font-black text-right">
                       <tr>
-                        <td colSpan={3} className="px-4 py-4 text-right text-muted-foreground uppercase tracking-widest text-[10px]">Grand Total</td>
-                        <td className="px-4 py-4 text-right text-emerald-600 dark:text-emerald-400 text-lg">₹{Number(selectedQuote.total_amount).toLocaleString()}</td>
+                        <td colSpan={3} className="px-4 py-2 text-muted-foreground uppercase tracking-widest text-[10px]">Gross Subtotal</td>
+                        <td className="px-4 py-2 text-foreground tabular-nums">₹{Number(selectedQuote.subtotal).toLocaleString()}</td>
+                      </tr>
+                      {Number(selectedQuote.discount) > 0 && (
+                        <tr className="text-rose-600">
+                          <td colSpan={3} className="px-4 py-2 uppercase tracking-widest text-[10px]">Discount Applied</td>
+                          <td className="px-4 py-2 tabular-nums">-₹{Number(selectedQuote.discount).toLocaleString()}</td>
+                        </tr>
+                      )}
+                      <tr>
+                        <td colSpan={3} className="px-4 py-2 text-muted-foreground uppercase tracking-widest text-[10px]">Taxable Value</td>
+                        <td className="px-4 py-2 text-foreground tabular-nums">₹{Math.max(0, Number(selectedQuote.subtotal) - Number(selectedQuote.discount)).toLocaleString()}</td>
+                      </tr>
+                      {Number(selectedQuote.tax_amount) > 0 && (
+                        <tr>
+                          <td colSpan={3} className="px-4 py-2 text-muted-foreground uppercase tracking-widest text-[10px]">GST (18%)</td>
+                          <td className="px-4 py-2 text-foreground tabular-nums">₹{Number(selectedQuote.tax_amount).toLocaleString()}</td>
+                        </tr>
+                      )}
+                      <tr className="border-t border-border/80 bg-emerald-500/5 text-base font-black">
+                        <td colSpan={3} className="px-4 py-4 uppercase tracking-widest text-[10px] text-emerald-600 dark:text-emerald-400">Grand Total</td>
+                        <td className="px-4 py-4 text-emerald-600 dark:text-emerald-400 text-xl tabular-nums">₹{Number(selectedQuote.total_amount).toLocaleString()}</td>
                       </tr>
                     </tfoot>
                   </table>
@@ -678,8 +834,28 @@ function QuotationsContent() {
                     </tbody>
                     <tfoot>
                         <tr>
-                            <td colSpan={3} style={{ padding: '10px', textAlign: 'right', fontWeight: 'bold' }}>Grand Total</td>
-                            <td style={{ padding: '10px', textAlign: 'right', fontWeight: 'bold', fontSize: '16px', backgroundColor: '#eee' }}>₹{Number(selectedQuote.total_amount).toLocaleString()}</td>
+                            <td colSpan={3} style={{ padding: '8px 10px', textAlign: 'right', color: '#555', fontSize: '12px' }}>Gross Subtotal</td>
+                            <td style={{ padding: '8px 10px', textAlign: 'right', fontSize: '13px' }}>₹{Number(selectedQuote.subtotal).toLocaleString()}</td>
+                        </tr>
+                        {Number(selectedQuote.discount) > 0 && (
+                            <tr style={{ color: '#b91c1c' }}>
+                                <td colSpan={3} style={{ padding: '8px 10px', textAlign: 'right', fontSize: '12px' }}>Discount Applied</td>
+                                <td style={{ padding: '8px 10px', textAlign: 'right', fontSize: '13px', fontWeight: 'bold' }}>-₹{Number(selectedQuote.discount).toLocaleString()}</td>
+                            </tr>
+                        )}
+                        <tr style={{ fontWeight: 'bold' }}>
+                            <td colSpan={3} style={{ padding: '8px 10px', textAlign: 'right', color: '#000', fontSize: '12px' }}>Taxable Value</td>
+                            <td style={{ padding: '8px 10px', textAlign: 'right', fontSize: '13px' }}>₹{Math.max(0, Number(selectedQuote.subtotal) - Number(selectedQuote.discount)).toLocaleString()}</td>
+                        </tr>
+                        {Number(selectedQuote.tax_amount) > 0 && (
+                            <tr>
+                                <td colSpan={3} style={{ padding: '8px 10px', textAlign: 'right', color: '#555', fontSize: '12px' }}>GST (18%)</td>
+                                <td style={{ padding: '8px 10px', textAlign: 'right', fontSize: '13px' }}>₹{Number(selectedQuote.tax_amount).toLocaleString()}</td>
+                            </tr>
+                        )}
+                        <tr style={{ fontWeight: 'bold', fontSize: '15px', backgroundColor: '#f3f4f6' }}>
+                            <td colSpan={3} style={{ padding: '12px 10px', textAlign: 'right', textTransform: 'uppercase' }}>Grand Total</td>
+                            <td style={{ padding: '12px 10px', textAlign: 'right', color: '#059669', fontSize: '16px' }}>₹{Number(selectedQuote.total_amount).toLocaleString()}</td>
                         </tr>
                     </tfoot>
                 </table>
