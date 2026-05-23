@@ -126,8 +126,12 @@ export default function ClientsPage() {
     pan_number: '', 
     industry: '', 
     city: '',
-    assigned_staff_id: ''
+    state: '',
+    billing_address: '',
+    assigned_staff_id: '',
+    contacts: [{ name: '', designation: '', email: '', phone: '' }]
   });
+  const [activeTab, setActiveTab] = useState("basic");
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -184,24 +188,47 @@ export default function ClientsPage() {
     if (!token) return;
     setSubmitting(true);
     try {
+      const cleanFormData = {
+        name: formData.name.trim(),
+        email: formData.email.trim() || undefined,
+        phone: formData.phone.trim() || undefined,
+        gst_number: formData.gst_number.trim() || undefined,
+        pan_number: formData.pan_number.trim() || undefined,
+        industry: formData.industry.trim() || undefined,
+        city: formData.city.trim() || undefined,
+        state: formData.state.trim() || undefined,
+        billing_address: formData.billing_address.trim() || undefined,
+        assigned_staff_id: formData.assigned_staff_id || undefined,
+        is_active: true,
+        contacts: formData.contacts
+          .map(c => ({
+            name: c.name.trim() || undefined,
+            designation: c.designation.trim() || undefined,
+            email: c.email.trim() || undefined,
+            phone: c.phone.trim() || undefined,
+          }))
+          .filter(c => c.name || c.email || c.phone)
+      };
+
       const res = await fetch(`${API_BASE_URL}/clients`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}` 
         },
-        body: JSON.stringify({
-          ...formData,
-          assigned_staff_id: formData.assigned_staff_id || undefined,
-          is_active: true
-        })
+        body: JSON.stringify(cleanFormData)
       });
       if (res.ok) {
         setOpen(false);
-        setFormData({ name: '', email: '', phone: '', gst_number: '', pan_number: '', industry: '', city: '', assigned_staff_id: '' });
-        fetchClients(); 
+        setFormData({ name: '', email: '', phone: '', gst_number: '', pan_number: '', industry: '', city: '', state: '', billing_address: '', assigned_staff_id: '', contacts: [{ name: '', designation: '', email: '', phone: '' }] });
+        setActiveTab("basic");
+        fetchClients();
       } else {
-        alert("Failed to create client");
+        const errData = await res.json().catch(() => ({}));
+        const errMsg = errData.message 
+          ? (Array.isArray(errData.message) ? errData.message.join(", ") : errData.message)
+          : "Failed to create client";
+        alert(`Failed to create client: ${errMsg}`);
       }
     } catch(err) {
       alert("Network error");
@@ -271,102 +298,93 @@ export default function ClientsPage() {
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleCreateClient} className="mt-4">
-              <div className="grid grid-cols-2 gap-6">
-                {/* Left Column */}
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="org_name" className="text-foreground/80">Organization Name *</Label>
-                    <div className="relative">
-                      <Building2 className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
-                      <input 
-                        id="org_name" 
-                        name="org_name" 
-                        list="leads-list"
-                        autoComplete="off" 
-                        value={formData.name} 
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          const matchedLead = leads.find(l => l.company_name === val);
-                          if (matchedLead) {
-                            setFormData({
-                              ...formData,
-                              name: val,
-                              email: matchedLead.email || formData.email,
-                              phone: matchedLead.phone || formData.phone,
-                              industry: matchedLead.source || formData.industry,
-                            });
-                          } else {
-                            setFormData({...formData, name: val});
-                          }
-                        }} 
-                        className="w-full pl-9 h-10 bg-background border border-border rounded-md text-foreground focus:ring-2 focus:ring-primary focus:outline-none placeholder:text-muted-foreground/50" 
-                        placeholder="Acme Global Inc." 
-                        required 
-                      />
-                      <datalist id="leads-list">
-                        {leads.map((l) => (
-                          <option key={l.id} value={l.company_name}>
-                            {l.contact_person ? `${l.company_name} (${l.contact_person})` : l.company_name}
-                          </option>
-                        ))}
-                      </datalist>
-                    </div>
-                  </div>
+              {/* Tab Navigation */}
+              <div className="flex space-x-1 rounded-xl bg-muted p-1 mb-6">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('basic')}
+                  className={`w-full rounded-lg py-2.5 text-sm font-medium leading-5 ${activeTab === 'basic' ? 'bg-background shadow text-foreground' : 'text-muted-foreground hover:bg-white/[0.12] hover:text-foreground'}`}
+                >
+                  Basic Info
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('address')}
+                  className={`w-full rounded-lg py-2.5 text-sm font-medium leading-5 ${activeTab === 'address' ? 'bg-background shadow text-foreground' : 'text-muted-foreground hover:bg-white/[0.12] hover:text-foreground'}`}
+                >
+                  Address
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('contacts')}
+                  className={`w-full rounded-lg py-2.5 text-sm font-medium leading-5 ${activeTab === 'contacts' ? 'bg-background shadow text-foreground' : 'text-muted-foreground hover:bg-white/[0.12] hover:text-foreground'}`}
+                >
+                  Contacts
+                </button>
+              </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="assigned_staff" className="text-foreground/80">Assigned Safety Officer</Label>
-                    <div className="relative">
-                      <Briefcase className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
-                      <select 
-                        id="assigned_staff"
-                        value={formData.assigned_staff_id}
-                        onChange={(e) => setFormData({...formData, assigned_staff_id: e.target.value})}
-                        className="w-full pl-9 h-10 bg-background border border-border rounded-md text-foreground focus:ring-2 focus:ring-primary focus:outline-none appearance-none"
-                      >
-                        <option value="">Select Safety Officer (Optional)</option>
-                        {staff.map((s: any) => (
-                          <option key={s.id} value={s.id}>{s.name} ({s.designation || 'Safety Officer'})</option>
-                        ))}
-                      </select>
+              {/* Basic Tab */}
+              {activeTab === 'basic' && (
+                <div className="grid grid-cols-2 gap-6">
+                  {/* Left Column */}
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="org_name" className="text-foreground/80">Organization Name *</Label>
+                      <div className="relative">
+                        <Building2 className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
+                        <input 
+                          id="org_name" 
+                          name="org_name" 
+                          list="leads-list"
+                          autoComplete="off" 
+                          value={formData.name} 
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            const matchedLead = leads.find(l => l.company_name === val);
+                            if (matchedLead) {
+                              setFormData({
+                                ...formData,
+                                name: val,
+                                email: matchedLead.email || formData.email,
+                                phone: matchedLead.phone || formData.phone,
+                                industry: matchedLead.source || formData.industry,
+                              });
+                            } else {
+                              setFormData({...formData, name: val});
+                            }
+                          }} 
+                          className="w-full pl-9 h-10 bg-background border border-border rounded-md text-foreground focus:ring-2 focus:ring-primary focus:outline-none placeholder:text-muted-foreground/50" 
+                          placeholder="Acme Global Inc." 
+                          required 
+                        />
+                        <datalist id="leads-list">
+                          {leads.map((l) => (
+                            <option key={l.id} value={l.company_name}>
+                              {l.contact_person ? `${l.company_name} (${l.contact_person})` : l.company_name}
+                            </option>
+                          ))}
+                        </datalist>
+                      </div>
                     </div>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="email" className="text-foreground/80">Official Email</Label>
-                    <div className="relative">
-                      <Mail className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
-                      <Input id="email" type="email" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} className="pl-9 bg-background border-border text-foreground placeholder:text-muted-foreground/50" placeholder="contact@acme.com" />
-                    </div>
-                  </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="phone" className="text-foreground/80">Contact Number</Label>
-                    <div className="relative">
-                      <Phone className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
-                      <Input id="phone" type="tel" value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} className="pl-9 bg-background border-border text-foreground placeholder:text-muted-foreground/50" placeholder="+91 98765 43210" />
+                    <div className="space-y-2">
+                      <Label htmlFor="assigned_staff" className="text-foreground/80">Assigned Safety Officer</Label>
+                      <div className="relative">
+                        <Briefcase className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
+                        <select 
+                          id="assigned_staff"
+                          value={formData.assigned_staff_id}
+                          onChange={(e) => setFormData({...formData, assigned_staff_id: e.target.value})}
+                          className="w-full pl-9 h-10 bg-background border border-border rounded-md text-foreground focus:ring-2 focus:ring-primary focus:outline-none appearance-none"
+                        >
+                          <option value="">Select Safety Officer (Optional)</option>
+                          {staff.map((s: any) => (
+                            <option key={s.id} value={s.id}>{s.name} ({s.designation || 'Safety Officer'})</option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
-                  </div>
-                </div>
 
-                {/* Right Column */}
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="gst" className="text-foreground/80">GST Number</Label>
-                    <div className="relative">
-                      <FileText className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
-                      <Input id="gst" value={formData.gst_number} onChange={(e) => setFormData({...formData, gst_number: e.target.value})} className="pl-9 bg-background border-border text-foreground uppercase placeholder:text-muted-foreground/50" placeholder="22AAAAA0000A1Z5" />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="pan" className="text-foreground/80">PAN Number</Label>
-                    <div className="relative">
-                      <FileText className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
-                      <Input id="pan" value={formData.pan_number} onChange={(e) => setFormData({...formData, pan_number: e.target.value})} className="pl-9 bg-background border-border text-foreground uppercase placeholder:text-muted-foreground/50" placeholder="ABCDE1234F" />
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="industry" className="text-foreground/80">Industry</Label>
                       <div className="relative">
@@ -374,16 +392,176 @@ export default function ClientsPage() {
                         <Input id="industry" value={formData.industry} onChange={(e) => setFormData({...formData, industry: e.target.value})} className="pl-9 bg-background border-border text-foreground placeholder:text-muted-foreground/50" placeholder="Manufacturing" />
                       </div>
                     </div>
+                  </div>
+
+                  {/* Right Column */}
+                  <div className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="city" className="text-foreground/80">Base City</Label>
+                      <Label htmlFor="email" className="text-foreground/80">Primary Org Email</Label>
+                      <div className="relative">
+                        <Mail className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
+                        <Input id="email" type="email" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} className="pl-9 bg-background border-border text-foreground placeholder:text-muted-foreground/50" placeholder="contact@acme.com" />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="phone" className="text-foreground/80">Primary Org Phone</Label>
+                      <div className="relative">
+                        <Phone className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
+                        <Input id="phone" type="tel" value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} className="pl-9 bg-background border-border text-foreground placeholder:text-muted-foreground/50" placeholder="+91 98765 43210" />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="gst" className="text-foreground/80">GST Number</Label>
+                      <div className="relative">
+                        <FileText className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
+                        <Input id="gst" value={formData.gst_number} onChange={(e) => setFormData({...formData, gst_number: e.target.value})} className="pl-9 bg-background border-border text-foreground uppercase placeholder:text-muted-foreground/50" placeholder="22AAAAA0000A1Z5" />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="pan" className="text-foreground/80">PAN Number</Label>
+                      <div className="relative">
+                        <FileText className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
+                        <Input id="pan" value={formData.pan_number} onChange={(e) => setFormData({...formData, pan_number: e.target.value})} className="pl-9 bg-background border-border text-foreground uppercase placeholder:text-muted-foreground/50" placeholder="ABCDE1234F" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Address Tab */}
+              {activeTab === 'address' && (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="billing_address" className="text-foreground/80">Organization Address</Label>
+                    <div className="relative">
+                      <MapPin className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
+                      <Input id="billing_address" value={formData.billing_address} onChange={(e) => setFormData({...formData, billing_address: e.target.value})} className="pl-9 bg-background border-border text-foreground placeholder:text-muted-foreground/50" placeholder="123 Corporate Park, Main Street" />
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="city" className="text-foreground/80">City</Label>
                       <div className="relative">
                         <MapPin className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
                         <Input id="city" value={formData.city} onChange={(e) => setFormData({...formData, city: e.target.value})} className="pl-9 bg-background border-border text-foreground placeholder:text-muted-foreground/50" placeholder="Mumbai" />
                       </div>
                     </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="state" className="text-foreground/80">State / District</Label>
+                      <div className="relative">
+                        <MapPin className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
+                        <Input id="state" value={formData.state} onChange={(e) => setFormData({...formData, state: e.target.value})} className="pl-9 bg-background border-border text-foreground placeholder:text-muted-foreground/50" placeholder="Maharashtra" />
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
+
+              {/* Contacts Tab */}
+              {activeTab === 'contacts' && (
+                <div className="space-y-6">
+                  {formData.contacts.map((contact, index) => (
+                    <div key={index} className="p-4 rounded-xl border border-border bg-accent/5 relative space-y-4">
+                      {index > 0 && (
+                        <button 
+                          type="button" 
+                          onClick={() => {
+                            const newContacts = [...formData.contacts];
+                            newContacts.splice(index, 1);
+                            setFormData({...formData, contacts: newContacts});
+                          }}
+                          className="absolute top-4 right-4 text-muted-foreground hover:text-red-500 text-sm font-medium"
+                        >
+                          Remove
+                        </button>
+                      )}
+                      
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label className="text-foreground/80">Contact Person Name</Label>
+                          <div className="relative">
+                            <User className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
+                            <Input 
+                              value={contact.name} 
+                              onChange={(e) => {
+                                const newContacts = [...formData.contacts];
+                                newContacts[index].name = e.target.value;
+                                setFormData({...formData, contacts: newContacts});
+                              }} 
+                              className="pl-9 bg-background border-border text-foreground" placeholder="John Doe" 
+                            />
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-foreground/80">Designation</Label>
+                          <div className="relative">
+                            <Briefcase className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
+                            <Input 
+                              value={contact.designation} 
+                              onChange={(e) => {
+                                const newContacts = [...formData.contacts];
+                                newContacts[index].designation = e.target.value;
+                                setFormData({...formData, contacts: newContacts});
+                              }} 
+                              className="pl-9 bg-background border-border text-foreground" placeholder="Manager" 
+                            />
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-foreground/80">Email</Label>
+                          <div className="relative">
+                            <Mail className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
+                            <Input 
+                              type="email"
+                              value={contact.email} 
+                              onChange={(e) => {
+                                const newContacts = [...formData.contacts];
+                                newContacts[index].email = e.target.value;
+                                setFormData({...formData, contacts: newContacts});
+                              }} 
+                              className="pl-9 bg-background border-border text-foreground" placeholder="john@acme.com" 
+                            />
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-foreground/80">Phone</Label>
+                          <div className="relative">
+                            <Phone className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
+                            <Input 
+                              type="tel"
+                              value={contact.phone} 
+                              onChange={(e) => {
+                                const newContacts = [...formData.contacts];
+                                newContacts[index].phone = e.target.value;
+                                setFormData({...formData, contacts: newContacts});
+                              }} 
+                              className="pl-9 bg-background border-border text-foreground" placeholder="+91..." 
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => {
+                      setFormData({
+                        ...formData,
+                        contacts: [...formData.contacts, { name: '', designation: '', email: '', phone: '' }]
+                      });
+                    }}
+                    className="w-full border-dashed border-2 text-primary hover:text-primary hover:bg-primary/5"
+                  >
+                    <Plus className="w-4 h-4 mr-2" /> Add Another Contact Person
+                  </Button>
+                </div>
+              )}
 
               <DialogFooter className="mt-8 border-t border-border pt-6">
                 <Button variant="ghost" type="button" onClick={() => setOpen(false)} className="text-muted-foreground hover:text-foreground hover:bg-accent/10 mr-2">

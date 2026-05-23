@@ -65,6 +65,13 @@ export class ClientsService {
   }
 
   async create(data: any) {
+    if (data.contacts && Array.isArray(data.contacts)) {
+      data.contacts = {
+        create: data.contacts.filter((c: any) => c.name || c.email || c.phone)
+      };
+    } else {
+      delete data.contacts;
+    }
     return this.prisma.client.create({ data });
   }
 

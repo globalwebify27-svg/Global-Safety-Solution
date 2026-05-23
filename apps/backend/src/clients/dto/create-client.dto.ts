@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsBoolean, IsEmail } from 'class-validator';
+import { IsString, IsOptional, IsBoolean, IsEmail, IsArray } from 'class-validator';
 
 export class CreateClientDto {
   @IsString()
@@ -55,4 +55,8 @@ export class CreateClientDto {
   @IsOptional()
   @IsString()
   assigned_staff_id?: string;
+
+  @IsOptional()
+  @IsArray()
+  contacts?: any[];
 }

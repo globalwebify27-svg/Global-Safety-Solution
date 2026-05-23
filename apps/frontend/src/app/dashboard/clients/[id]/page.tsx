@@ -73,8 +73,11 @@ interface Client {
   pan_number?: string;
   industry?: string;
   city?: string;
+  state?: string;
+  billing_address?: string;
   is_active: boolean;
   created_at?: string;
+  contacts?: { id: string; name: string; designation?: string; email?: string; phone?: string; }[];
   compliances?: Compliance[];
   assigned_staff?: {
     id: string;
@@ -319,6 +322,66 @@ export default function ClientProfilePage({ params }: { params: Promise<{ id: st
                 </div>
               </div>
             </div>
+          </div>
+
+          <div className="bg-card/40 backdrop-blur-md rounded-3xl border border-border p-8 shadow-sm">
+            <h3 className="text-xl font-bold text-foreground mb-6 flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-orange-500/10 flex items-center justify-center">
+                <MapPin className="w-4 h-4 text-orange-600 dark:text-orange-400" />
+              </div>
+              Organization Headquarters
+            </h3>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-10">
+              <div className="space-y-6">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] flex items-center gap-2">Registered Address</label>
+                  <p className="text-foreground mt-1 font-bold text-base">{client.billing_address || "Address not on file"}</p>
+                </div>
+              </div>
+              <div className="space-y-6">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] flex items-center gap-2">State / District</label>
+                  <p className="text-foreground mt-1 font-bold text-base">{client.state || "Not specified"}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-card/40 backdrop-blur-md rounded-3xl border border-border p-8 shadow-sm">
+            <h3 className="text-xl font-bold text-foreground mb-6 flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                <Users className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+              </div>
+              Key Contact Persons
+            </h3>
+            
+            {client.contacts && client.contacts.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                 {client.contacts.map((contact: any) => (
+                    <div key={contact.id} className="flex flex-col p-5 rounded-2xl bg-background border border-border shadow-sm">
+                      <p className="font-bold text-foreground text-lg mb-1">{contact.name || "Unnamed Contact"}</p>
+                      <p className="text-sm font-semibold text-primary mb-4">{contact.designation || "Designation not provided"}</p>
+                      
+                      <div className="space-y-2 mt-auto">
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Mail className="w-3.5 h-3.5" />
+                          <span className="truncate">{contact.email || "No email"}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Phone className="w-3.5 h-3.5" />
+                          <span>{contact.phone || "No phone"}</span>
+                        </div>
+                      </div>
+                    </div>
+                 ))}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground bg-muted/20 rounded-2xl border border-dashed border-border">
+                <Users className="w-12 h-12 mb-4 opacity-20" />
+                <p className="font-bold uppercase tracking-widest text-[10px]">No contact persons assigned yet.</p>
+              </div>
+            )}
           </div>
 
           <div className="bg-card/40 backdrop-blur-md rounded-3xl border border-border p-8 shadow-sm">
