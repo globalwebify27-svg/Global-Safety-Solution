@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useAuthStore } from "@/store/auth";
 import { API_BASE_URL } from "@/lib/config";
 import { Button } from "@/components/ui/button";
-import { Plus, User, Mail, Phone, FileText, Building2, MapPin, Briefcase } from "lucide-react";
+import { Plus, User, Mail, Phone, FileText, Building2, MapPin, Briefcase, Search } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -115,6 +115,7 @@ export default function ClientsPage() {
   const [leads, setLeads] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const token = useAuthStore((state) => state.token);
 
   const [formData, setFormData] = useState({ 
@@ -209,6 +210,35 @@ export default function ClientsPage() {
     }
   };
 
+  const filteredClients = clients.filter((c) => {
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    
+    // Check main client details
+    if (c.name.toLowerCase().includes(q)) return true;
+    if (c.email?.toLowerCase().includes(q)) return true;
+    if (c.gst_number?.toLowerCase().includes(q)) return true;
+    if (c.industry?.toLowerCase().includes(q)) return true;
+    if (c.city?.toLowerCase().includes(q)) return true;
+    
+    // Check assigned officer
+    if (c.assigned_staff?.name.toLowerCase().includes(q)) return true;
+
+    // Check nested projects and work orders
+    if (c.projects) {
+      for (const p of c.projects) {
+        if (p.name.toLowerCase().includes(q)) return true;
+        if (p.work_orders) {
+          for (const w of p.work_orders) {
+            if (w.work_order_no.toLowerCase().includes(q)) return true;
+          }
+        }
+      }
+    }
+
+    return false;
+  });
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -216,11 +246,22 @@ export default function ClientsPage() {
           Clients Directory
         </h1>
         
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger render={<Button className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20 h-10 px-6 py-2 rounded-md font-semibold inline-flex items-center justify-center text-sm transition-colors" />}>
-            <Plus className="w-4 h-4 mr-2" /> Add Client
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[700px] bg-card border-border text-foreground shadow-2xl">
+        <div className="flex items-center gap-4">
+          <div className="relative w-64 md:w-80">
+            <Search className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
+            <Input 
+              placeholder="Search by client, officer, order ID..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 bg-card border-border shadow-sm focus:ring-primary"
+            />
+          </div>
+          
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger render={<Button className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20 h-10 px-6 py-2 rounded-md font-semibold inline-flex items-center justify-center text-sm transition-colors" />}>
+              <Plus className="w-4 h-4 mr-2" /> Add Client
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[700px] bg-card border-border text-foreground shadow-2xl">
             <DialogHeader>
               <DialogTitle className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-teal-500">
                 Onboard Enterprise Client
@@ -355,6 +396,7 @@ export default function ClientsPage() {
             </form>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       {/* Directory Table */}
@@ -374,10 +416,10 @@ export default function ClientsPage() {
           <tbody className="divide-y divide-border text-sm">
             {loading ? (
                <tr><td colSpan={7} className="px-6 py-8 text-center text-muted-foreground">Loading clients...</td></tr>
-            ) : clients.length === 0 ? (
+            ) : filteredClients.length === 0 ? (
                <tr><td colSpan={7} className="px-6 py-8 text-center text-muted-foreground">No enterprise clients found in the registry.</td></tr>
             ) : (
-               clients.map((c) => (
+               filteredClients.map((c) => (
                 <tr key={c.id} className="hover:bg-accent/5 transition-colors group">
                   <td className="px-6 py-4">
                     <div className="text-foreground font-semibold">{c.name}</div>
