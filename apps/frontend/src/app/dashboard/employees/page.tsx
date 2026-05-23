@@ -27,7 +27,9 @@ import {
   ExternalLink,
   History,
   Award,
-  Pencil
+  Pencil,
+  Trash2,
+  UserX
 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -53,6 +55,7 @@ export default function EmployeesPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [openEditDialog, setOpenEditDialog] = useState(false);
+  const [openBasicEditDialog, setOpenBasicEditDialog] = useState(false);
   const [profileTab, setProfileTab] = useState<"overview" | "history">("overview");
   const [openPromoteDialog, setOpenPromoteDialog] = useState(false);
   const [promoteForm, setPromoteForm] = useState({
@@ -67,6 +70,12 @@ export default function EmployeesPage() {
   const [profileData, setProfileData] = useState<any>(null);
   
   const token = useAuthStore((state) => state.token);
+
+  const [basicEditForm, setBasicEditForm] = useState({
+    name: "",
+    email: "",
+    phone: "",
+  });
 
   const [onboardForm, setOnboardForm] = useState({
     name: "",
@@ -244,6 +253,62 @@ export default function EmployeesPage() {
       emergency_contact_phone: emp.emergency_contact_phone || "",
     });
     setOpenEditDialog(true);
+  };
+
+  const openBasicEdit = (emp: any) => {
+    setSelectedEmployee(emp);
+    setBasicEditForm({
+      name: emp.name || "",
+      email: emp.email || "",
+      phone: emp.phone || "",
+    });
+    setOpenBasicEditDialog(true);
+  };
+
+  const handleBasicUpdateEmployee = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!token || !selectedEmployee) return;
+    setSubmitting(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/users/${selectedEmployee.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(basicEditForm)
+      });
+      if (res.ok) {
+        setOpenBasicEditDialog(false);
+        fetchEmployees();
+      } else {
+        const err = await res.json();
+        alert(err.message || "Failed to update employee");
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDeactivateEmployee = async (emp: Employee) => {
+    if (!token) return;
+    const action = emp.is_active ? 'deactivate' : 'reactivate';
+    if (!confirm(`Are you sure you want to ${action} ${emp.name}?`)) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/users/${emp.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ is_active: !emp.is_active })
+      });
+      if (res.ok) fetchEmployees();
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   return (
@@ -449,8 +514,14 @@ export default function EmployeesPage() {
                         <DropdownMenuItem onClick={() => fetchProfile(emp.id)} className="flex items-center gap-3 p-3 rounded-xl cursor-pointer focus:bg-emerald-500/10 focus:text-emerald-500 font-bold text-sm">
                           <IdCard className="w-4 h-4" /> View Full Profile
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => openEdit(emp)} className="flex items-center gap-3 p-3 rounded-xl cursor-pointer focus:bg-blue-500/10 focus:text-blue-500 text-blue-600 dark:text-blue-400 font-bold text-sm">
+                        <DropdownMenuItem onClick={() => openBasicEdit(emp)} className="flex items-center gap-3 p-3 rounded-xl cursor-pointer focus:bg-blue-500/10 focus:text-blue-500 text-blue-600 dark:text-blue-400 font-bold text-sm">
                           <Pencil className="w-4 h-4" /> Edit Employee
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => openEdit(emp)} className="flex items-center gap-3 p-3 rounded-xl cursor-pointer focus:bg-blue-500/10 focus:text-blue-500 font-bold text-sm">
+                          <ExternalLink className="w-4 h-4" /> Modify Credentials
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleDeactivateEmployee(emp)} className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer font-bold text-sm mt-1 border-t border-border ${emp.is_active ? 'text-rose-600 focus:bg-rose-500/10' : 'text-emerald-600 focus:bg-emerald-500/10'}`}>
+                          {emp.is_active ? <><UserX className="w-4 h-4" /> Deactivate Staff</> : <><CheckCircle2 className="w-4 h-4" /> Reactivate Staff</>}
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -786,6 +857,65 @@ export default function EmployeesPage() {
             <DialogFooter className="pt-6 border-t border-border/50">
               <Button type="submit" disabled={submitting} className="w-full h-14 bg-blue-600 hover:bg-blue-500 text-lg font-black rounded-2xl">
                 {submitting ? "Updating Registry..." : "Synchronize Records"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Employee Dialog — name, email, phone */}
+      <Dialog open={openBasicEditDialog} onOpenChange={setOpenBasicEditDialog}>
+        <DialogContent className="sm:max-w-[480px] bg-card border-border text-foreground rounded-3xl shadow-2xl p-8">
+          <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-t-3xl" />
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-black flex items-center gap-3">
+              <Pencil className="w-6 h-6 text-blue-600" /> Edit Employee Info
+            </DialogTitle>
+            <DialogDescription className="font-medium">
+              Update personal details for <span className="font-black text-foreground">{selectedEmployee?.name}</span>
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleBasicUpdateEmployee} className="space-y-5 mt-6">
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Full Name *</Label>
+              <Input
+                required
+                value={basicEditForm.name}
+                onChange={(e) => setBasicEditForm({...basicEditForm, name: e.target.value})}
+                placeholder="e.g. Rahul Sharma"
+                className="h-12 bg-background border-border rounded-xl font-bold focus:ring-blue-500"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Email Address *</Label>
+              <Input
+                required
+                type="email"
+                value={basicEditForm.email}
+                onChange={(e) => setBasicEditForm({...basicEditForm, email: e.target.value})}
+                placeholder="e.g. rahul@globalsafety.com"
+                className="h-12 bg-background border-border rounded-xl font-bold focus:ring-blue-500"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Contact Number</Label>
+              <Input
+                value={basicEditForm.phone}
+                onChange={(e) => setBasicEditForm({...basicEditForm, phone: e.target.value})}
+                placeholder="+91 98765 43210"
+                className="h-12 bg-background border-border rounded-xl font-bold focus:ring-blue-500"
+              />
+            </div>
+
+            <DialogFooter className="pt-4">
+              <Button type="button" variant="ghost" onClick={() => setOpenBasicEditDialog(false)} className="rounded-xl font-bold">
+                Cancel
+              </Button>
+              <Button type="submit" disabled={submitting} className="bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-black px-8 shadow-lg shadow-blue-500/20">
+                {submitting ? "Saving..." : "Save Changes"}
               </Button>
             </DialogFooter>
           </form>

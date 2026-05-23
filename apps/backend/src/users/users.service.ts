@@ -62,7 +62,9 @@ export class UsersService {
       where: { id },
       data: {
         name: data.name || undefined,
+        email: data.email || undefined,
         phone: data.phone || undefined,
+        is_active: data.is_active !== undefined ? data.is_active : undefined,
         designation: data.designation || undefined,
         department: data.department || undefined,
         address: data.address || undefined,
