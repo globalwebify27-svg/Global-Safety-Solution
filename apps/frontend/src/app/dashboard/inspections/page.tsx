@@ -702,8 +702,12 @@ export default function InspectionsPage() {
                       <Input 
                         placeholder="Add observations..." 
                         className="bg-background h-10 text-sm flex-1"
-                        value={item.notes || ""}
-                        onChange={(e) => handleUpdateItem(item.id, item.status, e.target.value, item.expenditure)}
+                        defaultValue={item.notes || ""}
+                        onBlur={(e) => {
+                          if (e.target.value !== (item.notes || "")) {
+                            handleUpdateItem(item.id, item.status, e.target.value, item.expenditure);
+                          }
+                        }}
                       />
                       <div className="flex items-center gap-2">
                         <span className="text-[10px] font-bold text-muted-foreground uppercase">Exp (₹)</span>
@@ -711,8 +715,12 @@ export default function InspectionsPage() {
                           type="number"
                           placeholder="0.00"
                           className="bg-background h-10 text-sm w-28"
-                          value={item.expenditure || ""}
-                          onChange={(e) => handleUpdateItem(item.id, item.status, item.notes, e.target.value)}
+                          defaultValue={item.expenditure || ""}
+                          onBlur={(e) => {
+                            if (e.target.value !== String(item.expenditure || "")) {
+                              handleUpdateItem(item.id, item.status, item.notes, e.target.value);
+                            }
+                          }}
                         />
                       </div>
                     </div>
