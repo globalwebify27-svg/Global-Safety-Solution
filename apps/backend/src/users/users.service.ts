@@ -100,14 +100,21 @@ export class UsersService {
       data.password_hash = await bcrypt.hash('Staff@123', 10);
     }
 
+    const { role_id, ...userData } = data;
+
     return this.prisma.user.create({
       data: {
-        ...data,
+        ...userData,
         employee_id: employeeId,
         base_salary: data.base_salary
           ? new Prisma.Decimal(data.base_salary)
           : undefined,
         join_date: data.join_date ? new Date(data.join_date) : new Date(),
+        roles: role_id ? {
+          create: {
+            role_id: role_id
+          }
+        } : undefined
       },
     });
   }

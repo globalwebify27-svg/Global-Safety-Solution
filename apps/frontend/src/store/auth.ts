@@ -10,6 +10,7 @@ interface User {
   designation?: string;
   department?: string;
   role?: string;
+  roles?: any[];
 }
 
 interface AuthState {

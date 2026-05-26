@@ -187,6 +187,12 @@ export class RBACService {
         module: 'SYSTEM',
         description: 'Manage roles and permissions',
       },
+      // Field Tasks
+      {
+        name: 'VIEW_FIELD_TASKS',
+        module: 'FIELD_TASKS',
+        description: 'View field task board',
+      },
     ];
 
     for (const p of permissions) {
@@ -200,8 +206,7 @@ export class RBACService {
     const roles = [
       {
         name: 'SUPER_ADMIN',
-        description:
-          'Complete system access with authority to manage roles and organization settings.',
+        description: 'Complete system access, excluding field execution tasks.',
       },
       {
         name: 'HR_MANAGER',
@@ -209,15 +214,15 @@ export class RBACService {
       },
       {
         name: 'FIELD_ENGINEER',
-        description: 'Perform site inspections and upload safety reports.',
+        description: 'Perform site inspections and field tasks.',
       },
       {
         name: 'SALES_EXECUTIVE',
-        description: 'Manage leads and generate quotations.',
+        description: 'Manage leads, quotations, and clients.',
       },
       {
-        name: 'CLIENT',
-        description: 'Access to project reports, invoices, and certificates.',
+        name: 'OFFICE_ADMIN',
+        description: 'General office management access.',
       },
     ];
 
@@ -227,6 +232,24 @@ export class RBACService {
         update: { description: role.description },
         create: role,
       });
+    }
+
+    // Role-to-Permission Mapping
+    const allPerms = await this.prisma.permission.findMany();
+    
+    const rolePermissionMapping: Record<string, string[]> = {
+      SUPER_ADMIN: allPerms.filter(p => p.module !== 'FIELD_TASKS').map(p => p.id),
+      HR_MANAGER: allPerms.filter(p => ['DASHBOARD', 'HR', 'SYSTEM'].includes(p.module)).map(p => p.id),
+      SALES_EXECUTIVE: allPerms.filter(p => ['DASHBOARD', 'SALES', 'FINANCE', 'CLIENTS'].includes(p.module)).map(p => p.id),
+      FIELD_ENGINEER: allPerms.filter(p => ['DASHBOARD', 'FIELD_TASKS'].includes(p.module)).map(p => p.id),
+      OFFICE_ADMIN: allPerms.filter(p => p.module !== 'FIELD_TASKS' && p.module !== 'SYSTEM').map(p => p.id),
+    };
+
+    for (const [roleName, permIds] of Object.entries(rolePermissionMapping)) {
+      const role = await this.prisma.role.findUnique({ where: { name: roleName } });
+      if (role) {
+        await this.updateRolePermissions(role.id, permIds);
+      }
     }
 
     // Assign SUPER_ADMIN role to default admin

@@ -49,6 +49,9 @@ interface Inspection {
   remarks?: string;
   client_id?: string;
   project_id?: string;
+  admin_feedback?: string;
+  draft_cert_type?: string;
+  draft_cert_data?: any;
 }
 
 export default function InspectionsPage() {
@@ -59,24 +62,50 @@ export default function InspectionsPage() {
   const [openSchedule, setOpenSchedule] = useState(false);
   const [openVisit, setOpenVisit] = useState(false);
   const [selectedInspection, setSelectedInspection] = useState<Inspection | null>(null);
+
+  // Certificate Preparation & Review States
+  const [draftCertType, setDraftCertType] = useState("FIRE_SAFETY");
+  const [draftCertValidity, setDraftCertValidity] = useState("1y");
+  const [draftCertExpiry, setDraftCertExpiry] = useState("");
+  const [draftCertNotes, setDraftCertNotes] = useState("");
+  const [draftCertScope, setDraftCertScope] = useState("");
+  const [feedbackInput, setFeedbackInput] = useState("");
+  const [submittingReview, setSubmittingReview] = useState(false);
   
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [uploadedPhotoUrls, setUploadedPhotoUrls] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const parseRemarksPhotos = (remarks?: string | null): string[] => {
-    if (!remarks) return [];
+  const parseRemarksData = (remarks?: string | null): {
+    admin_feedback?: string;
+    draft_cert_type?: string;
+    draft_cert_data?: any;
+    verification_photos?: string[];
+  } => {
+    if (!remarks) return {};
+    if (remarks.startsWith('{') && remarks.endsWith('}')) {
+      try {
+        return JSON.parse(remarks);
+      } catch (e) {
+        return {};
+      }
+    }
     if (remarks.startsWith("Verification Photos: ")) {
       try {
         const parsed = JSON.parse(remarks.replace("Verification Photos: ", ""));
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed)) return { verification_photos: parsed };
       } catch (e) {
-        return remarks.replace("Verification Photos: ", "").split(",").filter(Boolean);
+        const urls = remarks.replace("Verification Photos: ", "").split(",").filter(Boolean);
+        return { verification_photos: urls };
       }
     } else if (remarks.startsWith("Verification Photo: ")) {
-      return [remarks.replace("Verification Photo: ", "")];
+      return { verification_photos: [remarks.replace("Verification Photo: ", "")] };
     }
-    return [];
+    return {};
+  };
+
+  const parseRemarksPhotos = (remarks?: string | null): string[] => {
+    return parseRemarksData(remarks).verification_photos || [];
   };
   
   const [scheduleForm, setScheduleForm] = useState({
@@ -88,6 +117,44 @@ export default function InspectionsPage() {
 
   const token = useAuthStore((state) => state.token);
   const user = useAuthStore((state) => state.user);
+
+  useEffect(() => {
+    if (selectedInspection) {
+      const oneYearLater = new Date();
+      oneYearLater.setFullYear(oneYearLater.getFullYear() + 1);
+      const defaultExp = oneYearLater.toISOString().split("T")[0];
+      setDraftCertExpiry(defaultExp);
+      
+      const remarksData = parseRemarksData(selectedInspection.remarks);
+      selectedInspection.admin_feedback = remarksData.admin_feedback;
+      selectedInspection.draft_cert_type = remarksData.draft_cert_type;
+      selectedInspection.draft_cert_data = remarksData.draft_cert_data;
+      
+      if (selectedInspection.draft_cert_type) {
+        setDraftCertType(selectedInspection.draft_cert_type);
+      } else {
+        setDraftCertType("FIRE_SAFETY");
+      }
+      
+      if (selectedInspection.draft_cert_data) {
+        try {
+          const parsed = typeof selectedInspection.draft_cert_data === 'string'
+            ? JSON.parse(selectedInspection.draft_cert_data)
+            : selectedInspection.draft_cert_data;
+          setDraftCertValidity(parsed.validity_period || "1y");
+          setDraftCertExpiry(parsed.expiry_date || defaultExp);
+          setDraftCertNotes(parsed.remarks || parsed.recommendations || "");
+          setDraftCertScope(parsed.scope || "");
+        } catch (e) {
+          console.error("Error parsing draft cert data", e);
+        }
+      } else {
+        setDraftCertValidity("1y");
+        setDraftCertNotes("");
+        setDraftCertScope("");
+      }
+    }
+  }, [selectedInspection?.id]);
 
   useEffect(() => {
     fetchData();
@@ -113,6 +180,7 @@ export default function InspectionsPage() {
             u.designation?.toLowerCase().includes('engineer') || 
             u.designation?.toLowerCase().includes('dev') ||
             u.designation?.toLowerCase().includes('technician') ||
+            u.designation?.toLowerCase().includes('tecnician') ||
             u.department?.toLowerCase().includes('operations') ||
             u.name?.toLowerCase().includes('admin')
           )
@@ -241,7 +309,7 @@ export default function InspectionsPage() {
     }
   };
 
-  const handleCompleteVisit = async () => {
+  const handleSubmitForReview = async () => {
     if (!selectedInspection || !token) return;
 
     // Block sign-off if any checklist item is still PENDING
@@ -254,20 +322,28 @@ export default function InspectionsPage() {
       return;
     }
     
+    setSubmittingReview(true);
     const submit = async (latitude?: number, longitude?: number) => {
       try {
         const hasFailItems = (selectedInspection.items || []).some(item => item.status === 'FAIL');
-        const finalStatus = hasFailItems ? 'REJECTED' : 'COMPLETED';
+        const finalStatus = hasFailItems ? 'REJECTED' : 'PENDING_REVIEW';
 
         const res = await fetch(`${API_BASE_URL}/inspections/${selectedInspection.id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
           body: JSON.stringify({ 
             status: finalStatus, 
-            completed_date: new Date().toISOString(),
+            completed_date: finalStatus === 'REJECTED' ? new Date().toISOString() : undefined,
             lat: latitude,
             lng: longitude,
-            remarks: uploadedPhotoUrls.length > 0 ? "Verification Photos: " + JSON.stringify(uploadedPhotoUrls) : undefined
+            remarks: uploadedPhotoUrls.length > 0 ? "Verification Photos: " + JSON.stringify(uploadedPhotoUrls) : undefined,
+            draft_cert_type: finalStatus === 'PENDING_REVIEW' ? draftCertType : undefined,
+            draft_cert_data: finalStatus === 'PENDING_REVIEW' ? {
+              validity_period: draftCertValidity,
+              expiry_date: draftCertExpiry,
+              remarks: draftCertNotes,
+              scope: draftCertScope
+            } : undefined
           })
         });
         if (res.ok) {
@@ -275,7 +351,7 @@ export default function InspectionsPage() {
           if (finalStatus === 'REJECTED') {
             toast.warning("Visit submitted and marked as REJECTED due to failed items");
           } else {
-            toast.success("Visit marked as completed with site verification");
+            toast.success("Visit submitted and pending Office Staff review");
           }
           fetchData();
         } else {
@@ -284,6 +360,8 @@ export default function InspectionsPage() {
         }
       } catch (e) {
         toast.error("Failed to complete visit due to network error");
+      } finally {
+        setSubmittingReview(false);
       }
     };
 
@@ -320,6 +398,57 @@ export default function InspectionsPage() {
     }
   };
 
+  const handleApproveInspection = async (inspectionId: string) => {
+    if (!token) return;
+    setSubmittingReview(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/inspections/${inspectionId}/approve`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        toast.success("Inspection Approved! Official Certificate issued successfully.");
+        setOpenVisit(false);
+        fetchData();
+      } else {
+        const err = await res.json();
+        toast.error(err.message || "Failed to approve inspection");
+      }
+    } catch (e) {
+      toast.error("Failed to approve inspection");
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
+
+  const handleRejectInspection = async (inspectionId: string) => {
+    if (!token || !feedbackInput.trim()) {
+      toast.error("Please enter feedback for rejection");
+      return;
+    }
+    setSubmittingReview(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/inspections/${inspectionId}/reject`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ feedback: feedbackInput })
+      });
+      if (res.ok) {
+        toast.warning("Inspection Rejected. Safety Officer will be notified.");
+        setFeedbackInput("");
+        setOpenVisit(false);
+        fetchData();
+      } else {
+        const err = await res.json();
+        toast.error(err.message || "Failed to reject inspection");
+      }
+    } catch (e) {
+      toast.error("Failed to reject inspection");
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
+
   const handleDownloadCertificate = async (id: string) => {
     if (!token) return;
     try {
@@ -340,6 +469,37 @@ export default function InspectionsPage() {
       toast.error("Failed to download certificate");
     }
   };
+
+  const isAuthorized = user?.email === "admin@globalsafety.com" ||
+    user?.name?.toLowerCase().includes("admin") ||
+    user?.role === "ADMIN" || 
+    ((user?.designation && (
+      user.designation.toLowerCase().includes("admin") || 
+      user.designation.toLowerCase().includes("executive") ||
+      user.designation.toLowerCase().includes("staff") ||
+      user.designation.toLowerCase().includes("manager") ||
+      user.designation.toLowerCase().includes("director")
+    )) &&
+    !(
+      user?.designation?.toLowerCase().includes("engineer") ||
+      user?.designation?.toLowerCase().includes("technician") ||
+      user?.designation?.toLowerCase().includes("tecnician") ||
+      user?.designation?.toLowerCase().includes("field")
+    ));
+
+  if (user && !isAuthorized) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4 text-center">
+        <div className="w-16 h-16 rounded-full bg-rose-500/10 flex items-center justify-center text-rose-600">
+          <AlertCircle className="w-8 h-8" />
+        </div>
+        <h2 className="text-2xl font-black tracking-tight text-foreground">Access Denied</h2>
+        <p className="text-muted-foreground max-w-md font-medium">
+          The Site Inspections management panel is restricted to Office Staff and Administrators. Please use the Field Task Board to manage your active site inspections.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8 pb-10">
@@ -561,12 +721,23 @@ export default function InspectionsPage() {
             <div className="space-y-6">
               <DialogHeader>
                 <DialogTitle className="text-2xl font-black flex items-center gap-3">
-                  <ClipboardCheck className="w-6 h-6 text-blue-600" /> Inspection Checklist
+                  <ClipboardCheck className="w-6 h-6 text-blue-600" /> {selectedInspection.status === 'PENDING_REVIEW' ? 'Office Review & Issuance' : 'Inspection Checklist'}
                 </DialogTitle>
                 <DialogDescription>
                   Site Visit for <span className="font-bold text-foreground">{selectedInspection.client?.name}</span>
                 </DialogDescription>
               </DialogHeader>
+
+              {/* Rejection Banner */}
+              {selectedInspection.status === 'REJECTED' && selectedInspection.admin_feedback && (
+                <div className="p-4 bg-rose-500/10 border border-rose-500/25 rounded-2xl flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                  <div>
+                    <h5 className="text-sm font-bold text-rose-800">Changes Requested by Office Staff</h5>
+                    <p className="text-xs text-rose-600 mt-1">{selectedInspection.admin_feedback}</p>
+                  </div>
+                </div>
+              )}
 
               {/* Sleek inline Audit Management & Settings Bar */}
               <div className="p-5 bg-blue-500/5 border border-blue-500/10 rounded-2xl space-y-4 shadow-inner">
@@ -575,8 +746,9 @@ export default function InspectionsPage() {
                   <span className={cn("px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-tight ring-1",
                     selectedInspection.status === 'COMPLETED' ? 'bg-emerald-500/10 text-emerald-600 ring-emerald-500/20' :
                     selectedInspection.status === 'REJECTED' ? 'bg-rose-500/10 text-rose-600 ring-rose-500/20' :
+                    selectedInspection.status === 'PENDING_REVIEW' ? 'bg-amber-500/10 text-amber-600 ring-amber-500/20' :
                     selectedInspection.status === 'SCHEDULED' ? 'bg-blue-500/10 text-blue-600 ring-blue-500/20' :
-                    'bg-amber-500/10 text-amber-600 ring-amber-500/20'
+                    'bg-slate-500/10 text-slate-600 ring-slate-500/20'
                   )}>
                     CURRENT STATE: {selectedInspection.status}
                   </span>
@@ -667,6 +839,7 @@ export default function InspectionsPage() {
                     >
                       <option value="SCHEDULED">SCHEDULED</option>
                       <option value="IN_PROGRESS">IN_PROGRESS</option>
+                      <option value="PENDING_REVIEW">PENDING_REVIEW</option>
                       <option value="COMPLETED">COMPLETED</option>
                       <option value="REJECTED">REJECTED</option>
                     </select>
@@ -674,154 +847,343 @@ export default function InspectionsPage() {
                 </div>
               </div>
 
-              <div className="space-y-4">
-                {(selectedInspection?.items || []).map((item) => (
-                  <div key={item.id} className="p-5 bg-muted/20 border border-border rounded-2xl space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-foreground">{item.description}</span>
-                      <div className="flex items-center gap-2">
-                        <Button 
-                          size="sm" 
-                          variant={item.status === 'PASS' ? 'default' : 'outline'} 
-                          className={cn("h-8 rounded-lg", item.status === 'PASS' && "bg-emerald-600 hover:bg-emerald-500")}
-                          onClick={() => handleUpdateItem(item.id, 'PASS', item.notes, item.expenditure)}
-                        >
-                          <Check className="w-4 h-4" />
-                        </Button>
-                        <Button 
-                          size="sm" 
-                          variant={item.status === 'FAIL' ? 'destructive' : 'outline'} 
-                          className="h-8 rounded-lg"
-                          onClick={() => handleUpdateItem(item.id, 'FAIL', item.notes, item.expenditure)}
-                        >
-                          <X className="w-4 h-4" />
-                        </Button>
-                      </div>
+              {selectedInspection.status === 'PENDING_REVIEW' ? (
+                <div className="space-y-6">
+                  {/* Draft Certificate details card */}
+                  <div className="p-6 bg-blue-600/5 border border-blue-600/10 rounded-2xl space-y-4">
+                    <div className="flex items-center justify-between border-b border-blue-600/10 pb-3">
+                      <h4 className="font-black text-blue-600 uppercase text-xs tracking-wider">Prepared Draft Certificate</h4>
+                      <span className="text-[10px] font-bold bg-blue-600/10 text-blue-600 px-2.5 py-1 rounded-full uppercase">
+                        {draftCertType === 'FIRE_SAFETY' ? '🔥 Fire Safety' :
+                         draftCertType === 'ELECTRICAL_SAFETY' ? '⚡ Electrical Safety' :
+                         '🏗️ Structural Safety'}
+                      </span>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <Input 
-                        placeholder="Add observations..." 
-                        className="bg-background h-10 text-sm flex-1"
-                        defaultValue={item.notes || ""}
-                        onBlur={(e) => {
-                          if (e.target.value !== (item.notes || "")) {
-                            handleUpdateItem(item.id, item.status, e.target.value, item.expenditure);
-                          }
-                        }}
-                      />
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-bold text-muted-foreground uppercase">Exp (₹)</span>
-                        <Input
-                          type="number"
-                          placeholder="0.00"
-                          className="bg-background h-10 text-sm w-28"
-                          defaultValue={item.expenditure || ""}
-                          onBlur={(e) => {
-                            if (e.target.value !== String(item.expenditure || "")) {
-                              handleUpdateItem(item.id, item.status, item.notes, e.target.value);
-                            }
-                          }}
-                        />
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="text-[10px] font-bold text-muted-foreground uppercase">Validity Period</span>
+                        <p className="font-bold mt-0.5">{draftCertValidity === '1y' ? '1 Year' : '3 Years'}</p>
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-bold text-muted-foreground uppercase">Expiry Date</span>
+                        <p className="font-bold mt-0.5">{draftCertExpiry ? new Date(draftCertExpiry).toLocaleDateString() : 'N/A'}</p>
+                      </div>
+                      <div className="col-span-2">
+                        <span className="text-[10px] font-bold text-muted-foreground uppercase">Scope of Inspection</span>
+                        <p className="font-semibold mt-0.5 text-foreground/80">{draftCertScope || 'N/A'}</p>
+                      </div>
+                      <div className="col-span-2">
+                        <span className="text-[10px] font-bold text-muted-foreground uppercase">Remarks & Recommendations</span>
+                        <p className="font-semibold mt-0.5 text-foreground/80">{draftCertNotes || 'N/A'}</p>
                       </div>
                     </div>
                   </div>
-                ))}
-              </div>
 
-              <div className="space-y-4">
-                <div className="p-4 bg-blue-500/5 border border-blue-500/10 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  <div className="flex items-center gap-4">
-                    <div className="p-3 bg-blue-500/10 rounded-xl">
-                      <Camera className="w-6 h-6 text-blue-600 animate-pulse" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-bold text-foreground">Site Verification Photos</p>
-                      <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">
-                        Upload multiple verification photos for this visit
-                      </p>
+                  {/* Checklist Summary */}
+                  <div className="space-y-3">
+                    <h4 className="font-black text-xs uppercase tracking-widest text-muted-foreground">Checklist Results</h4>
+                    <div className="max-h-48 overflow-y-auto space-y-2 border border-border/50 rounded-xl p-3 bg-muted/10">
+                      {(selectedInspection.items || []).map((item) => (
+                        <div key={item.id} className="flex items-center justify-between text-xs p-2.5 bg-background rounded-lg border border-border/50">
+                          <span className="font-medium text-foreground">{item.description}</span>
+                          <span className={cn("px-2 py-0.5 rounded text-[10px] font-black uppercase",
+                            item.status === 'PASS' ? 'bg-emerald-500/10 text-emerald-600' :
+                            item.status === 'FAIL' ? 'bg-rose-500/10 text-rose-600' : 'bg-muted text-muted-foreground'
+                          )}>
+                            {item.status}
+                          </span>
+                        </div>
+                      ))}
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-3 self-end md:self-auto">
-                    <input 
-                      type="file" 
-                      ref={fileInputRef} 
-                      onChange={handlePhotoUpload} 
-                      accept="image/*" 
-                      className="hidden" 
-                      multiple
-                    />
+                  {/* Verification Photos Preview */}
+                  {uploadedPhotoUrls.length > 0 && (
+                    <div className="space-y-2">
+                      <h4 className="font-black text-xs uppercase tracking-widest text-muted-foreground">Site Photos</h4>
+                      <div className="grid grid-cols-4 sm:grid-cols-6 gap-3 p-4 bg-muted/20 border border-border/50 rounded-2xl">
+                        {uploadedPhotoUrls.map((url, index) => (
+                          <div key={index} className="relative aspect-square rounded-xl overflow-hidden border border-border group shadow-sm bg-background">
+                            <img 
+                              src={url} 
+                              alt={`Verification preview ${index + 1}`} 
+                              className="w-full h-full object-cover transition-all duration-300 group-hover:scale-110 cursor-pointer" 
+                              onClick={() => window.open(url, '_blank')}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Office Review Controls */}
+                  {(() => {
+                    const isOfficeUser = user?.role === 'ADMIN' || 
+                      user?.designation?.toLowerCase().includes('admin') || 
+                      user?.designation?.toLowerCase().includes('executive') ||
+                      user?.designation?.toLowerCase().includes('staff') ||
+                      user?.email?.toLowerCase().includes('admin');
                     
-                    {uploadingPhoto ? (
-                      <Button disabled variant="outline" className="rounded-xl h-10 border-blue-500/20 text-blue-600 flex items-center gap-2">
-                        <Loader2 className="w-4 h-4 animate-spin" /> Uploading...
-                      </Button>
-                    ) : selectedInspection.status !== 'COMPLETED' ? (
-                      <Button 
-                        type="button"
-                        variant="outline" 
-                        onClick={() => fileInputRef.current?.click()}
-                        className="rounded-xl h-10 border-blue-500/20 text-blue-600 hover:bg-blue-500/10 font-bold transition-all"
-                      >
-                        {uploadedPhotoUrls.length > 0 ? "Add More Photos" : "Upload Photos"}
-                      </Button>
-                    ) : null}
-                  </div>
+                    if (isOfficeUser) {
+                      return (
+                        <div className="p-6 bg-amber-500/5 border border-amber-500/10 rounded-2xl space-y-4 shadow-sm">
+                          <h4 className="font-black text-amber-600 uppercase text-xs tracking-wider">Office Review Actions</h4>
+                          <div className="space-y-2">
+                            <Label className="text-xs font-semibold">Rejection Feedback (Required only if requesting changes)</Label>
+                            <Input
+                              placeholder="e.g., Please re-check the sprinkler systems on the 3rd floor..."
+                              value={feedbackInput}
+                              onChange={(e) => setFeedbackInput(e.target.value)}
+                              className="bg-background text-sm h-11"
+                            />
+                          </div>
+                          <div className="flex gap-3 pt-2">
+                            <Button 
+                              onClick={() => handleRejectInspection(selectedInspection.id)}
+                              disabled={submittingReview || !feedbackInput.trim()}
+                              className="flex-1 rounded-xl font-bold bg-rose-600 hover:bg-rose-500 text-white h-11 transition-all"
+                            >
+                              Reject & Request Changes
+                            </Button>
+                            <Button 
+                              onClick={() => handleApproveInspection(selectedInspection.id)}
+                              disabled={submittingReview}
+                              className="flex-1 rounded-xl font-bold bg-emerald-600 hover:bg-emerald-500 text-white h-11 transition-all"
+                            >
+                              Approve & Issue Certificate
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    } else {
+                      return (
+                        <div className="p-4 bg-amber-500/5 border border-amber-500/10 rounded-2xl text-center">
+                          <p className="text-xs font-bold text-amber-700">
+                            ⏳ Under Review: This draft certificate is currently awaiting office review and formal approval.
+                          </p>
+                        </div>
+                      );
+                    }
+                  })()}
                 </div>
-
-                {uploadedPhotoUrls.length > 0 && (
-                  <div className="grid grid-cols-4 sm:grid-cols-6 gap-3 p-4 bg-muted/20 border border-border/50 rounded-2xl">
-                    {uploadedPhotoUrls.map((url, index) => (
-                      <div key={index} className="relative aspect-square rounded-xl overflow-hidden border border-border group shadow-sm bg-background">
-                        <img 
-                          src={url} 
-                          alt={`Verification preview ${index + 1}`} 
-                          className="w-full h-full object-cover transition-all duration-300 group-hover:scale-110 cursor-pointer" 
-                          onClick={() => window.open(url, '_blank')}
-                        />
-                        {selectedInspection.status !== 'COMPLETED' && (
-                          <button
-                            type="button"
-                            onClick={() => setUploadedPhotoUrls(prev => prev.filter((_, idx) => idx !== index))}
-                            className="absolute top-1.5 right-1.5 bg-rose-500 hover:bg-rose-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow duration-200 cursor-pointer"
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-3 h-3">
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                          </button>
-                        )}
+              ) : (
+                <>
+                  <div className="space-y-4">
+                    {(selectedInspection?.items || []).map((item) => (
+                      <div key={item.id} className="p-5 bg-muted/20 border border-border rounded-2xl space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-foreground">{item.description}</span>
+                          <div className="flex items-center gap-2">
+                            <Button 
+                              size="sm" 
+                              variant={item.status === 'PASS' ? 'default' : 'outline'} 
+                              className={cn("h-8 rounded-lg", item.status === 'PASS' && "bg-emerald-600 hover:bg-emerald-500")}
+                              onClick={() => handleUpdateItem(item.id, 'PASS', item.notes, item.expenditure)}
+                            >
+                              <Check className="w-4 h-4" />
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant={item.status === 'FAIL' ? 'destructive' : 'outline'} 
+                              className="h-8 rounded-lg"
+                              onClick={() => handleUpdateItem(item.id, 'FAIL', item.notes, item.expenditure)}
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <Input 
+                            placeholder="Add observations..." 
+                            className="bg-background h-10 text-sm flex-1"
+                            defaultValue={item.notes || ""}
+                            onBlur={(e) => {
+                              if (e.target.value !== (item.notes || "")) {
+                                handleUpdateItem(item.id, item.status, e.target.value, item.expenditure);
+                              }
+                            }}
+                          />
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-bold text-muted-foreground uppercase">Exp (₹)</span>
+                            <Input
+                              type="number"
+                              placeholder="0.00"
+                              className="bg-background h-10 text-sm w-28"
+                              defaultValue={item.expenditure || ""}
+                              onBlur={(e) => {
+                                if (e.target.value !== String(item.expenditure || "")) {
+                                  handleUpdateItem(item.id, item.status, item.notes, e.target.value);
+                                }
+                              }}
+                            />
+                          </div>
+                        </div>
                       </div>
                     ))}
                   </div>
-                )}
-              </div>
+
+                  <div className="space-y-4">
+                    <div className="p-4 bg-blue-500/5 border border-blue-500/10 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      <div className="flex items-center gap-4">
+                        <div className="p-3 bg-blue-500/10 rounded-xl">
+                          <Camera className="w-6 h-6 text-blue-600 animate-pulse" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-foreground">Site Verification Photos</p>
+                          <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">
+                            Upload multiple verification photos for this visit
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3 self-end md:self-auto">
+                        <input 
+                          type="file" 
+                          ref={fileInputRef} 
+                          onChange={handlePhotoUpload} 
+                          accept="image/*" 
+                          className="hidden" 
+                          multiple
+                        />
+                        
+                        {uploadingPhoto ? (
+                          <Button disabled variant="outline" className="rounded-xl h-10 border-blue-500/20 text-blue-600 flex items-center gap-2">
+                            <Loader2 className="w-4 h-4 animate-spin" /> Uploading...
+                          </Button>
+                        ) : selectedInspection.status !== 'COMPLETED' ? (
+                          <Button 
+                            type="button"
+                            variant="outline" 
+                            onClick={() => fileInputRef.current?.click()}
+                            className="rounded-xl h-10 border-blue-500/20 text-blue-600 hover:bg-blue-500/10 font-bold transition-all"
+                          >
+                            {uploadedPhotoUrls.length > 0 ? "Add More Photos" : "Upload Photos"}
+                          </Button>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    {uploadedPhotoUrls.length > 0 && (
+                      <div className="grid grid-cols-4 sm:grid-cols-6 gap-3 p-4 bg-muted/20 border border-border/50 rounded-2xl">
+                        {uploadedPhotoUrls.map((url, index) => (
+                          <div key={index} className="relative aspect-square rounded-xl overflow-hidden border border-border group shadow-sm bg-background">
+                            <img 
+                              src={url} 
+                              alt={`Verification preview ${index + 1}`} 
+                              className="w-full h-full object-cover transition-all duration-300 group-hover:scale-110 cursor-pointer" 
+                              onClick={() => window.open(url, '_blank')}
+                            />
+                            {selectedInspection.status !== 'COMPLETED' && (
+                              <button
+                                type="button"
+                                onClick={() => setUploadedPhotoUrls(prev => prev.filter((_, idx) => idx !== index))}
+                                className="absolute top-1.5 right-1.5 bg-rose-500 hover:bg-rose-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow duration-200 cursor-pointer"
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-3 h-3">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Safety Officer Certificate Preparation section */}
+                  {selectedInspection.status !== 'COMPLETED' && (
+                    <div className="p-6 bg-blue-600/5 border border-blue-600/10 rounded-2xl space-y-4 mt-6">
+                      <div className="flex items-center gap-2 border-b border-blue-600/10 pb-3">
+                        <ClipboardCheck className="w-5 h-5 text-blue-600" />
+                        <h4 className="font-black text-blue-600 uppercase text-xs tracking-wider">Prepare Draft Certificate</h4>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <Label className="text-xs font-semibold">Certificate Template</Label>
+                          <select
+                            value={draftCertType}
+                            onChange={(e) => setDraftCertType(e.target.value)}
+                            className="w-full h-10 px-3 bg-background border border-border rounded-xl text-xs font-bold focus:outline-none"
+                          >
+                            <option value="FIRE_SAFETY">🔥 Fire Safety Compliance Certificate</option>
+                            <option value="ELECTRICAL_SAFETY">⚡ Electrical Safety Audit Certificate</option>
+                            <option value="STRUCTURAL_SAFETY">🏗️ Construction & Structural Safety Certificate</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs font-semibold">Validity Period</Label>
+                          <select
+                            value={draftCertValidity}
+                            onChange={(e) => setDraftCertValidity(e.target.value)}
+                            className="w-full h-10 px-3 bg-background border border-border rounded-xl text-xs font-bold focus:outline-none"
+                          >
+                            <option value="1y">1 Year</option>
+                            <option value="3y">3 Years</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1 col-span-2">
+                          <Label className="text-xs font-semibold">Expiry Date</Label>
+                          <Input
+                            type="date"
+                            value={draftCertExpiry}
+                            onChange={(e) => setDraftCertExpiry(e.target.value)}
+                            className="bg-background text-xs h-10"
+                          />
+                        </div>
+                        <div className="space-y-1 col-span-2">
+                          <Label className="text-xs font-semibold">Scope of Inspection</Label>
+                          <Input
+                            placeholder="e.g., Annual Fire Alarm, Extinguisher & Hydrant compliance check"
+                            value={draftCertScope}
+                            onChange={(e) => setDraftCertScope(e.target.value)}
+                            className="bg-background text-xs h-10"
+                          />
+                        </div>
+                        <div className="space-y-1 col-span-2">
+                          <Label className="text-xs font-semibold">Remarks & Recommendations</Label>
+                          <Input
+                            placeholder="e.g., All devices tested; replacement of 2 expired fire extinguishers recommended"
+                            value={draftCertNotes}
+                            onChange={(e) => setDraftCertNotes(e.target.value)}
+                            className="bg-background text-xs h-10"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
 
               <DialogFooter className="pt-4 border-t border-border">
                 <Button variant="ghost" onClick={() => setOpenVisit(false)}>Discard</Button>
-                {(() => {
+                {selectedInspection.status !== 'PENDING_REVIEW' && (() => {
                   const pendingCount = (selectedInspection.items || []).filter(it => it.status === 'PENDING').length;
                   const isAlreadyDone = selectedInspection.status === 'COMPLETED';
                   const isBlocked = pendingCount > 0;
                   return (
                     <Button
-                      disabled={isAlreadyDone || isBlocked}
-                      onClick={handleCompleteVisit}
+                      disabled={isAlreadyDone || isBlocked || submittingReview}
+                      onClick={handleSubmitForReview}
                       className={cn(
                         "text-white font-bold h-12 px-10 rounded-xl shadow-lg transition-all",
                         isAlreadyDone
                           ? "bg-muted text-muted-foreground cursor-not-allowed"
                           : isBlocked
                             ? "bg-amber-500/80 shadow-amber-500/20 cursor-not-allowed opacity-80"
-                            : "bg-emerald-600 hover:bg-emerald-500 shadow-emerald-500/20"
+                            : "bg-blue-600 hover:bg-blue-500 shadow-blue-500/20"
                       )}
                     >
-                      {isAlreadyDone
-                        ? "Already Completed"
-                        : isBlocked
-                          ? `${pendingCount} Item${pendingCount > 1 ? "s" : ""} Pending — Mark All First`
-                          : selectedInspection.status === "REJECTED"
-                            ? "Re-Submit Audit Sign Off"
-                            : "Complete Audit & Sign Off"}
+                      {submittingReview ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : isAlreadyDone ? (
+                        "Already Completed"
+                      ) : isBlocked ? (
+                        `${pendingCount} Item${pendingCount > 1 ? "s" : ""} Pending — Mark All First`
+                      ) : selectedInspection.status === "REJECTED" ? (
+                        "Re-Submit Certificate Request"
+                      ) : (
+                        "Submit Certificate Request"
+                      )}
                     </Button>
                   );
                 })()}

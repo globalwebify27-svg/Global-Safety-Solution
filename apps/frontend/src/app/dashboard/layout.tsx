@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useAuthStore } from "@/store/auth";
 import { API_BASE_URL } from "@/lib/config";
 import { LogOut, Home, Users, FolderKanban, ShieldCheck, Settings, BadgeCheck, UserCircle, Target, FileSpreadsheet, Package, Monitor, FolderLock, Menu, X, Banknote, ClipboardCheck } from "lucide-react";
@@ -10,24 +10,30 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { NotificationCenter } from "@/components/notification-center";
 
 const navigation = [
-  { name: "Overview", href: "/dashboard", icon: Home },
-  { name: "Quotation Hub", href: "/dashboard/quotations", icon: FileSpreadsheet },
-  { name: "Sales Pipeline", href: "/dashboard/leads", icon: Target },
-  { name: "Client Management", href: "/dashboard/clients", icon: Users },
-  { name: "Finance & Invoices", href: "/dashboard/finance", icon: Banknote },
-  { name: "Staff Directory", href: "/dashboard/employees", icon: UserCircle },
-  { name: "Payroll Hub", href: "/dashboard/payroll", icon: Banknote },
-  { name: "Attendance Hub", href: "/dashboard/attendance", icon: BadgeCheck },
-  { name: "Site Inspections", href: "/dashboard/inspections", icon: ClipboardCheck },
-  { name: "Operations", href: "/dashboard/operations", icon: FolderKanban },
-  { name: "Compliance", href: "/dashboard/compliance", icon: ShieldCheck },
-  { name: "Digital Vault", href: "/dashboard/documents", icon: FolderLock },
-  { name: "Inventory Ledger", href: "/dashboard/inventory", icon: Package },
-  { name: "Asset Registry", href: "/dashboard/assets", icon: Monitor },
-  { name: "Settings", href: "/dashboard/settings", icon: Settings },
-  { name: "Field Task Board", href: "/dashboard/field-tasks", icon: ClipboardCheck, roles: ["Engineer", "Field Worker", "Admin"] },
+  { name: "Overview",          href: "/dashboard",             icon: Home,            module: "DASHBOARD" },
+  { name: "Quotation Hub",     href: "/dashboard/quotations",  icon: FileSpreadsheet, module: "SALES" },
+  { name: "Sales Pipeline",    href: "/dashboard/leads",       icon: Target,          module: "SALES" },
+  { name: "Client Management", href: "/dashboard/clients",     icon: Users,           module: "CLIENTS" },
+  { name: "Finance & Invoices",href: "/dashboard/finance",     icon: Banknote,        module: "FINANCE" },
+  { name: "Staff Directory",   href: "/dashboard/employees",   icon: UserCircle,      module: "HR" },
+  { name: "Payroll Hub",       href: "/dashboard/payroll",     icon: Banknote,        module: "HR" },
+  { name: "Attendance Hub",    href: "/dashboard/attendance",  icon: BadgeCheck,      module: "ALL" }, // Everyone needs Attendance
+  { name: "Site Inspections",  href: "/dashboard/inspections", icon: ClipboardCheck,  module: "OPERATIONS" },
+  { name: "Operations",        href: "/dashboard/operations",  icon: FolderKanban,    module: "OPERATIONS" },
+  { name: "Compliance",        href: "/dashboard/compliance",  icon: ShieldCheck,     module: "COMPLIANCE" },
+  { name: "Digital Vault",     href: "/dashboard/documents",   icon: FolderLock,      module: "ALL" }, // Everyone needs Vault
+  { name: "Inventory Ledger",  href: "/dashboard/inventory",   icon: Package,         module: "OPERATIONS" },
+  { name: "Asset Registry",    href: "/dashboard/assets",      icon: Monitor,         module: "OPERATIONS" },
+  { name: "Settings",          href: "/dashboard/settings",    icon: Settings,        module: "SYSTEM" },
+  { name: "Field Task Board",  href: "/dashboard/field-tasks", icon: ClipboardCheck,  module: "FIELD_TASKS" },
 ];
 
+const isAdminLegacy = (user: any): boolean => {
+  const email = user?.email || "";
+  const name = (user?.name || "").toLowerCase();
+  const role = (user?.role || "").toLowerCase();
+  return email === "admin@globalsafety.com" || name.includes("admin") || role === "admin";
+};
 
 export default function DashboardLayout({
   children,
@@ -40,16 +46,34 @@ export default function DashboardLayout({
   const router = useRouter();
   const { logout, token, user } = useAuthStore();
 
-  const filteredNavigation = navigation.filter(item => {
-    if (!item.roles) return true; // Show to everyone if no roles defined
-    const userDesignation = user?.designation || "";
-    const userRole = user?.role || "";
-    return item.roles.some(role => 
-      userDesignation.toLowerCase().includes(role.toLowerCase()) || 
-      userRole.toLowerCase().includes(role.toLowerCase()) ||
-      userRole === "ADMIN"
+  const userModules = useMemo(() => {
+    if (!user || !user.roles) return [];
+    return user.roles.flatMap((r: any) => 
+      r.role?.permissions?.map((p: any) => p.permission?.module) || []
     );
-  });
+  }, [user]);
+
+  const filteredNavigation = useMemo(() => {
+    if (!user) return [];
+    
+    const isSuperAdmin = user?.roles?.some((r: any) => r.role?.name === 'SUPER_ADMIN') || isAdminLegacy(user);
+
+    return navigation.filter(item => {
+      // 1. Modules everyone needs
+      if (item.module === "ALL") return true;
+
+      // 2. Super Admin Access
+      if (isSuperAdmin) {
+        // Specifically hide FIELD_TASKS from Super Admin as requested
+        if (item.module === "FIELD_TASKS") return false;
+        return true; 
+      }
+
+      // 3. Check dynamic database permissions
+      return userModules.includes(item.module);
+    });
+  }, [user, userModules]);
+
 
   const [hydrated, setHydrated] = useState(false);
 
@@ -88,6 +112,12 @@ export default function DashboardLayout({
   useEffect(() => {
     setIsMobileMenuOpen(false);
   }, [pathname]);
+
+  if (!hydrated) {
+    return <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+    </div>;
+  }
 
   return (
     <div className="min-h-screen bg-background text-foreground flex overflow-hidden">
@@ -197,10 +227,14 @@ export default function DashboardLayout({
             <NotificationCenter />
             <ThemeToggle />
             <div className="hidden md:flex flex-col items-end mr-2">
-              <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Super Admin</span>
-              <span className="text-xs font-bold text-foreground/80">Global Webify</span>
+              <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                {user?.roles?.[0]?.role?.name?.replace(/_/g, ' ') || user?.designation || "STAFF"}
+              </span>
+              <span className="text-xs font-bold text-foreground/80">{orgName || "Global Webify"}</span>
             </div>
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-500 cursor-pointer shadow-xl shadow-blue-500/20 border border-border" />
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-500 cursor-pointer shadow-xl shadow-blue-500/20 border border-border flex items-center justify-center text-white font-bold">
+              {user?.name?.charAt(0) || "U"}
+            </div>
           </div>
         </header>
         

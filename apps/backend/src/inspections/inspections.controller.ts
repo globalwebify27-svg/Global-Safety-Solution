@@ -50,6 +50,11 @@ export class InspectionsController {
     return this.inspectionsService.findByEngineer(req.user.userId);
   }
 
+  @Get('engineer/:engineerId')
+  findByEngineerId(@Param('engineerId') engineerId: string) {
+    return this.inspectionsService.findByEngineer(engineerId);
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.inspectionsService.findOne(id);
@@ -81,6 +86,16 @@ export class InspectionsController {
       'Content-Length': buffer.length,
     });
     res.end(buffer);
+  }
+
+  @Post(':id/approve')
+  approve(@Param('id') id: string) {
+    return this.inspectionsService.approve(id);
+  }
+
+  @Post(':id/reject')
+  reject(@Param('id') id: string, @Body() body: { feedback: string }) {
+    return this.inspectionsService.reject(id, body.feedback);
   }
 
   @Delete(':id')

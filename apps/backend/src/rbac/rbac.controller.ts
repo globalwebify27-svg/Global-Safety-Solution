@@ -15,7 +15,7 @@ export class RBACController {
 
   @Get('roles')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('SUPER_ADMIN')
+  @Roles('SUPER_ADMIN', 'HR_MANAGER', 'OFFICE_ADMIN')
   getRoles() {
     console.log('RBACController: getRoles called');
     return this.rbacService.getAllRoles();

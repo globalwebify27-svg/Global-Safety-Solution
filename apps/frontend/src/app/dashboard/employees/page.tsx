@@ -52,6 +52,7 @@ interface Employee {
 
 export default function EmployeesPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [roles, setRoles] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [openEditDialog, setOpenEditDialog] = useState(false);
@@ -80,6 +81,7 @@ export default function EmployeesPage() {
   const [onboardForm, setOnboardForm] = useState({
     name: "",
     email: "",
+    role_id: "",
     designation: "",
     department: "",
     phone: "",
@@ -108,7 +110,21 @@ export default function EmployeesPage() {
 
   useEffect(() => {
     fetchEmployees();
+    fetchRoles();
   }, [token]);
+
+  const fetchRoles = async () => {
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/rbac/roles`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (Array.isArray(data)) setRoles(data);
+    } catch (e) {
+      console.error("Roles fetch error:", e);
+    }
+  };
 
   const fetchEmployees = async () => {
     if (!token) return;
@@ -195,7 +211,7 @@ export default function EmployeesPage() {
       if (res.ok) {
         setOpenOnboard(false);
         setOnboardForm({
-          name: "", email: "", designation: "", department: "", phone: "", password_hash: "",
+          name: "", email: "", role_id: "", designation: "", department: "", phone: "", password_hash: "",
           base_salary: "", pan_number: "", aadhar_number: "", address: "",
           emergency_contact_name: "", emergency_contact_phone: "",
           join_date: new Date().toISOString().split('T')[0]
@@ -349,12 +365,41 @@ export default function EmployeesPage() {
 
                 <div className="grid grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <Label className="text-xs font-bold uppercase tracking-widest opacity-70">Designation</Label>
-                    <Input value={onboardForm.designation} onChange={(e) => setOnboardForm({...onboardForm, designation: e.target.value})} className="h-12 bg-background/50 border-border rounded-xl focus:ring-emerald-500" placeholder="e.g. Safety Inspector" />
+                    <Label className="text-xs font-bold uppercase tracking-widest opacity-70">Role & Designation *</Label>
+                    <select 
+                      value={onboardForm.role_id} 
+                      onChange={(e) => {
+                        const selectedRole = roles.find(r => r.id === e.target.value);
+                        setOnboardForm({
+                          ...onboardForm, 
+                          role_id: e.target.value,
+                          designation: selectedRole ? selectedRole.name.replace(/_/g, ' ') : ""
+                        });
+                      }} 
+                      required
+                      className="w-full h-12 px-4 bg-background/50 border border-border rounded-xl focus:ring-emerald-500 focus:outline-none appearance-none"
+                    >
+                      <option value="" disabled>Select Role</option>
+                      {roles.map(r => (
+                        <option key={r.id} value={r.id}>{r.name.replace(/_/g, ' ')}</option>
+                      ))}
+                    </select>
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-xs font-bold uppercase tracking-widest opacity-70">Department</Label>
-                    <Input value={onboardForm.department} onChange={(e) => setOnboardForm({...onboardForm, department: e.target.value})} className="h-12 bg-background/50 border-border rounded-xl focus:ring-emerald-500" placeholder="e.g. Operations" />
+                    <Label className="text-xs font-bold uppercase tracking-widest opacity-70">Department *</Label>
+                    <select 
+                      value={onboardForm.department} 
+                      onChange={(e) => setOnboardForm({...onboardForm, department: e.target.value})} 
+                      required
+                      className="w-full h-12 px-4 bg-background/50 border border-border rounded-xl focus:ring-emerald-500 focus:outline-none appearance-none"
+                    >
+                      <option value="" disabled>Select Department</option>
+                      <option value="Human Resources">Human Resources</option>
+                      <option value="Sales & CRM">Sales & CRM</option>
+                      <option value="Engineering & Field Operations">Engineering & Field Operations</option>
+                      <option value="Administration">Administration</option>
+                      <option value="Finance">Finance</option>
+                    </select>
                   </div>
                 </div>
 
