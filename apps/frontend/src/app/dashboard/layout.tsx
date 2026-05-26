@@ -28,6 +28,17 @@ const navigation = [
   { name: "Field Task Board",  href: "/dashboard/field-tasks", icon: ClipboardCheck,  module: "FIELD_TASKS" },
 ];
 
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const [orgName, setOrgName] = useState("");
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const pathname = usePathname();
+  const router = useRouter();
+  const { logout, token, user } = useAuthStore();
+
   const allowedModulesForRole: Record<string, string[]> = {
     'SUPER_ADMIN': ["DASHBOARD", "SALES", "CLIENTS", "FINANCE", "HR", "OPERATIONS", "COMPLIANCE", "SYSTEM"],
     'HR_MANAGER': ["DASHBOARD", "HR"],
