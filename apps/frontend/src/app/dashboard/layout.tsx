@@ -28,51 +28,39 @@ const navigation = [
   { name: "Field Task Board",  href: "/dashboard/field-tasks", icon: ClipboardCheck,  module: "FIELD_TASKS" },
 ];
 
-const isAdminLegacy = (user: any): boolean => {
-  const email = user?.email || "";
-  const name = (user?.name || "").toLowerCase();
-  const role = (user?.role || "").toLowerCase();
-  return email === "admin@globalsafety.com" || name.includes("admin") || role === "admin";
-};
-
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  const [orgName, setOrgName] = useState("");
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const pathname = usePathname();
-  const router = useRouter();
-  const { logout, token, user } = useAuthStore();
-
-  const userModules = useMemo(() => {
-    if (!user || !user.roles) return [];
-    return user.roles.flatMap((r: any) => 
-      r.role?.permissions?.map((p: any) => p.permission?.module) || []
-    );
-  }, [user]);
+  const allowedModulesForRole: Record<string, string[]> = {
+    'SUPER_ADMIN': ["DASHBOARD", "SALES", "CLIENTS", "FINANCE", "HR", "OPERATIONS", "COMPLIANCE", "SYSTEM"],
+    'HR_MANAGER': ["DASHBOARD", "HR"],
+    'FIELD_ENGINEER': ["DASHBOARD", "FIELD_TASKS", "OPERATIONS", "COMPLIANCE"],
+    'SALES_EXECUTIVE': ["DASHBOARD", "SALES", "CLIENTS"],
+    'CLIENT': ["DASHBOARD", "CLIENTS"]
+  };
 
   const filteredNavigation = useMemo(() => {
     if (!user) return [];
     
-    const isSuperAdmin = user?.roles?.some((r: any) => r.role?.name === 'SUPER_ADMIN') || isAdminLegacy(user);
+    const roleName = user?.roles?.[0]?.role?.name || "STAFF";
+    
+    // Legacy fallback just in case
+    const isLegacyAdmin = user?.email === "admin@globalsafety.com";
+    const effectiveRole = isLegacyAdmin ? "SUPER_ADMIN" : roleName;
+
+    const allowed = allowedModulesForRole[effectiveRole] || [];
 
     return navigation.filter(item => {
       // 1. Modules everyone needs
       if (item.module === "ALL") return true;
 
       // 2. Super Admin Access
-      if (isSuperAdmin) {
-        // Specifically hide FIELD_TASKS from Super Admin as requested
-        if (item.module === "FIELD_TASKS") return false;
+      if (effectiveRole === "SUPER_ADMIN") {
+        if (item.module === "FIELD_TASKS") return false; // Hide field tasks from admin view
         return true; 
       }
 
-      // 3. Check dynamic database permissions
-      return userModules.includes(item.module);
+      // 3. Check role mapping
+      return allowed.includes(item.module);
     });
-  }, [user, userModules]);
+  }, [user]);
 
 
   const [hydrated, setHydrated] = useState(false);
