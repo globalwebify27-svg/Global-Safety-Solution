@@ -869,11 +869,31 @@ export default function EmployeesPage() {
             <div className="grid grid-cols-2 gap-6">
               <div className="space-y-2">
                 <Label className="text-xs font-bold uppercase tracking-widest opacity-70">Designation</Label>
-                <Input value={editForm.designation} onChange={(e) => setEditForm({...editForm, designation: e.target.value})} className="h-12 bg-background border-border rounded-xl focus:ring-blue-500" />
+                <select 
+                  value={editForm.designation} 
+                  onChange={(e) => setEditForm({...editForm, designation: e.target.value})} 
+                  className="w-full h-12 px-4 bg-background border border-border rounded-xl focus:ring-blue-500 focus:outline-none appearance-none"
+                >
+                  <option value="" disabled>Select Designation</option>
+                  {roles.map(r => (
+                    <option key={r.id} value={r.name.replace(/_/g, ' ')}>{r.name.replace(/_/g, ' ')}</option>
+                  ))}
+                </select>
               </div>
               <div className="space-y-2">
                 <Label className="text-xs font-bold uppercase tracking-widest opacity-70">Department</Label>
-                <Input value={editForm.department} onChange={(e) => setEditForm({...editForm, department: e.target.value})} className="h-12 bg-background border-border rounded-xl focus:ring-blue-500" />
+                <select 
+                  value={editForm.department} 
+                  onChange={(e) => setEditForm({...editForm, department: e.target.value})} 
+                  className="w-full h-12 px-4 bg-background border border-border rounded-xl focus:ring-blue-500 focus:outline-none appearance-none"
+                >
+                  <option value="" disabled>Select Department</option>
+                  <option value="Human Resources">Human Resources</option>
+                  <option value="Sales & CRM">Sales & CRM</option>
+                  <option value="Engineering & Field Operations">Engineering & Field Operations</option>
+                  <option value="Administration">Administration</option>
+                  <option value="Finance">Finance</option>
+                </select>
               </div>
             </div>
 
