@@ -11,19 +11,19 @@ import { NotificationCenter } from "@/components/notification-center";
 
 const navigation = [
   { name: "Overview",          href: "/dashboard",             icon: Home,            module: "DASHBOARD" },
-  { name: "Quotation Hub",     href: "/dashboard/quotations",  icon: FileSpreadsheet, module: "SALES" },
-  { name: "Sales Pipeline",    href: "/dashboard/leads",       icon: Target,          module: "SALES" },
+  { name: "Quotation Hub",     href: "/dashboard/quotations",  icon: FileSpreadsheet, module: "QUOTATIONS" },
+  { name: "Sales Pipeline",    href: "/dashboard/leads",       icon: Target,          module: "LEADS" },
   { name: "Client Management", href: "/dashboard/clients",     icon: Users,           module: "CLIENTS" },
   { name: "Finance & Invoices",href: "/dashboard/finance",     icon: Banknote,        module: "FINANCE" },
   { name: "Staff Directory",   href: "/dashboard/employees",   icon: UserCircle,      module: "HR" },
-  { name: "Payroll Hub",       href: "/dashboard/payroll",     icon: Banknote,        module: "HR" },
-  { name: "Attendance Hub",    href: "/dashboard/attendance",  icon: BadgeCheck,      module: "ALL" }, // Everyone needs Attendance
-  { name: "Site Inspections",  href: "/dashboard/inspections", icon: ClipboardCheck,  module: "OPERATIONS" },
+  { name: "Payroll Hub",       href: "/dashboard/payroll",     icon: Banknote,        module: "PAYROLL" },
+  { name: "Attendance Hub",    href: "/dashboard/attendance",  icon: BadgeCheck,      module: "ATTENDANCE" },
+  { name: "Site Inspections",  href: "/dashboard/inspections", icon: ClipboardCheck,  module: "INSPECTIONS" },
   { name: "Operations",        href: "/dashboard/operations",  icon: FolderKanban,    module: "OPERATIONS" },
   { name: "Compliance",        href: "/dashboard/compliance",  icon: ShieldCheck,     module: "COMPLIANCE" },
-  { name: "Digital Vault",     href: "/dashboard/documents",   icon: FolderLock,      module: "ALL" }, // Everyone needs Vault
-  { name: "Inventory Ledger",  href: "/dashboard/inventory",   icon: Package,         module: "OPERATIONS" },
-  { name: "Asset Registry",    href: "/dashboard/assets",      icon: Monitor,         module: "OPERATIONS" },
+  { name: "Digital Vault",     href: "/dashboard/documents",   icon: FolderLock,      module: "VAULT" },
+  { name: "Inventory Ledger",  href: "/dashboard/inventory",   icon: Package,         module: "INVENTORY" },
+  { name: "Asset Registry",    href: "/dashboard/assets",      icon: Monitor,         module: "ASSETS" },
   { name: "Settings",          href: "/dashboard/settings",    icon: Settings,        module: "SYSTEM" },
   { name: "Field Task Board",  href: "/dashboard/field-tasks", icon: ClipboardCheck,  module: "FIELD_TASKS" },
 ];
@@ -40,11 +40,23 @@ export default function DashboardLayout({
   const { logout, token, user } = useAuthStore();
 
   const allowedModulesForRole: Record<string, string[]> = {
-    'SUPER_ADMIN': ["DASHBOARD", "SALES", "CLIENTS", "FINANCE", "HR", "OPERATIONS", "COMPLIANCE", "SYSTEM"],
-    'HR_MANAGER': ["DASHBOARD", "HR"],
-    'FIELD_ENGINEER': ["DASHBOARD", "FIELD_TASKS", "OPERATIONS", "COMPLIANCE"],
-    'SALES_EXECUTIVE': ["DASHBOARD", "SALES", "CLIENTS"],
-    'CLIENT': ["DASHBOARD", "CLIENTS"]
+    'SUPER_ADMIN': [
+      "DASHBOARD", "QUOTATIONS", "LEADS", "CLIENTS", "FINANCE", 
+      "HR", "PAYROLL", "ATTENDANCE", "INSPECTIONS", "OPERATIONS", 
+      "COMPLIANCE", "VAULT", "INVENTORY", "ASSETS", "SYSTEM"
+    ],
+    'HR_MANAGER': [
+      "DASHBOARD", "HR", "PAYROLL", "ATTENDANCE", "VAULT"
+    ],
+    'FIELD_ENGINEER': [
+      "DASHBOARD", "FIELD_TASKS", "INSPECTIONS", "ATTENDANCE", "VAULT"
+    ],
+    'SALES_EXECUTIVE': [
+      "DASHBOARD", "QUOTATIONS", "LEADS", "CLIENTS", "VAULT", "ATTENDANCE"
+    ],
+    'CLIENT': [
+      "DASHBOARD", "QUOTATIONS", "INSPECTIONS", "VAULT"
+    ]
   };
 
   const filteredNavigation = useMemo(() => {
@@ -70,7 +82,7 @@ export default function DashboardLayout({
     const allowed = allowedModulesForRole[effectiveRole] || [];
 
     return navigation.filter(item => {
-      // 1. Modules everyone needs
+      // 1. Modules everyone needs (if any exist)
       if (item.module === "ALL") return true;
 
       // 2. Super Admin Access
