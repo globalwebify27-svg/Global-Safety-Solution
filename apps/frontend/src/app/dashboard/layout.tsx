@@ -50,9 +50,20 @@ export default function DashboardLayout({
   const filteredNavigation = useMemo(() => {
     if (!user) return [];
     
-    const roleName = user?.roles?.[0]?.role?.name || "STAFF";
+    // 1. Try to get the dynamic DB role
+    let roleName = user?.roles?.[0]?.role?.name;
     
-    // Legacy fallback just in case
+    // 2. Fallback to legacy designation if DB role is missing
+    if (!roleName) {
+      const designation = (user?.designation || "").toUpperCase();
+      if (designation.includes("HR")) roleName = "HR_MANAGER";
+      else if (designation.includes("FIELD") || designation.includes("ENGINEER")) roleName = "FIELD_ENGINEER";
+      else if (designation.includes("SALES")) roleName = "SALES_EXECUTIVE";
+      else if (designation.includes("CLIENT")) roleName = "CLIENT";
+      else roleName = "STAFF";
+    }
+    
+    // 3. Admin override
     const isLegacyAdmin = user?.email === "admin@globalsafety.com";
     const effectiveRole = isLegacyAdmin ? "SUPER_ADMIN" : roleName;
 
