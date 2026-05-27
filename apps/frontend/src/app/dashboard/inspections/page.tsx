@@ -174,21 +174,7 @@ export default function InspectionsPage() {
       if (Array.isArray(iData)) setInspections(iData);
       if (Array.isArray(cData)) setClients(cData);
       if (Array.isArray(eData)) {
-        let filtered = eData.filter((u: any) => 
-          u.is_active && 
-          (
-            u.designation?.toLowerCase().includes('engineer') || 
-            u.designation?.toLowerCase().includes('dev') ||
-            u.designation?.toLowerCase().includes('technician') ||
-            u.designation?.toLowerCase().includes('tecnician') ||
-            u.department?.toLowerCase().includes('operations') ||
-            u.name?.toLowerCase().includes('admin')
-          )
-        );
-        if (filtered.length === 0) {
-          filtered = eData.filter((u: any) => u.is_active);
-        }
-        setEngineers(filtered);
+        setEngineers(eData.filter((u: any) => u.is_active));
       }
     } catch (e) {
       console.error(e);
