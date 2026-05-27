@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { useAuthStore } from "@/store/auth";
 import { API_BASE_URL } from "@/lib/config";
-import { LogOut, Home, Users, FolderKanban, ShieldCheck, Settings, BadgeCheck, UserCircle, Target, FileSpreadsheet, Package, Monitor, FolderLock, Menu, X, Banknote, ClipboardCheck } from "lucide-react";
+import { LogOut, Home, Users, FolderKanban, ShieldCheck, Settings, BadgeCheck, UserCircle, Target, FileSpreadsheet, Package, Monitor, FolderLock, Menu, X, Banknote, ClipboardCheck, ChevronDown, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -15,9 +15,9 @@ const navigation = [
   { name: "Sales Pipeline",    href: "/dashboard/leads",       icon: Target,          module: "LEADS" },
   { name: "Client Management", href: "/dashboard/clients",     icon: Users,           module: "CLIENTS" },
   { name: "Finance & Invoices",href: "/dashboard/finance",     icon: Banknote,        module: "FINANCE" },
-  { name: "Staff Directory",   href: "/dashboard/employees",   icon: UserCircle,      module: "HR" },
-  { name: "Payroll Hub",       href: "/dashboard/payroll",     icon: Banknote,        module: "PAYROLL" },
-  { name: "Attendance Hub",    href: "/dashboard/attendance",  icon: BadgeCheck,      module: "ATTENDANCE" },
+  { name: "Staff Directory",   href: "/dashboard/employees",   icon: UserCircle,      module: "HR",         isHrGroup: true },
+  { name: "Payroll Hub",       href: "/dashboard/payroll",     icon: Banknote,        module: "PAYROLL",    isHrGroup: true },
+  { name: "Attendance Hub",    href: "/dashboard/attendance",  icon: BadgeCheck,      module: "ATTENDANCE", isHrGroup: true },
   { name: "Site Inspections",  href: "/dashboard/inspections", icon: ClipboardCheck,  module: "INSPECTIONS" },
   { name: "Operations",        href: "/dashboard/operations",  icon: FolderKanban,    module: "OPERATIONS" },
   { name: "Compliance",        href: "/dashboard/compliance",  icon: ShieldCheck,     module: "COMPLIANCE" },
@@ -35,6 +35,7 @@ export default function DashboardLayout({
 }) {
   const [orgName, setOrgName] = useState("");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isHrMenuOpen, setIsHrMenuOpen] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
   const { logout, token, user } = useAuthStore();
@@ -151,8 +152,53 @@ export default function DashboardLayout({
         </div>
         
         <nav className="flex-1 px-4 py-6 space-y-1.5 overflow-y-auto scrollbar-hide">
-          {filteredNavigation.map((item) => {
+          {filteredNavigation.map((item: any) => {
             const isActive = pathname === item.href;
+            
+            // Check if Super Admin & HR Group item
+            const isSuperAdmin = user?.email === "admin@globalsafety.com" || user?.roles?.[0]?.role?.name === "SUPER_ADMIN";
+            
+            if (isSuperAdmin && item.isHrGroup) {
+              // Only render the dropdown header once (on the first HR item)
+              if (item.module === "HR") {
+                const hrItems = filteredNavigation.filter((i: any) => i.isHrGroup);
+                const hasActiveChild = hrItems.some((i: any) => pathname === i.href);
+                return (
+                  <div key="hr-group" className="space-y-1 mt-2 mb-2">
+                    <button 
+                      onClick={() => setIsHrMenuOpen(!isHrMenuOpen)}
+                      className={`flex items-center justify-between w-full px-3 py-2.5 rounded-xl text-sm font-bold transition-all ${hasActiveChild ? "bg-primary/5 text-primary" : "text-muted-foreground hover:bg-accent/5 hover:text-foreground"}`}
+                    >
+                      <span className="flex items-center gap-3">
+                        <Users className="w-5 h-5" /> Employees
+                      </span>
+                      {isHrMenuOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                    </button>
+                    {isHrMenuOpen && (
+                      <div className="pl-4 ml-2 border-l-2 border-border/50 space-y-1 mt-1">
+                        {hrItems.map((child: any) => {
+                          const childActive = pathname === child.href;
+                          return (
+                            <Link
+                              key={child.name}
+                              href={child.href}
+                              className={`flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-bold transition-all ${childActive ? "bg-primary/10 text-primary ring-1 ring-primary/20" : "text-muted-foreground hover:bg-accent/5 hover:text-foreground"}`}
+                            >
+                              <child.icon className={`w-4 h-4 ${childActive ? "text-primary" : ""}`} />
+                              {child.name}
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+              // Skip rendering individual HR items in the main loop if we are Super Admin
+              return null;
+            }
+
+            // Normal item rendering
             return (
               <Link
                 key={item.name}
@@ -205,8 +251,48 @@ export default function DashboardLayout({
         </div>
         
         <nav className="flex-1 px-4 py-6 space-y-1.5 overflow-y-auto">
-          {filteredNavigation.map((item) => {
+          {filteredNavigation.map((item: any) => {
             const isActive = pathname === item.href;
+            const isSuperAdmin = user?.email === "admin@globalsafety.com" || user?.roles?.[0]?.role?.name === "SUPER_ADMIN";
+            
+            if (isSuperAdmin && item.isHrGroup) {
+              if (item.module === "HR") {
+                const hrItems = filteredNavigation.filter((i: any) => i.isHrGroup);
+                const hasActiveChild = hrItems.some((i: any) => pathname === i.href);
+                return (
+                  <div key="hr-group-mobile" className="space-y-1 mt-2 mb-2">
+                    <button 
+                      onClick={() => setIsHrMenuOpen(!isHrMenuOpen)}
+                      className={`flex items-center justify-between w-full px-4 py-3.5 rounded-2xl text-base font-bold transition-all ${hasActiveChild ? "bg-primary/5 text-primary" : "text-muted-foreground hover:bg-accent/5"}`}
+                    >
+                      <span className="flex items-center gap-3">
+                        <Users className="w-5 h-5" /> Employees
+                      </span>
+                      {isHrMenuOpen ? <ChevronDown className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
+                    </button>
+                    {isHrMenuOpen && (
+                      <div className="pl-6 ml-2 border-l-2 border-border/50 space-y-1 mt-2">
+                        {hrItems.map((child: any) => {
+                          const childActive = pathname === child.href;
+                          return (
+                            <Link
+                              key={child.name}
+                              href={child.href}
+                              className={`flex items-center gap-3 px-4 py-3 rounded-2xl text-base font-bold transition-all ${childActive ? "bg-primary/10 text-primary ring-1 ring-primary/20 shadow-lg shadow-primary/5" : "text-muted-foreground hover:bg-accent/5"}`}
+                            >
+                              <child.icon className={`w-4 h-4 ${childActive ? "text-primary" : ""}`} />
+                              {child.name}
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+              return null;
+            }
+
             return (
               <Link
                 key={item.name}
