@@ -49,7 +49,7 @@ export default function DashboardLayout({
       "DASHBOARD", "HR", "PAYROLL", "ATTENDANCE", "VAULT"
     ],
     'FIELD_ENGINEER': [
-      "DASHBOARD", "FIELD_TASKS", "INSPECTIONS", "ATTENDANCE", "VAULT"
+      "DASHBOARD", "FIELD_TASKS", "ATTENDANCE"
     ],
     'SALES_EXECUTIVE': [
       "DASHBOARD", "QUOTATIONS", "LEADS", "CLIENTS", "VAULT", "ATTENDANCE"
