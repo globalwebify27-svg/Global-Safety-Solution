@@ -5,7 +5,230 @@ import { PrismaService } from '../prisma/prisma.service';
 export class DashboardService {
   constructor(private prisma: PrismaService) {}
 
-  async getOverviewStats() {
+  async getOverviewStats(userPayload: any) {
+    if (!userPayload) {
+      return this.getSuperAdminOverviewStats();
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userPayload.userId },
+      include: {
+        roles: {
+          include: {
+            role: true,
+          },
+        },
+      },
+    });
+
+    if (!user) {
+      return this.getSuperAdminOverviewStats();
+    }
+
+    const isSuperAdmin =
+      user.email === 'admin@globalsafety.com' ||
+      user.roles?.some((ur: any) => ur.role.name === 'SUPER_ADMIN');
+    const isHrManager =
+      user.roles?.some((ur: any) => ur.role.name === 'HR_MANAGER') ||
+      (user.designation || '').toUpperCase().includes('HR');
+    const isSales =
+      user.roles?.some((ur: any) => ur.role.name === 'SALES_EXECUTIVE') ||
+      (user.designation || '').toUpperCase().includes('SALES');
+    const isEngineer =
+      user.roles?.some((ur: any) => ur.role.name === 'FIELD_ENGINEER') ||
+      (user.designation || '').toUpperCase().includes('FIELD') ||
+      (user.designation || '').toUpperCase().includes('ENGINEER');
+
+    // Super Admin & HR Manager see company-wide stats
+    if (isSuperAdmin || isHrManager) {
+      return this.getSuperAdminOverviewStats();
+    }
+
+    // Sales Executive Dashboard
+    if (isSales) {
+      const activeLeads = await this.prisma.lead.count({
+        where: {
+          assigned_to: user.id,
+          status: { notIn: ['WON', 'LOST'] },
+        },
+      });
+
+      const pendingFollowups = await this.prisma.lead.count({
+        where: {
+          assigned_to: user.id,
+          next_follow_up: { lte: new Date(Date.now() + 7 * 86400000) }, // next 7 days
+        },
+      });
+
+      const myQuotes = await this.prisma.quotation.aggregate({
+        where: {
+          status: 'ACCEPTED',
+          lead: { assigned_to: user.id },
+        },
+        _sum: { total_amount: true },
+      });
+
+      const wonValue = myQuotes._sum.total_amount
+        ? Number(myQuotes._sum.total_amount)
+        : 0;
+
+      const recentLeads = await this.prisma.lead.findMany({
+        where: { assigned_to: user.id },
+        take: 8,
+        orderBy: { updated_at: 'desc' },
+      });
+
+      const recentActivity = recentLeads.map((l) => ({
+        id: l.id,
+        type: 'LEAD',
+        title: l.company_name,
+        detail: `Status: ${l.status} • Contact: ${l.contact_person}`,
+        date: l.updated_at,
+      }));
+
+      // Generate simple chart data
+      const chartData = [
+        { name: 'Jan', revenue: wonValue * 0.4 },
+        { name: 'Feb', revenue: wonValue * 0.6 },
+        { name: 'Mar', revenue: wonValue * 0.8 },
+        { name: 'Apr', revenue: wonValue },
+      ];
+
+      return {
+        role: 'SALES_EXECUTIVE',
+        activeLeads,
+        pendingFollowups,
+        wonValue:
+          wonValue > 100000
+            ? `₹${(wonValue / 100000).toFixed(1)}L`
+            : `₹${(wonValue / 1000).toFixed(1)}K`,
+        recentActivity,
+        chartData,
+      };
+    }
+
+    // Field Engineer Dashboard
+    if (isEngineer) {
+      const pendingInspections = await this.prisma.inspection.count({
+        where: {
+          engineer_id: user.id,
+          status: 'SCHEDULED',
+        },
+      });
+
+      const pendingTasks = await this.prisma.task.count({
+        where: {
+          assigned_to: user.id,
+          status: { not: 'COMPLETED' },
+        },
+      });
+
+      // Calculate attendance for current month
+      const now = new Date();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const presentDays = await this.prisma.attendance.count({
+        where: {
+          user_id: user.id,
+          date: { gte: startOfMonth },
+        },
+      });
+
+      const calendarDays = now.getDate();
+      const attendanceRate =
+        calendarDays > 0
+          ? ((presentDays / calendarDays) * 100).toFixed(0) + '%'
+          : '100%';
+
+      const myTasks = await this.prisma.task.findMany({
+        where: { assigned_to: user.id, status: { not: 'COMPLETED' } },
+        take: 5,
+        orderBy: { due_date: 'asc' },
+        include: { project: true },
+      });
+
+      const myInspections = await this.prisma.inspection.findMany({
+        where: { engineer_id: user.id, status: 'SCHEDULED' },
+        take: 5,
+        orderBy: { scheduled_date: 'asc' },
+        include: { client: true },
+      });
+
+      const recentActivity = [
+        ...myTasks.map((t) => ({
+          id: t.id,
+          type: 'TASK',
+          title: t.title,
+          detail: `Priority: ${t.priority} • Due: ${t.due_date ? new Date(t.due_date).toLocaleDateString() : 'N/A'}`,
+          date: t.updated_at,
+        })),
+        ...myInspections.map((i) => ({
+          id: i.id,
+          type: 'INSPECTION',
+          title: `Inspection for ${i.client.name}`,
+          detail: `Scheduled: ${new Date(i.scheduled_date).toLocaleDateString()}`,
+          date: i.updated_at,
+        })),
+      ]
+        .sort((a, b) => b.date.getTime() - a.date.getTime())
+        .slice(0, 8);
+
+      return {
+        role: 'FIELD_ENGINEER',
+        pendingInspections,
+        pendingTasks,
+        attendanceRate,
+        recentActivity,
+      };
+    }
+
+    // Default Employee / Staff Dashboard
+    const pendingTasks = await this.prisma.task.count({
+      where: {
+        assigned_to: user.id,
+        status: { not: 'COMPLETED' },
+      },
+    });
+
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const presentDays = await this.prisma.attendance.count({
+      where: {
+        user_id: user.id,
+        date: { gte: startOfMonth },
+      },
+    });
+
+    const calendarDays = now.getDate();
+    const attendanceRate =
+      calendarDays > 0
+        ? ((presentDays / calendarDays) * 100).toFixed(0) + '%'
+        : '100%';
+
+    const myTasks = await this.prisma.task.findMany({
+      where: { assigned_to: user.id, status: { not: 'COMPLETED' } },
+      take: 8,
+      orderBy: { due_date: 'asc' },
+      include: { project: true },
+    });
+
+    const recentActivity = myTasks.map((t) => ({
+      id: t.id,
+      type: 'TASK',
+      title: t.title,
+      detail: `Project: ${t.project.name} • Priority: ${t.priority}`,
+      date: t.updated_at,
+    }));
+
+    return {
+      role: 'STAFF',
+      pendingTasks,
+      attendanceRate,
+      leaveBalance: user.leave_balance,
+      recentActivity,
+    };
+  }
+
+  async getSuperAdminOverviewStats() {
     const activeProjects = await this.prisma.project.count({
       where: { status: 'ONGOING' },
     });
