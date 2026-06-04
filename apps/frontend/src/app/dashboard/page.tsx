@@ -76,21 +76,12 @@ interface SystemStatusData {
 
 export default function DashboardPage() {
   const router = useRouter();
-  const [stats, setStats] = useState({
-    activeProjects: 0,
-    compliancesDue: 0,
-    revenueMTD: "₹0",
-    projectsTrend: "+0%",
-    complianceTrend: "Secure",
-    revenueTrend: "+0%",
-    recentActivity: [] as ActivityItem[],
-    chartData: [] as any[]
-  });
+  const [stats, setStats] = useState<any>(null);
   const [systemStatus, setSystemStatus] = useState<SystemStatusData | null>(null);
   const [loading, setLoading] = useState(true);
   const [isStatusOpen, setIsStatusOpen] = useState(false);
   const [isQuickActionOpen, setIsQuickActionOpen] = useState(false);
-  const { token, logout } = useAuthStore();
+  const { token, logout, user } = useAuthStore();
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
@@ -115,7 +106,7 @@ export default function DashboardPage() {
       return r.json();
     })
     .then(data => {
-      if(data && data.activeProjects !== undefined) setStats(data);
+      if (data) setStats(data);
       setLoading(false);
     })
     .catch((err) => {
@@ -143,13 +134,324 @@ export default function DashboardPage() {
     }
   }, [isStatusOpen]);
 
-  if (loading) return (
+  if (loading || !stats) return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
       <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
       <p className="text-muted-foreground font-bold animate-pulse tracking-widest uppercase text-xs">Synchronizing Intelligence...</p>
     </div>
   );
 
+  const userRole = user?.role || "STAFF";
+
+  // 1. Sales Executive Dashboard
+  if (userRole === "SALES_EXECUTIVE") {
+    const quickActions = [
+      { name: "New Lead", icon: Target, href: "/dashboard/leads", color: "blue" },
+      { name: "Create Quote", icon: FileText, href: "/dashboard/quotations", color: "indigo" },
+      { name: "Digital Vault", icon: FileSpreadsheet, href: "/dashboard/documents", color: "emerald" },
+    ];
+
+    return (
+      <div className="space-y-10 pb-12 animate-in fade-in duration-700">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="space-y-2">
+            <h1 className="text-4xl font-black tracking-tighter text-foreground">
+              Sales <span className="text-primary">Console</span>
+            </h1>
+            <p className="text-muted-foreground font-medium max-w-md">Nurture leads and close compliance opportunities.</p>
+          </div>
+          <div className="flex items-center gap-3">
+            {/* Quick Action Modal */}
+            <Dialog open={isQuickActionOpen} onOpenChange={setIsQuickActionOpen}>
+              <DialogTrigger render={<Button className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold h-12 px-6 shadow-xl shadow-primary/20" />}>
+                <Plus className="w-4 h-4 mr-2" /> Quick Action
+              </DialogTrigger>
+              <DialogContent className="max-w-xl bg-card/95 backdrop-blur-xl border-border rounded-[2.5rem]">
+                <DialogHeader>
+                  <DialogTitle className="text-2xl font-black tracking-tighter">Strategic Handoff</DialogTitle>
+                  <DialogDescription className="text-muted-foreground font-medium uppercase tracking-widest text-[10px]">Accelerate your sales pipeline</DialogDescription>
+                </DialogHeader>
+                <div className="grid grid-cols-2 gap-4 mt-6">
+                  {quickActions.map((action) => (
+                    <button
+                      key={action.name}
+                      onClick={() => {
+                        setIsQuickActionOpen(false);
+                        router.push(action.href);
+                      }}
+                      className="group p-6 rounded-3xl bg-accent/20 border border-border hover:border-primary/40 hover:bg-primary/5 transition-all text-left flex flex-col gap-4"
+                    >
+                      <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center transition-all group-hover:scale-110", 
+                        action.color === 'blue' ? 'bg-blue-500/10 text-blue-500' :
+                        action.color === 'indigo' ? 'bg-indigo-500/10 text-indigo-500' :
+                        'bg-emerald-500/10 text-emerald-500'
+                      )}>
+                        <action.icon className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <p className="font-black text-foreground tracking-tighter">{action.name}</p>
+                        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Launch Module</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
+        </div>
+
+        {/* Stats Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {[
+            { title: "Active Opportunities", value: stats.activeLeads, icon: Target, color: "blue", desc: "Leads under qualification" },
+            { title: "Follow-ups Scheduled", value: stats.pendingFollowups, icon: Clock, color: "emerald", desc: "Tasks due in next 7 days" },
+            { title: "Won Value (MTD)", value: stats.wonValue, icon: TrendingUp, color: "purple", desc: "Your completed sales value" }
+          ].map((stat, i) => (
+            <div key={i} className="group p-8 rounded-[2rem] bg-card/40 border border-border relative overflow-hidden transition-all hover:border-primary/20 hover:translate-y-[-4px]">
+              <div className={cn("absolute top-0 right-0 w-32 h-32 blur-[80px] opacity-20 transition-opacity group-hover:opacity-30", 
+                stat.color === 'blue' ? 'bg-blue-500' : stat.color === 'emerald' ? 'bg-emerald-500' : 'bg-purple-500'
+              )} />
+              <div className="relative z-10 space-y-6">
+                <div className="flex items-center justify-between">
+                  <div className={cn("p-3 rounded-2xl", 
+                    stat.color === 'blue' ? 'bg-blue-500/10 text-blue-500' : stat.color === 'emerald' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-purple-500/10 text-purple-500'
+                  )}>
+                    <stat.icon className="w-6 h-6" />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-4xl font-black text-foreground tracking-tighter">{stat.value}</p>
+                  <p className="text-muted-foreground text-sm font-bold">{stat.title}</p>
+                  <p className="text-muted-foreground/60 text-[10px] uppercase font-black tracking-widest">{stat.desc}</p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Performance Chart & Recent activity */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          <div className="lg:col-span-8 p-8 rounded-[2.5rem] bg-card/30 border border-border backdrop-blur-md">
+            <div className="flex items-center justify-between mb-10">
+              <div>
+                <h3 className="text-xl font-bold text-foreground">My Sales Performance</h3>
+                <p className="text-muted-foreground text-xs font-medium uppercase tracking-widest mt-1">Personal growth trajectory</p>
+              </div>
+            </div>
+            <div className="h-[350px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={stats.chartData || []}>
+                  <defs>
+                    <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="var(--primary)" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="currentColor" className="text-border/50" />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: 'var(--muted-foreground)', fontSize: 10, fontWeight: 700 }} dy={10} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fill: 'var(--muted-foreground)', fontSize: 10, fontWeight: 700 }} dx={-10} />
+                  <Tooltip contentStyle={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '16px', color: 'var(--foreground)' }} itemStyle={{ color: 'var(--primary)', fontSize: '12px' }} />
+                  <Area type="monotone" dataKey="revenue" stroke="var(--primary)" strokeWidth={4} fillOpacity={1} fill="url(#colorRev)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div className="lg:col-span-4 p-8 rounded-[2.5rem] bg-card/30 border border-border backdrop-blur-md flex flex-col">
+            <h3 className="text-xl font-bold text-foreground flex items-center gap-2 mb-8">
+              <Clock className="w-5 h-5 text-indigo-500" /> Active Leads
+            </h3>
+            <div className="space-y-6 flex-1 overflow-y-auto pr-2 scrollbar-hide">
+              {(stats.recentActivity || []).map((item: any, i: number) => (
+                <div key={i} className="flex gap-4 group cursor-pointer hover:bg-accent/5 p-2 rounded-xl transition-all" onClick={() => router.push('/dashboard/leads')}>
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center border bg-blue-500/10 border-blue-500/20 text-blue-500">
+                    <Target className="w-4 h-4" />
+                  </div>
+                  <div className="flex-1 space-y-0.5">
+                    <p className="text-xs font-black text-foreground truncate">{item.title}</p>
+                    <p className="text-[10px] font-medium text-muted-foreground leading-tight line-clamp-1">{item.detail}</p>
+                  </div>
+                </div>
+              ))}
+              {(stats.recentActivity || []).length === 0 && (
+                <p className="text-muted-foreground italic text-sm text-center py-10">No active leads assigned yet.</p>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 2. Field Engineer Dashboard
+  if (userRole === "FIELD_ENGINEER") {
+    return (
+      <div className="space-y-10 pb-12 animate-in fade-in duration-700">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="space-y-2">
+            <h1 className="text-4xl font-black tracking-tighter text-foreground">
+              Engineer <span className="text-primary">Portal</span>
+            </h1>
+            <p className="text-muted-foreground font-medium max-w-md">Assigned site inspections and field operations.</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <Button onClick={() => router.push('/dashboard/attendance')} className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold h-12 px-6 shadow-xl shadow-primary/20">
+              <Clock className="w-4 h-4 mr-2" /> Clock In / Out
+            </Button>
+          </div>
+        </div>
+
+        {/* Stats Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {[
+            { title: "Scheduled Inspections", value: stats.pendingInspections, icon: ClipboardCheck, color: "blue", desc: "Pending safety checks" },
+            { title: "Pending Operations", value: stats.pendingTasks, icon: Briefcase, color: "emerald", desc: "Tasks assigned to you" },
+            { title: "Attendance Rate", value: stats.attendanceRate, icon: Activity, color: "purple", desc: "This month's coverage" }
+          ].map((stat, i) => (
+            <div key={i} className="group p-8 rounded-[2rem] bg-card/40 border border-border relative overflow-hidden transition-all hover:border-primary/20 hover:translate-y-[-4px]">
+              <div className={cn("absolute top-0 right-0 w-32 h-32 blur-[80px] opacity-20 transition-opacity group-hover:opacity-30", 
+                stat.color === 'blue' ? 'bg-blue-500' : stat.color === 'emerald' ? 'bg-emerald-500' : 'bg-purple-500'
+              )} />
+              <div className="relative z-10 space-y-6">
+                <div className="flex items-center justify-between">
+                  <div className={cn("p-3 rounded-2xl", 
+                    stat.color === 'blue' ? 'bg-blue-500/10 text-blue-500' : stat.color === 'emerald' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-purple-500/10 text-purple-500'
+                  )}>
+                    <stat.icon className="w-6 h-6" />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-4xl font-black text-foreground tracking-tighter">{stat.value}</p>
+                  <p className="text-muted-foreground text-sm font-bold">{stat.title}</p>
+                  <p className="text-muted-foreground/60 text-[10px] uppercase font-black tracking-widest">{stat.desc}</p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Schedule & Tasks lists */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div className="p-8 rounded-[2.5rem] bg-card/30 border border-border backdrop-blur-md">
+            <h3 className="text-xl font-bold text-foreground mb-6 flex items-center gap-2">
+              <ClipboardCheck className="w-5 h-5 text-blue-500" /> My Inspection Schedule
+            </h3>
+            <div className="space-y-4">
+              {stats.inspections?.map((insp: any) => (
+                <div key={insp.id} className="p-4 rounded-2xl bg-muted/30 border border-border flex justify-between items-center">
+                  <div>
+                    <p className="font-bold text-foreground">{insp.client}</p>
+                    <p className="text-xs text-muted-foreground">Date: {new Date(insp.scheduledDate).toLocaleDateString()}</p>
+                  </div>
+                  <span className="text-[10px] font-black uppercase bg-blue-500/10 text-blue-500 px-3 py-1 rounded-full">{insp.status}</span>
+                </div>
+              ))}
+              {(!stats.inspections || stats.inspections.length === 0) && (
+                <p className="text-muted-foreground italic text-sm text-center py-8">No inspections scheduled for you.</p>
+              )}
+            </div>
+          </div>
+
+          <div className="p-8 rounded-[2.5rem] bg-card/30 border border-border backdrop-blur-md">
+            <h3 className="text-xl font-bold text-foreground mb-6 flex items-center gap-2">
+              <Briefcase className="w-5 h-5 text-emerald-500" /> My Assigned Tasks
+            </h3>
+            <div className="space-y-4">
+              {stats.tasks?.map((task: any) => (
+                <div key={task.id} className="p-4 rounded-2xl bg-muted/30 border border-border flex justify-between items-center">
+                  <div>
+                    <p className="font-bold text-foreground">{task.title}</p>
+                    <p className="text-xs text-muted-foreground">Project: {task.project}</p>
+                  </div>
+                  <span className={cn("text-[9px] font-black uppercase px-2 py-0.5 rounded-md", 
+                    task.priority === 'HIGH' ? 'bg-rose-500/10 text-rose-500' : 'bg-amber-500/10 text-amber-500'
+                  )}>{task.priority}</span>
+                </div>
+              ))}
+              {(!stats.tasks || stats.tasks.length === 0) && (
+                <p className="text-muted-foreground italic text-sm text-center py-8">No pending tasks assigned.</p>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 3. Staff / Regular User Dashboard
+  if (userRole === "STAFF") {
+    return (
+      <div className="space-y-10 pb-12 animate-in fade-in duration-700">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="space-y-2">
+            <h1 className="text-4xl font-black tracking-tighter text-foreground">
+              Employee <span className="text-primary">Console</span>
+            </h1>
+            <p className="text-muted-foreground font-medium max-w-md">Welcome back, {user?.name}. Here is your dashboard.</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <Button onClick={() => router.push('/dashboard/attendance')} className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold h-12 px-6 shadow-xl shadow-primary/20">
+              <Clock className="w-4 h-4 mr-2" /> Clock In / Out
+            </Button>
+          </div>
+        </div>
+
+        {/* Stats Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {[
+            { title: "My Pending Tasks", value: stats.pendingTasks, icon: Briefcase, color: "blue", desc: "Tasks requiring action" },
+            { title: "Attendance Coverage", value: stats.attendanceRate, icon: Activity, color: "emerald", desc: "Current month" },
+            { title: "Leave Balance", value: stats.leaveBalance + " Days", icon: ShieldCheck, color: "purple", desc: "Available leaves" }
+          ].map((stat, i) => (
+            <div key={i} className="group p-8 rounded-[2rem] bg-card/40 border border-border relative overflow-hidden transition-all hover:border-primary/20 hover:translate-y-[-4px]">
+              <div className={cn("absolute top-0 right-0 w-32 h-32 blur-[80px] opacity-20 transition-opacity group-hover:opacity-30", 
+                stat.color === 'blue' ? 'bg-blue-500' : stat.color === 'emerald' ? 'bg-emerald-500' : 'bg-purple-500'
+              )} />
+              <div className="relative z-10 space-y-6">
+                <div className="flex items-center justify-between">
+                  <div className={cn("p-3 rounded-2xl", 
+                    stat.color === 'blue' ? 'bg-blue-500/10 text-blue-500' : stat.color === 'emerald' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-purple-500/10 text-purple-500'
+                  )}>
+                    <stat.icon className="w-6 h-6" />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-4xl font-black text-foreground tracking-tighter">{stat.value}</p>
+                  <p className="text-muted-foreground text-sm font-bold">{stat.title}</p>
+                  <p className="text-muted-foreground/60 text-[10px] uppercase font-black tracking-widest">{stat.desc}</p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Tasks list */}
+        <div className="p-8 rounded-[2.5rem] bg-card/30 border border-border backdrop-blur-md">
+          <h3 className="text-xl font-bold text-foreground mb-6 flex items-center gap-2">
+            <Briefcase className="w-5 h-5 text-blue-500" /> My Active Tasks
+          </h3>
+          <div className="space-y-4">
+            {stats.tasks?.map((task: any) => (
+              <div key={task.id} className="p-4 rounded-2xl bg-muted/30 border border-border flex justify-between items-center">
+                <div>
+                  <p className="font-bold text-foreground">{task.title}</p>
+                  <p className="text-xs text-muted-foreground">Project: {task.project}</p>
+                </div>
+                <span className={cn("text-[9px] font-black uppercase px-2 py-0.5 rounded-md", 
+                  task.priority === 'HIGH' ? 'bg-rose-500/10 text-rose-500' : 'bg-amber-500/10 text-amber-500'
+                )}>{task.priority}</span>
+              </div>
+            ))}
+            {(!stats.tasks || stats.tasks.length === 0) && (
+              <p className="text-muted-foreground italic text-sm text-center py-8">All caught up! No active tasks assigned.</p>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 4. Default Admin / Manager Dashboard
   const quickActions = [
     { name: "New Lead", icon: Target, href: "/dashboard/leads", color: "blue" },
     { name: "Create Quote", icon: FileText, href: "/dashboard/quotations", color: "indigo" },
@@ -440,7 +742,7 @@ export default function DashboardPage() {
           </div>
 
           <div className="space-y-6 flex-1 overflow-y-auto pr-2 scrollbar-hide">
-            {(stats.recentActivity || []).map((item, i) => (
+            {(stats.recentActivity || []).map((item: any, i: number) => (
               <div 
                 key={i} 
                 className="flex gap-4 group cursor-pointer hover:bg-accent/5 p-2 rounded-xl transition-all"
@@ -484,6 +786,5 @@ export default function DashboardPage() {
         </div>
       </div>
     </div>
-
   );
 }

@@ -1,22 +1,20 @@
-import { PrismaClient } from '@prisma/client';
-import * as bcrypt from 'bcrypt';
-
+const { PrismaClient } = require('@prisma/client');
+const bcrypt = require('bcrypt');
 const prisma = new PrismaClient();
 
 async function main() {
   const password_hash = await bcrypt.hash('Staff@123', 10);
+  const users = await prisma.user.findMany();
   
-  const emails = ['amit@gmail.com', 'kartik@gmail.com', 'admin@globalsafety.com'];
-  
-  for (const email of emails) {
+  for (const user of users) {
     try {
       await prisma.user.update({
-        where: { email },
+        where: { id: user.id },
         data: { password_hash }
       });
-      console.log(`Successfully reset password for: ${email}`);
+      console.log(`Successfully reset password for: ${user.email}`);
     } catch (e) {
-      console.log(`Failed to reset password for ${email}`);
+      console.log(`Failed to reset password for ${user.email}: ${e.message}`);
     }
   }
 }
