@@ -4,16 +4,41 @@ import * as React from "react"
 import { Menu as MenuPrimitive } from "@base-ui/react/menu"
 import { cn } from "@/lib/utils"
 
-function DropdownMenu({ ...props }: MenuPrimitive.Root.Props) {
-  return <MenuPrimitive.Root {...props} />
+function DropdownMenu({ children, ...props }: MenuPrimitive.Root.Props & { children?: React.ReactNode }) {
+  return <MenuPrimitive.Root {...props}>{children}</MenuPrimitive.Root>
 }
 
-function DropdownMenuTrigger({ ...props }: MenuPrimitive.Trigger.Props) {
-  return <MenuPrimitive.Trigger data-slot="dropdown-menu-trigger" {...props} />
+function DropdownMenuTrigger({
+  children,
+  asChild,
+  render,
+  ...props
+}: React.ComponentPropsWithoutRef<"button"> & {
+  asChild?: boolean
+  render?: React.ReactElement
+}) {
+  if (asChild && React.isValidElement(children)) {
+    return (
+      <MenuPrimitive.Trigger
+        data-slot="dropdown-menu-trigger"
+        render={children}
+        {...props}
+      />
+    )
+  }
+  return (
+    <MenuPrimitive.Trigger
+      data-slot="dropdown-menu-trigger"
+      render={render}
+      {...props}
+    >
+      {children}
+    </MenuPrimitive.Trigger>
+  )
 }
 
-function DropdownMenuPortal({ ...props }: MenuPrimitive.Portal.Props) {
-  return <MenuPrimitive.Portal {...props} />
+function DropdownMenuPortal({ children, ...props }: MenuPrimitive.Portal.Props & { children?: React.ReactNode }) {
+  return <MenuPrimitive.Portal {...props}>{children}</MenuPrimitive.Portal>
 }
 
 function DropdownMenuContent({
@@ -22,14 +47,14 @@ function DropdownMenuContent({
   align = "start",
   side = "bottom",
   ...props
-}: MenuPrimitive.Popup.Props & { 
+}: React.ComponentPropsWithoutRef<"div"> & { 
   sideOffset?: number; 
-  className?: string;
   align?: "start" | "center" | "end";
   side?: "top" | "right" | "bottom" | "left";
 }) {
   return (
     <DropdownMenuPortal>
+      {/* @ts-ignore */}
       <MenuPrimitive.Positioner className="z-[9999]" sideOffset={sideOffset} align={align} side={side}>
         <MenuPrimitive.Popup
           data-slot="dropdown-menu-content"
@@ -47,7 +72,7 @@ function DropdownMenuContent({
 function DropdownMenuItem({
   className,
   ...props
-}: MenuPrimitive.Item.Props & { className?: string }) {
+}: React.ComponentPropsWithoutRef<"div">) {
   return (
     <MenuPrimitive.Item
       data-slot="dropdown-menu-item"
@@ -95,3 +120,4 @@ export {
   DropdownMenuLabel,
   DropdownMenuSeparator,
 }
+

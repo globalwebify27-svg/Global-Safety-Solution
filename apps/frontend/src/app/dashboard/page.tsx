@@ -163,8 +163,10 @@ export default function DashboardPage() {
           <div className="flex items-center gap-3">
             {/* Quick Action Modal */}
             <Dialog open={isQuickActionOpen} onOpenChange={setIsQuickActionOpen}>
-              <DialogTrigger render={<Button className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold h-12 px-6 shadow-xl shadow-primary/20" />}>
-                <Plus className="w-4 h-4 mr-2" /> Quick Action
+              <DialogTrigger asChild>
+                <Button className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold h-12 px-6 shadow-xl shadow-primary/20">
+                  <Plus className="w-4 h-4 mr-2" /> Quick Action
+                </Button>
               </DialogTrigger>
               <DialogContent className="max-w-xl bg-card/95 backdrop-blur-xl border-border rounded-[2.5rem]">
                 <DialogHeader>
@@ -474,8 +476,10 @@ export default function DashboardPage() {
         <div className="flex items-center gap-3">
           {/* System Status Modal */}
           <Dialog open={isStatusOpen} onOpenChange={setIsStatusOpen}>
-            <DialogTrigger render={<Button variant="outline" className="bg-card border-border hover:bg-accent text-foreground font-bold h-12 px-6" />}>
-              <Activity className="w-4 h-4 mr-2 text-primary" /> System Status
+            <DialogTrigger asChild>
+              <Button variant="outline" className="bg-card border-border hover:bg-accent text-foreground font-bold h-12 px-6">
+                <Activity className="w-4 h-4 mr-2 text-primary" /> System Status
+              </Button>
             </DialogTrigger>
             <DialogContent className="max-w-2xl bg-card/95 backdrop-blur-xl border-border rounded-[2.5rem]">
               <DialogHeader>
@@ -571,8 +575,10 @@ export default function DashboardPage() {
 
           {/* Quick Action Modal */}
           <Dialog open={isQuickActionOpen} onOpenChange={setIsQuickActionOpen}>
-            <DialogTrigger render={<Button className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold h-12 px-6 shadow-xl shadow-primary/20" />}>
-              <Plus className="w-4 h-4 mr-2" /> Quick Action
+            <DialogTrigger asChild>
+              <Button className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold h-12 px-6 shadow-xl shadow-primary/20">
+                <Plus className="w-4 h-4 mr-2" /> Quick Action
+              </Button>
             </DialogTrigger>
             <DialogContent className="max-w-xl bg-card/95 backdrop-blur-xl border-border rounded-[2.5rem]">
               <DialogHeader>
