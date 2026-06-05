@@ -591,7 +591,7 @@ function QuotationsContent() {
       </div>
 
       <div className="bg-card/40 border border-border rounded-[2.5rem] overflow-hidden shadow-sm backdrop-blur-md">
-        <div className="overflow-x-auto scrollbar-hide">
+        <div className="overflow-x-auto">
           <table className="w-full text-left min-w-[800px] lg:min-w-0">
             <thead className="bg-muted border-b border-border">
               <tr>
@@ -693,9 +693,9 @@ function QuotationsContent() {
 
       {/* View Details Dialog */}
       <Dialog open={openView} onOpenChange={setOpenView}>
-        <DialogContent className="sm:max-w-[800px] bg-card border-border text-foreground p-0 overflow-hidden shadow-2xl">
+        <DialogContent className="w-[95vw] sm:w-full sm:max-w-[800px] bg-card border-border text-foreground p-0 overflow-hidden shadow-2xl max-h-[90vh] flex flex-col rounded-[2rem]">
           {selectedQuote && (
-            <div className="flex flex-col h-full">
+            <div className="flex flex-col h-full max-h-[90vh] overflow-hidden">
               <div className="bg-gradient-to-r from-emerald-600 to-teal-600 p-8 text-white">
                 <div className="flex justify-between items-start">
                   <div>
@@ -709,7 +709,7 @@ function QuotationsContent() {
                 </div>
               </div>
 
-              <div className="p-8 space-y-8">
+              <div className="p-8 space-y-8 overflow-y-auto flex-1 glass-scrollbar">
                 <div className="grid grid-cols-2 gap-10">
                   <div className="space-y-2">
                     <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Issuer</p>

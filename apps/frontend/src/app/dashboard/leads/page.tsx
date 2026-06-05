@@ -515,7 +515,7 @@ export default function LeadsPage() {
 
       {viewMode === "table" ? (
         <div className="bg-card/40 border border-border rounded-[2.5rem] overflow-hidden shadow-sm backdrop-blur-md">
-          <div className="overflow-x-auto scrollbar-hide">
+          <div className="overflow-x-auto">
             <table className="w-full text-left min-w-[800px] lg:min-w-0">
               <thead className="bg-muted border-b border-border">
                 <tr>
