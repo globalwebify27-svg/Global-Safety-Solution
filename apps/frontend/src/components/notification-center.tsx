@@ -31,6 +31,7 @@ export function NotificationCenter() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const token = useAuthStore((state) => state.token);
+  const [showAll, setShowAll] = useState(false);
 
   const fetchNotifications = async () => {
     if (!token) return;
@@ -109,7 +110,10 @@ export function NotificationCenter() {
           )}
         </div>
         <DropdownMenuSeparator className="bg-border/50" />
-        <div className="max-h-[400px] overflow-y-auto scrollbar-hide py-1">
+        <div className={cn(
+          "overflow-y-auto py-1",
+          showAll ? "max-h-[600px]" : "max-h-[400px]"
+        )}>
           {notifications.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-muted-foreground space-y-3">
               <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
@@ -118,7 +122,7 @@ export function NotificationCenter() {
               <p className="text-sm font-medium italic">No recent alerts.</p>
             </div>
           ) : (
-            notifications.map((n) => (
+            (showAll ? notifications : notifications.slice(0, 4)).map((n) => (
               <DropdownMenuItem 
                 key={n.id} 
                 onClick={async () => {
@@ -166,8 +170,12 @@ export function NotificationCenter() {
         </div>
         <DropdownMenuSeparator className="bg-border/50" />
         <div className="p-2">
-           <Button variant="ghost" className="w-full h-10 rounded-xl text-xs font-bold text-muted-foreground hover:bg-accent/10">
-             View Full Activity Log
+           <Button 
+             variant="ghost" 
+             onClick={() => setShowAll(!showAll)} 
+             className="w-full h-10 rounded-xl text-xs font-bold text-muted-foreground hover:bg-accent/10"
+           >
+             {showAll ? "Show Less Alerts" : "View Full Activity Log"}
            </Button>
         </div>
       </DropdownMenuContent>
