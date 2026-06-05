@@ -563,7 +563,7 @@ export default function FinancePage() {
                       </div>
                     </td>
                     <td className="px-8 py-6">
-                      <span className={cn("px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-tighter shadow-sm ring-1", 
+                      <span className={cn("px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-tighter shadow-sm ring-1 whitespace-nowrap", 
                         invoice.status === 'PAID' ? 'bg-emerald-500/10 text-emerald-600 ring-emerald-500/20' :
                         invoice.status === 'PARTIAL' ? 'bg-blue-500/10 text-blue-600 ring-blue-500/20' :
                         'bg-amber-500/10 text-amber-600 ring-amber-500/20'
@@ -572,7 +572,7 @@ export default function FinancePage() {
                       </span>
                     </td>
                     <td className="px-8 py-6">
-                      <span className={cn("px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-tighter shadow-sm ring-1", 
+                      <span className={cn("px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-tighter shadow-sm ring-1 whitespace-nowrap", 
                         getPaymentTypeFromInvoice(invoice).color
                       )}>
                         {getPaymentTypeFromInvoice(invoice).label}
