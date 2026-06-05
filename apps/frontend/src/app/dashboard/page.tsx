@@ -134,7 +134,7 @@ export default function DashboardPage() {
     }
   }, [isStatusOpen]);
 
-  if (loading || !stats) return (
+  if (loading || !stats || !token || !user) return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
       <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
       <p className="text-muted-foreground font-bold animate-pulse tracking-widest uppercase text-xs">Synchronizing Intelligence...</p>
