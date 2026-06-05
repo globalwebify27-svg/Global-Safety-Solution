@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import { useAuthStore } from "@/store/auth";
 import { API_BASE_URL } from "@/lib/config";
-import { Bell, Check, Info, AlertTriangle, CheckCircle2, XCircle, Clock } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { Bell, Check, Info, AlertTriangle, CheckCircle2, XCircle, Clock } from "lucide-react";
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -48,6 +48,49 @@ export function NotificationCenter() {
       // Silently handle polling errors to avoid console spam, or use a concise warning
       console.warn("[NotificationCenter] Polling failed:", (e as any).message || 'Connection refused');
     }
+  };
+
+  const handleNotificationClick = async (n: Notification) => {
+    // 1. Mark as read if not already read
+    if (!n.is_read) {
+      await markAsRead(n.id);
+    }
+    
+    // 2. Determine redirect destination
+    let destination = n.link;
+    if (!destination) {
+      const titleLower = n.title.toLowerCase();
+      const messageLower = n.message.toLowerCase();
+      
+      if (titleLower.includes("quotation") || messageLower.includes("quotation")) {
+        destination = "/dashboard/quotations";
+      } else if (titleLower.includes("inspection") || messageLower.includes("inspection")) {
+        destination = "/dashboard/inspections";
+      } else if (titleLower.includes("lead") || titleLower.includes("sales") || messageLower.includes("lead")) {
+        destination = "/dashboard/leads";
+      } else if (titleLower.includes("inventory") || titleLower.includes("stock") || messageLower.includes("stock")) {
+        destination = "/dashboard/inventory";
+      } else if (titleLower.includes("finance") || titleLower.includes("invoice") || titleLower.includes("payment") || messageLower.includes("invoice")) {
+        destination = "/dashboard/finance";
+      } else if (titleLower.includes("attendance") || messageLower.includes("attendance")) {
+        destination = "/dashboard/attendance";
+      } else if (titleLower.includes("employee") || titleLower.includes("staff") || messageLower.includes("employee")) {
+        destination = "/dashboard/employees";
+      } else if (titleLower.includes("payroll") || messageLower.includes("payroll")) {
+        destination = "/dashboard/payroll";
+      } else if (titleLower.includes("document") || titleLower.includes("vault") || messageLower.includes("vault")) {
+        destination = "/dashboard/documents";
+      } else if (titleLower.includes("asset") || messageLower.includes("asset")) {
+        destination = "/dashboard/assets";
+      } else if (titleLower.includes("compliance") || messageLower.includes("compliance")) {
+        destination = "/dashboard/compliance";
+      } else {
+        destination = "/dashboard";
+      }
+    }
+    
+    // 3. Navigate
+    router.push(destination);
   };
 
   useEffect(() => {
@@ -125,14 +168,7 @@ export function NotificationCenter() {
             (showAll ? notifications : notifications.slice(0, 4)).map((n) => (
               <DropdownMenuItem 
                 key={n.id} 
-                onClick={async () => {
-                  if (!n.is_read) {
-                    await markAsRead(n.id);
-                  }
-                  if (n.link) {
-                    router.push(n.link);
-                  }
-                }}
+                onClick={() => handleNotificationClick(n)}
                 className={cn(
                   "flex items-start gap-4 p-4 rounded-xl cursor-pointer transition-colors focus:bg-accent/10 mb-1 last:mb-0",
                   !n.is_read ? "bg-primary/5" : "opacity-70"

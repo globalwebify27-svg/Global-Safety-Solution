@@ -127,6 +127,52 @@
   html {
     @apply font-sans;
   }
+  
+  /* Prevent native body double scrollbar and set screen size */
+  html, body {
+    height: 100vh;
+    overflow: hidden;
+  }
+}
+
+/* Custom scrollbar styling (Glass Style & Page Color Matching) */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.2); /* slate-500 with opacity */
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  transition: all 0.2s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.35);
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.16); /* slate-400 with opacity */
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.3);
+}
+
+/* Firefox scrollbar support */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(100, 116, 139, 0.2) transparent;
+}
+
+.dark * {
+  scrollbar-color: rgba(148, 163, 184, 0.16) transparent;
 }
 
 /* Hide native number input spin buttons globally */
