@@ -5,6 +5,7 @@ import { useAuthStore } from "@/store/auth";
 import { API_BASE_URL } from "@/lib/config";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+// @ts-ignore
 import { 
   Monitor, 
   Smartphone, 
@@ -241,8 +242,10 @@ export default function AssetsPage() {
         </div>
 
         <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger render={<Button className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold shadow-xl shadow-indigo-500/20 px-8 h-12 transition-all active:scale-95 border-0" />}>
+          <DialogTrigger asChild>
+            <Button className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold shadow-xl shadow-indigo-500/20 px-8 h-12 transition-all active:scale-95 border-0">
               <Plus className="w-5 h-5 mr-2" /> Register Asset
+            </Button>
           </DialogTrigger>
           <DialogContent className="sm:max-w-[600px] bg-card border-border text-foreground rounded-[2rem]">
             <DialogHeader>
