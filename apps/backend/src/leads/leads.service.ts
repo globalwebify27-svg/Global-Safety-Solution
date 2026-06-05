@@ -37,7 +37,7 @@ export class LeadsService {
         entity_type: 'LEAD',
         entity_id: lead.id,
         action: 'CREATED',
-        new_data: { company_name: lead.company_name, contact_person: lead.contact_person, expected_value: lead.expected_value },
+        new_data: JSON.stringify({ company_name: lead.company_name, contact_person: lead.contact_person, expected_value: lead.expected_value }),
         user_id: 'System'
       }
     });
@@ -66,7 +66,7 @@ export class LeadsService {
         entity_type: 'LEAD',
         entity_id: id,
         action: 'UPDATED',
-        new_data: { ...data },
+        new_data: JSON.stringify({ ...data }),
         user_id: 'System'
       }
     });
@@ -162,7 +162,7 @@ export class LeadsService {
             entity_type: 'LEAD',
             entity_id: id,
             action: 'CONVERTED_TO_CLIENT',
-            new_data: { client_id: createdClientId, status: 'WON' },
+            new_data: JSON.stringify({ client_id: createdClientId, status: 'WON' }),
             user_id: 'System'
           }
         });
@@ -198,7 +198,7 @@ export class LeadsService {
         entity_type: 'LEAD',
         entity_id: id,
         action: 'EMAIL_DISPATCHED',
-        new_data: { subject, recipient: lead.email },
+        new_data: JSON.stringify({ subject, recipient: lead.email }),
         user_id: 'System'
       }
     });
@@ -238,7 +238,7 @@ export class LeadsService {
         entity_type: 'LEAD_TRANSACTION',
         entity_id: leadId,
         action: 'CREATED',
-        new_data: { description: data.description, amount, type: data.type },
+        new_data: JSON.stringify({ description: data.description, amount, type: data.type }),
         user_id: userId
       }
     });

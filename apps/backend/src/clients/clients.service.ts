@@ -141,7 +141,7 @@ export class ClientsService {
             entity_type: 'CLIENT',
             entity_id: id,
             action: 'STAFF_REASSIGNED',
-            old_data: {
+            old_data: JSON.stringify({
               assigned_staff_id: oldClient.assigned_staff_id || null,
               assigned_staff_name: oldStaffName,
               completed_projects: completedProjects,
@@ -152,11 +152,11 @@ export class ClientsService {
               pending_work_orders: pendingWorkOrders,
               completed_inspections: completedInspections,
               pending_inspections: pendingInspections,
-            } as any,
-            new_data: {
+            }),
+            new_data: JSON.stringify({
               assigned_staff_id: data.assigned_staff_id || null,
               assigned_staff_name: newStaffName,
-            } as any,
+            }),
             user_id: 'System',
           },
         });
