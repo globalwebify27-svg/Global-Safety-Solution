@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useAuthStore } from "@/store/auth";
 import { API_BASE_URL } from "@/lib/config";
 import { Bell, Check, Info, AlertTriangle, CheckCircle2, XCircle, Clock } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -26,6 +27,7 @@ interface Notification {
 }
 
 export function NotificationCenter() {
+  const router = useRouter();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const token = useAuthStore((state) => state.token);
@@ -119,7 +121,14 @@ export function NotificationCenter() {
             notifications.map((n) => (
               <DropdownMenuItem 
                 key={n.id} 
-                onClick={() => !n.is_read && markAsRead(n.id)}
+                onClick={async () => {
+                  if (!n.is_read) {
+                    await markAsRead(n.id);
+                  }
+                  if (n.link) {
+                    router.push(n.link);
+                  }
+                }}
                 className={cn(
                   "flex items-start gap-4 p-4 rounded-xl cursor-pointer transition-colors focus:bg-accent/10 mb-1 last:mb-0",
                   !n.is_read ? "bg-primary/5" : "opacity-70"
