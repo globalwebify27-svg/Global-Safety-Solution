@@ -148,3 +148,31 @@ input[type="number"] {
     display: none; /* Chrome, Safari and Opera */
   }
 }
+
+@utility glass-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.15) transparent;
+  
+  &::-webkit-scrollbar {
+    height: 8px;
+    width: 8px;
+  }
+  
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  &::-webkit-scrollbar-thumb {
+    background: rgba(148, 163, 184, 0.12);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    border-radius: 9999px;
+    border: 1px solid rgba(148, 163, 184, 0.08);
+    transition: all 0.2s ease;
+  }
+  
+  &::-webkit-scrollbar-thumb:hover {
+    background: rgba(148, 163, 184, 0.25);
+    border-color: rgba(148, 163, 184, 0.15);
+  }
+}

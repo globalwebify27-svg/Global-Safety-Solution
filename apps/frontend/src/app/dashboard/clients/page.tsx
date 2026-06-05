@@ -578,8 +578,8 @@ export default function ClientsPage() {
       </div>
 
       {/* Directory Table */}
-      <div className="bg-card/50 backdrop-blur-md rounded-xl border border-border overflow-hidden shadow-sm">
-        <table className="w-full text-left font-medium">
+      <div className="bg-card/50 backdrop-blur-md rounded-xl border border-border overflow-x-auto glass-scrollbar shadow-sm">
+        <table className="w-full text-left font-medium min-w-[1100px]">
           <thead className="bg-muted text-muted-foreground text-sm">
             <tr>
               <th className="px-6 py-4 border-b border-border">Client Enterprise</th>
