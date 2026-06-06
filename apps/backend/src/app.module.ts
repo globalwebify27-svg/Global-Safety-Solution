@@ -29,6 +29,7 @@ import { AutomationsModule } from './automations/automations.module';
 import { ServiceProductsModule } from './service-products/service-products.module';
 import { WorkOrdersModule } from './work-orders/work-orders.module';
 import { CertificatesModule } from './certificates/certificates.module';
+import { AccountingModule } from './accounting/accounting.module';
 
 @Module({
   imports: [
@@ -60,6 +61,7 @@ import { CertificatesModule } from './certificates/certificates.module';
     ServiceProductsModule,
     WorkOrdersModule,
     CertificatesModule,
+    AccountingModule,
   ],
 
   controllers: [AppController],

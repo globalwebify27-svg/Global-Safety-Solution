@@ -1,9 +1,14 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
+import { AccountingService } from '../accounting/accounting.service';
+
 @Injectable()
 export class PaymentsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private accountingService: AccountingService,
+  ) {}
 
   async findAll() {
     return this.prisma.payment.findMany({
@@ -70,6 +75,18 @@ export class PaymentsService {
           }
         });
       }
+    }
+
+    try {
+      await this.accountingService.postVoucher({
+        description: `Auto-generated: Payment received for Invoice ${invoice.invoice_number}`,
+        amount: Number(amount),
+        debit_code: '1010', // Bank Current Account
+        credit_code: '1200', // Accounts Receivable
+        created_by: 'System',
+      });
+    } catch (err) {
+      console.warn('[Auto-Accounting] Failed to post payment voucher:', err.message);
     }
 
     return payment;

@@ -5,9 +5,14 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
+import { AccountingService } from '../accounting/accounting.service';
+
 @Injectable()
 export class InvoicesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private accountingService: AccountingService,
+  ) {}
 
   async findAll() {
     const invoices = await this.prisma.invoice.findMany({
@@ -102,7 +107,7 @@ export class InvoicesService {
       );
     }
 
-    return this.prisma.invoice.create({
+    const invoice = await this.prisma.invoice.create({
       data: {
         ...invoiceData,
         subtotal,
@@ -122,6 +127,20 @@ export class InvoicesService {
       },
       include: { items: true },
     });
+
+    try {
+      await this.accountingService.postVoucher({
+        description: `Auto-generated: Invoice created for ${invoice.invoice_number}`,
+        amount: totalAmount,
+        debit_code: '1200', // Accounts Receivable
+        credit_code: '4000', // Sales Revenue
+        created_by: 'System',
+      });
+    } catch (err) {
+      console.warn('[Auto-Accounting] Failed to post invoice voucher:', err.message);
+    }
+
+    return invoice;
   }
 
   async update(id: string, data: any) {

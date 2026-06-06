@@ -957,3 +957,36 @@ model Stock {
   @@index([warehouse_id], map: "stock_warehouse_id_fkey")
   @@map("stock")
 }
+
+model Account {
+  id          String        @id @default(uuid()) @db.VarChar(36)
+  name        String        @unique @db.VarChar(255)
+  code        String        @unique @db.VarChar(50)
+  type        String        @db.VarChar(50)         // ASSET, LIABILITY, EQUITY, REVENUE, EXPENSE
+  balance     Decimal       @default(0.00) @db.Decimal(15, 2)
+  created_at  DateTime      @default(now()) @db.DateTime(6)
+  updated_at  DateTime      @updatedAt @db.DateTime(6)
+  debits      LedgerEntry[] @relation("DebitAccount")
+  credits     LedgerEntry[] @relation("CreditAccount")
+
+  @@map("accounts")
+}
+
+model LedgerEntry {
+  id                String   @id @default(uuid()) @db.VarChar(36)
+  voucher_no        String   @unique @db.VarChar(100)
+  description       String   @db.Text
+  amount            Decimal  @db.Decimal(15, 2)
+  transaction_date  DateTime @default(now()) @db.DateTime(6)
+  debit_account_id  String   @db.VarChar(36)
+  credit_account_id String   @db.VarChar(36)
+  created_by        String   @db.VarChar(255)
+  created_at        DateTime @default(now()) @db.DateTime(6)
+
+  debit_account     Account  @relation("DebitAccount", fields: [debit_account_id], references: [id])
+  credit_account    Account  @relation("CreditAccount", fields: [credit_account_id], references: [id])
+
+  @@index([debit_account_id], map: "ledger_entries_debit_account_id_fkey")
+  @@index([credit_account_id], map: "ledger_entries_credit_account_id_fkey")
+  @@map("ledger_entries")
+}

@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { useAuthStore } from "@/store/auth";
 import { API_BASE_URL } from "@/lib/config";
-import { LogOut, Home, Users, FolderKanban, ShieldCheck, Settings, BadgeCheck, UserCircle, Target, FileSpreadsheet, Package, Monitor, FolderLock, Menu, X, Banknote, ClipboardCheck, ChevronDown, ChevronRight } from "lucide-react";
+import { LogOut, Home, Users, FolderKanban, ShieldCheck, Settings, BadgeCheck, UserCircle, Target, FileSpreadsheet, Package, Monitor, FolderLock, Menu, X, Banknote, ClipboardCheck, ChevronDown, ChevronRight, Calculator } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -15,6 +15,7 @@ const navigation = [
   { name: "Sales Pipeline",    href: "/dashboard/leads",       icon: Target,          module: "LEADS" },
   { name: "Client Management", href: "/dashboard/clients",     icon: Users,           module: "CLIENTS" },
   { name: "Finance & Invoices",href: "/dashboard/finance",     icon: Banknote,        module: "FINANCE" },
+  { name: "Accounting Hub",    href: "/dashboard/accounting",  icon: Calculator,      module: "FINANCE" },
   { name: "Staff Directory",   href: "/dashboard/employees",   icon: UserCircle,      module: "HR",         isHrGroup: true },
   { name: "Payroll Hub",       href: "/dashboard/payroll",     icon: Banknote,        module: "PAYROLL",    isHrGroup: true },
   { name: "Attendance Hub",    href: "/dashboard/attendance",  icon: BadgeCheck,      module: "ATTENDANCE", isHrGroup: true },
