@@ -326,20 +326,20 @@ export default function OperationsPage() {
       </div>
 
       {/* Statistics / Quick Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         {[
           { label: "Active Projects", value: projects.length, icon: FolderKanban, color: "text-blue-600 dark:text-blue-400", bg: "bg-blue-500/10" },
           { label: "Pending Tasks", value: projects.reduce((acc: number, p) => acc + (p.tasks?.filter(t => t.status !== 'DONE').length || 0), 0), icon: ListTodo, color: "text-amber-600 dark:text-amber-400", bg: "bg-amber-500/10" },
           { label: "Active Staff", value: users.length, icon: UserIcon, color: "text-rose-600 dark:text-rose-400", bg: "bg-rose-500/10" },
           { label: "System Health", value: "99%", icon: CheckCircle2, color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-500/10" }
         ].map((stat, i) => (
-          <div key={i} className="bg-card/40 border border-border rounded-2xl p-5 flex items-center justify-between group hover:border-primary/20 transition-all shadow-sm backdrop-blur-md">
-            <div className="space-y-1">
-              <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">{stat.label}</p>
-              <p className="text-3xl font-black text-foreground group-hover:text-primary transition-colors">{stat.value}</p>
+          <div key={i} className="bg-card/40 border border-border rounded-2xl p-4 lg:p-5 flex items-center justify-between group hover:border-primary/20 transition-all shadow-sm backdrop-blur-md gap-2">
+            <div className="space-y-1 min-w-0 flex-1">
+              <p className="text-[10px] lg:text-xs font-bold text-muted-foreground uppercase tracking-widest truncate">{stat.label}</p>
+              <p className="text-2xl lg:text-3xl font-black text-foreground group-hover:text-primary transition-colors truncate">{stat.value}</p>
             </div>
-            <div className={`w-12 h-12 rounded-xl ${stat.bg} flex items-center justify-center ${stat.color} group-hover:scale-110 transition-transform shadow-lg shadow-black/5`}>
-              <stat.icon className="w-6 h-6" />
+            <div className={`shrink-0 w-10 h-10 lg:w-12 lg:h-12 rounded-xl ${stat.bg} flex items-center justify-center ${stat.color} group-hover:scale-110 transition-transform shadow-lg shadow-black/5`}>
+              <stat.icon className="w-5 h-5 lg:w-6 lg:h-6" />
             </div>
           </div>
         ))}

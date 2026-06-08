@@ -209,22 +209,22 @@ export default function DashboardPage() {
             { title: "Follow-ups Scheduled", value: stats.pendingFollowups, icon: Clock, color: "emerald", desc: "Tasks due in next 7 days" },
             { title: "Won Value (MTD)", value: stats.wonValue, icon: TrendingUp, color: "purple", desc: "Your completed sales value" }
           ].map((stat, i) => (
-            <div key={i} className="group p-8 rounded-[2rem] bg-card/40 border border-border relative overflow-hidden transition-all hover:border-primary/20 hover:translate-y-[-4px]">
+            <div key={i} className="group p-5 lg:p-8 rounded-[2rem] bg-card/40 border border-border relative overflow-hidden transition-all hover:border-primary/20 hover:translate-y-[-4px] flex flex-col justify-between">
               <div className={cn("absolute top-0 right-0 w-32 h-32 blur-[80px] opacity-20 transition-opacity group-hover:opacity-30", 
                 stat.color === 'blue' ? 'bg-blue-500' : stat.color === 'emerald' ? 'bg-emerald-500' : 'bg-purple-500'
               )} />
-              <div className="relative z-10 space-y-6">
+              <div className="relative z-10 space-y-4 lg:space-y-6 flex-1 flex flex-col">
                 <div className="flex items-center justify-between">
-                  <div className={cn("p-3 rounded-2xl", 
+                  <div className={cn("p-2 lg:p-3 rounded-2xl shrink-0", 
                     stat.color === 'blue' ? 'bg-blue-500/10 text-blue-500' : stat.color === 'emerald' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-purple-500/10 text-purple-500'
                   )}>
-                    <stat.icon className="w-6 h-6" />
+                    <stat.icon className="w-5 h-5 lg:w-6 lg:h-6" />
                   </div>
                 </div>
-                <div className="space-y-1">
-                  <p className="text-4xl font-black text-foreground tracking-tighter">{stat.value}</p>
-                  <p className="text-muted-foreground text-sm font-bold">{stat.title}</p>
-                  <p className="text-muted-foreground/60 text-[10px] uppercase font-black tracking-widest">{stat.desc}</p>
+                <div className="space-y-1 mt-auto">
+                  <p className="text-3xl lg:text-4xl font-black text-foreground tracking-tighter truncate">{stat.value}</p>
+                  <p className="text-muted-foreground text-xs lg:text-sm font-bold truncate">{stat.title}</p>
+                  <p className="text-muted-foreground/60 text-[9px] lg:text-[10px] uppercase font-black tracking-widest line-clamp-1">{stat.desc}</p>
                 </div>
               </div>
             </div>
@@ -310,22 +310,22 @@ export default function DashboardPage() {
             { title: "Pending Operations", value: stats.pendingTasks, icon: Briefcase, color: "emerald", desc: "Tasks assigned to you" },
             { title: "Attendance Rate", value: stats.attendanceRate, icon: Activity, color: "purple", desc: "This month's coverage" }
           ].map((stat, i) => (
-            <div key={i} className="group p-8 rounded-[2rem] bg-card/40 border border-border relative overflow-hidden transition-all hover:border-primary/20 hover:translate-y-[-4px]">
+            <div key={i} className="group p-5 lg:p-8 rounded-[2rem] bg-card/40 border border-border relative overflow-hidden transition-all hover:border-primary/20 hover:translate-y-[-4px] flex flex-col justify-between">
               <div className={cn("absolute top-0 right-0 w-32 h-32 blur-[80px] opacity-20 transition-opacity group-hover:opacity-30", 
                 stat.color === 'blue' ? 'bg-blue-500' : stat.color === 'emerald' ? 'bg-emerald-500' : 'bg-purple-500'
               )} />
-              <div className="relative z-10 space-y-6">
+              <div className="relative z-10 space-y-4 lg:space-y-6 flex-1 flex flex-col">
                 <div className="flex items-center justify-between">
-                  <div className={cn("p-3 rounded-2xl", 
+                  <div className={cn("p-2 lg:p-3 rounded-2xl shrink-0", 
                     stat.color === 'blue' ? 'bg-blue-500/10 text-blue-500' : stat.color === 'emerald' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-purple-500/10 text-purple-500'
                   )}>
-                    <stat.icon className="w-6 h-6" />
+                    <stat.icon className="w-5 h-5 lg:w-6 lg:h-6" />
                   </div>
                 </div>
-                <div className="space-y-1">
-                  <p className="text-4xl font-black text-foreground tracking-tighter">{stat.value}</p>
-                  <p className="text-muted-foreground text-sm font-bold">{stat.title}</p>
-                  <p className="text-muted-foreground/60 text-[10px] uppercase font-black tracking-widest">{stat.desc}</p>
+                <div className="space-y-1 mt-auto">
+                  <p className="text-3xl lg:text-4xl font-black text-foreground tracking-tighter truncate">{stat.value}</p>
+                  <p className="text-muted-foreground text-xs lg:text-sm font-bold truncate">{stat.title}</p>
+                  <p className="text-muted-foreground/60 text-[9px] lg:text-[10px] uppercase font-black tracking-widest line-clamp-1">{stat.desc}</p>
                 </div>
               </div>
             </div>
@@ -405,22 +405,22 @@ export default function DashboardPage() {
             { title: "Attendance Coverage", value: stats.attendanceRate, icon: Activity, color: "emerald", desc: "Current month" },
             { title: "Leave Balance", value: stats.leaveBalance + " Days", icon: ShieldCheck, color: "purple", desc: "Available leaves" }
           ].map((stat, i) => (
-            <div key={i} className="group p-8 rounded-[2rem] bg-card/40 border border-border relative overflow-hidden transition-all hover:border-primary/20 hover:translate-y-[-4px]">
+            <div key={i} className="group p-5 lg:p-8 rounded-[2rem] bg-card/40 border border-border relative overflow-hidden transition-all hover:border-primary/20 hover:translate-y-[-4px] flex flex-col justify-between">
               <div className={cn("absolute top-0 right-0 w-32 h-32 blur-[80px] opacity-20 transition-opacity group-hover:opacity-30", 
                 stat.color === 'blue' ? 'bg-blue-500' : stat.color === 'emerald' ? 'bg-emerald-500' : 'bg-purple-500'
               )} />
-              <div className="relative z-10 space-y-6">
+              <div className="relative z-10 space-y-4 lg:space-y-6 flex-1 flex flex-col">
                 <div className="flex items-center justify-between">
-                  <div className={cn("p-3 rounded-2xl", 
+                  <div className={cn("p-2 lg:p-3 rounded-2xl shrink-0", 
                     stat.color === 'blue' ? 'bg-blue-500/10 text-blue-500' : stat.color === 'emerald' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-purple-500/10 text-purple-500'
                   )}>
-                    <stat.icon className="w-6 h-6" />
+                    <stat.icon className="w-5 h-5 lg:w-6 lg:h-6" />
                   </div>
                 </div>
-                <div className="space-y-1">
-                  <p className="text-4xl font-black text-foreground tracking-tighter">{stat.value}</p>
-                  <p className="text-muted-foreground text-sm font-bold">{stat.title}</p>
-                  <p className="text-muted-foreground/60 text-[10px] uppercase font-black tracking-widest">{stat.desc}</p>
+                <div className="space-y-1 mt-auto">
+                  <p className="text-3xl lg:text-4xl font-black text-foreground tracking-tighter truncate">{stat.value}</p>
+                  <p className="text-muted-foreground text-xs lg:text-sm font-bold truncate">{stat.title}</p>
+                  <p className="text-muted-foreground/60 text-[9px] lg:text-[10px] uppercase font-black tracking-widest line-clamp-1">{stat.desc}</p>
                 </div>
               </div>
             </div>
@@ -646,30 +646,30 @@ export default function DashboardPage() {
             desc: "Gross accepted valuations"
           }
         ].map((stat, i) => (
-          <div key={i} className="group p-8 rounded-[2rem] bg-card/40 border border-border relative overflow-hidden transition-all hover:border-primary/20 hover:translate-y-[-4px]">
+          <div key={i} className="group p-5 lg:p-8 rounded-[2rem] bg-card/40 border border-border relative overflow-hidden transition-all hover:border-primary/20 hover:translate-y-[-4px] flex flex-col justify-between">
             <div className={cn("absolute top-0 right-0 w-32 h-32 blur-[80px] opacity-20 transition-opacity group-hover:opacity-30", 
               stat.color === 'blue' ? 'bg-blue-500' : stat.color === 'emerald' ? 'bg-emerald-500' : 'bg-purple-500'
             )} />
             
-            <div className="relative z-10 space-y-6">
-              <div className="flex items-center justify-between">
-                <div className={cn("p-3 rounded-2xl", 
+            <div className="relative z-10 space-y-4 lg:space-y-6 flex-1 flex flex-col">
+              <div className="flex items-center justify-between gap-2">
+                <div className={cn("p-2 lg:p-3 rounded-2xl shrink-0", 
                   stat.color === 'blue' ? 'bg-blue-500/10 text-blue-500' : stat.color === 'emerald' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-purple-500/10 text-purple-500'
                 )}>
-                  <stat.icon className="w-6 h-6" />
+                  <stat.icon className="w-5 h-5 lg:w-6 lg:h-6" />
                 </div>
-                <div className={cn("flex items-center gap-1 text-xs font-black uppercase tracking-tighter", 
+                <div className={cn("flex items-center gap-1 text-[10px] lg:text-xs font-black uppercase tracking-tighter", 
                   stat.trend.startsWith('+') || stat.trend === 'Secure' ? 'text-emerald-500' : 'text-rose-500'
                 )}>
                   {stat.trend === 'Secure' ? <ShieldCheck className="w-3 h-3" /> : <ArrowUpRight className="w-3 h-3" />}
-                  {stat.trend}
+                  <span className="truncate">{stat.trend}</span>
                 </div>
               </div>
               
-              <div className="space-y-1">
-                <p className="text-4xl font-black text-foreground tracking-tighter">{stat.value}</p>
-                <p className="text-muted-foreground text-sm font-bold">{stat.title}</p>
-                <p className="text-muted-foreground/60 text-[10px] uppercase font-black tracking-widest">{stat.desc}</p>
+              <div className="space-y-1 mt-auto">
+                <p className="text-3xl lg:text-4xl font-black text-foreground tracking-tighter truncate">{stat.value}</p>
+                <p className="text-muted-foreground text-xs lg:text-sm font-bold truncate">{stat.title}</p>
+                <p className="text-muted-foreground/60 text-[9px] lg:text-[10px] uppercase font-black tracking-widest line-clamp-1">{stat.desc}</p>
               </div>
             </div>
           </div>

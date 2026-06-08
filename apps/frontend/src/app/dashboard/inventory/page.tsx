@@ -280,14 +280,14 @@ export default function InventoryPage() {
         </Dialog>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
         {stats.map((stat, i) => (
-          <div key={i} className="bg-card/40 border border-border rounded-2xl p-5 flex items-center justify-between shadow-sm backdrop-blur-md hover:border-primary/20 transition-all group">
-            <div className="space-y-1">
-              <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">{stat.label}</p>
-              <p className="text-3xl font-black text-foreground group-hover:text-primary transition-colors">{stat.value}</p>
+          <div key={i} className="bg-card/40 border border-border rounded-2xl p-5 flex items-center justify-between gap-4 shadow-sm backdrop-blur-md hover:border-primary/20 transition-all group min-w-0">
+            <div className="space-y-1 min-w-0">
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest truncate">{stat.label}</p>
+              <p className="text-2xl sm:text-3xl font-black text-foreground group-hover:text-primary transition-colors truncate">{stat.value}</p>
             </div>
-            <div className={`w-12 h-12 rounded-xl ${stat.bg} flex items-center justify-center ${stat.color} shadow-lg shadow-black/5`}>
+            <div className={`w-12 h-12 rounded-xl ${stat.bg} flex items-center justify-center ${stat.color} shadow-lg shadow-black/5 shrink-0`}>
               <stat.icon className="w-6 h-6" />
             </div>
           </div>
@@ -337,11 +337,11 @@ export default function InventoryPage() {
                   </td>
                   <td className="px-6 py-5">
                     {item.current_stock === 0 ? (
-                      <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase bg-rose-500/10 text-rose-400 ring-1 ring-rose-500/20">Out of Stock</span>
+                      <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase bg-rose-500/10 text-rose-400 ring-1 ring-rose-500/20 whitespace-nowrap">Out of Stock</span>
                     ) : item.current_stock <= item.min_stock ? (
-                      <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase bg-amber-500/10 text-amber-400 ring-1 ring-amber-500/20">Critical Stock</span>
+                      <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase bg-amber-500/10 text-amber-400 ring-1 ring-amber-500/20 whitespace-nowrap">Critical Stock</span>
                     ) : (
-                      <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase bg-emerald-500/10 text-emerald-400 ring-1 ring-emerald-500/20">Healthy</span>
+                      <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase bg-emerald-500/10 text-emerald-400 ring-1 ring-emerald-500/20 whitespace-nowrap">Healthy</span>
                     )}
                   </td>
                   <td className="px-6 py-5 text-right">

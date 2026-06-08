@@ -470,20 +470,20 @@ export default function EmployeesPage() {
       </div>
 
       {/* Grid of Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         {[
           { label: "Active Professionals", value: employees.length, icon: Users, color: "text-blue-500", bg: "bg-blue-500/10" },
           { label: "Payroll Commitment", value: `₹${(employees.reduce((acc, e) => acc + Number(e.base_salary || 0), 0) / 1000).toFixed(1)}K`, icon: CreditCard, color: "text-purple-500", bg: "bg-purple-500/10" },
           { label: "Field Readiness", value: employees.filter(e => e.designation?.toLowerCase().includes('engineer')).length, icon: Briefcase, color: "text-amber-500", bg: "bg-amber-500/10" },
           { label: "Leave Requests", value: "0", icon: Clock, color: "text-rose-500", bg: "bg-rose-500/10" }
         ].map((stat, i) => (
-          <div key={i} className="bg-card/40 border border-border rounded-3xl p-6 flex items-center justify-between group hover:border-emerald-500/30 transition-all shadow-sm backdrop-blur-md">
-            <div className="space-y-1">
-              <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em]">{stat.label}</p>
-              <p className="text-3xl font-black text-foreground">{stat.value}</p>
+          <div key={i} className="bg-card/40 border border-border rounded-3xl p-6 lg:p-4 xl:p-6 flex items-center justify-between group hover:border-emerald-500/30 transition-all shadow-sm backdrop-blur-md min-w-0">
+            <div className="space-y-1 min-w-0 mr-2">
+              <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] truncate">{stat.label}</p>
+              <p className="text-3xl font-black text-foreground truncate">{stat.value}</p>
             </div>
-            <div className={`w-14 h-14 rounded-2xl ${stat.bg} flex items-center justify-center ${stat.color} group-hover:scale-110 transition-transform border border-border/50 shadow-inner`}>
-              <stat.icon className="w-7 h-7" />
+            <div className={`w-14 h-14 lg:w-10 lg:h-10 xl:w-14 xl:h-14 rounded-2xl lg:rounded-xl xl:rounded-2xl ${stat.bg} flex items-center justify-center ${stat.color} group-hover:scale-110 transition-transform border border-border/50 shadow-inner shrink-0`}>
+              <stat.icon className="w-7 h-7 lg:w-5 lg:h-5 xl:w-7 xl:h-7" />
             </div>
           </div>
         ))}
