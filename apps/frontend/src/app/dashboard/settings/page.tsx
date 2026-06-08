@@ -224,7 +224,7 @@ export default function SettingsPage() {
         </div>
 
         {/* Content Area */}
-        <div className="flex-1 bg-card/40 border border-border rounded-3xl p-8 shadow-sm relative overflow-hidden backdrop-blur-md">
+        <div className="flex-1 bg-card/40 border border-border rounded-3xl p-4 sm:p-8 shadow-sm relative overflow-hidden backdrop-blur-md">
           <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 blur-[100px] rounded-full -z-10" />
           
           {activeTab === "profile" && user && (

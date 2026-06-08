@@ -69,6 +69,7 @@ export default function EmployeesPage() {
   const [openOnboard, setOpenOnboard] = useState(false);
   const [openProfile, setOpenProfile] = useState(false);
   const [profileData, setProfileData] = useState<any>(null);
+  const [searchQuery, setSearchQuery] = useState("");
   
   const token = useAuthStore((state) => state.token);
 
@@ -327,6 +328,17 @@ export default function EmployeesPage() {
     }
   };
 
+  const filteredEmployees = employees.filter((emp) => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      (emp.name && emp.name.toLowerCase().includes(query)) ||
+      (emp.employee_id && emp.employee_id.toLowerCase().includes(query)) ||
+      (emp.designation && emp.designation.toLowerCase().includes(query)) ||
+      (emp.department && emp.department.toLowerCase().includes(query))
+    );
+  });
+
   return (
     <div className="space-y-8 pb-10">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -482,7 +494,12 @@ export default function EmployeesPage() {
         <div className="p-8 border-b border-border/50 flex flex-col md:flex-row md:items-center justify-between gap-6">
            <div className="relative flex-1 max-w-md">
              <Search className="w-5 h-5 absolute left-4 top-3.5 text-muted-foreground/50" />
-             <input className="w-full bg-background/50 border border-border rounded-2xl py-3.5 pl-12 pr-6 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all" placeholder="Search by name, ID, or designation..." />
+             <input 
+               value={searchQuery}
+               onChange={(e) => setSearchQuery(e.target.value)}
+               className="w-full bg-background/50 border border-border rounded-2xl py-3.5 pl-12 pr-6 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all" 
+               placeholder="Search by name, ID, or designation..." 
+             />
            </div>
            <div className="flex items-center gap-3">
              <Button variant="ghost" className="rounded-xl h-12 px-6 font-bold text-muted-foreground hover:bg-accent/10">
@@ -512,7 +529,13 @@ export default function EmployeesPage() {
                       </div>
                     </td>
                  </tr>
-              ) : employees.map((emp) => (
+              ) : filteredEmployees.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-8 py-16 text-center text-muted-foreground font-medium italic">
+                    No staff members found matching &ldquo;{searchQuery}&rdquo;
+                  </td>
+                </tr>
+              ) : filteredEmployees.map((emp) => (
                 <tr key={emp.id} className="hover:bg-emerald-500/5 transition-colors group cursor-default">
                   <td className="px-8 py-6">
                     <div className="flex items-center gap-5">

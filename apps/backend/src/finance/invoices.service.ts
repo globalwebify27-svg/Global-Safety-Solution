@@ -125,12 +125,13 @@ export class InvoicesService {
           })),
         },
       },
-      include: { items: true },
+      include: { items: true, client: true },
     });
 
     try {
+      const clientName = invoice.client?.name || 'Unknown Client';
       await this.accountingService.postVoucher({
-        description: `Auto-generated: Invoice created for ${invoice.invoice_number}`,
+        description: `Auto-generated: Invoice created for ${invoice.invoice_number} (${clientName})`,
         amount: totalAmount,
         debit_code: '1200', // Accounts Receivable
         credit_code: '4000', // Sales Revenue

@@ -7,6 +7,7 @@ export class ClientsService {
 
   async findAll() {
     return this.prisma.client.findMany({
+      orderBy: { created_at: 'desc' },
       include: {
         contacts: true,
         compliances: true,

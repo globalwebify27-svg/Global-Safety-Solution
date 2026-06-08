@@ -473,11 +473,11 @@ export default function DashboardPage() {
           </h1>
           <p className="text-muted-foreground font-medium max-w-md">Real-time operational visibility and compliance health monitoring.</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
           {/* System Status Modal */}
           <Dialog open={isStatusOpen} onOpenChange={setIsStatusOpen}>
             <DialogTrigger asChild>
-              <Button variant="outline" className="bg-card border-border hover:bg-accent text-foreground font-bold h-12 px-6">
+              <Button variant="outline" className="w-full sm:w-auto bg-card border-border hover:bg-accent text-foreground font-bold h-12 px-6">
                 <Activity className="w-4 h-4 mr-2 text-primary" /> System Status
               </Button>
             </DialogTrigger>
@@ -576,7 +576,7 @@ export default function DashboardPage() {
           {/* Quick Action Modal */}
           <Dialog open={isQuickActionOpen} onOpenChange={setIsQuickActionOpen}>
             <DialogTrigger asChild>
-              <Button className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold h-12 px-6 shadow-xl shadow-primary/20">
+              <Button className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground font-bold h-12 px-6 shadow-xl shadow-primary/20">
                 <Plus className="w-4 h-4 mr-2" /> Quick Action
               </Button>
             </DialogTrigger>

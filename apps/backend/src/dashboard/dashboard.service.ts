@@ -230,7 +230,7 @@ export class DashboardService {
 
   async getSuperAdminOverviewStats() {
     const activeProjects = await this.prisma.project.count({
-      where: { status: 'ONGOING' },
+      where: { status: { in: ['ONGOING', 'PENDING'] } },
     });
 
     const next30Days = new Date();

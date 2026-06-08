@@ -77,7 +77,7 @@ export class LeadsService {
   async findOne(id: string) {
     const lead = await this.prisma.lead.findUnique({
       where: { id },
-      include: { 
+      include: {
         quotations: true,
         transactions: { orderBy: { created_at: 'desc' } },
         activities: { orderBy: { date: 'desc' } },
@@ -208,13 +208,13 @@ export class LeadsService {
 
   async addTransaction(leadId: string, data: any, userId: string) {
     const amount = Number(data.amount);
-    
+
     // Calculate new balance
     const lastTx = await this.prisma.leadTransaction.findFirst({
       where: { lead_id: leadId },
       orderBy: { created_at: 'desc' }
     });
-    
+
     let currentBalance = lastTx ? Number(lastTx.balance) : 0;
     if (data.type === 'CREDIT') {
       currentBalance += amount;
@@ -251,7 +251,7 @@ export class LeadsService {
     const total = leads.length;
     const stages: Record<string, number> = { NEW: 0, CONTACTED: 0, QUALIFIED: 0, PROPOSAL: 0, WON: 0, LOST: 0 };
     let pipelineValue = 0;
-    
+
     leads.forEach(l => {
       if (stages[l.status] !== undefined) {
         stages[l.status]++;

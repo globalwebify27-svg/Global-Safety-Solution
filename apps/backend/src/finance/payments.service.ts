@@ -23,7 +23,7 @@ export class PaymentsService {
     // Check if invoice exists
     const invoice = await this.prisma.invoice.findUnique({
       where: { id: invoice_id },
-      include: { payments: true },
+      include: { payments: true, client: true },
     });
 
     if (!invoice) throw new BadRequestException('Invoice not found');
@@ -78,8 +78,9 @@ export class PaymentsService {
     }
 
     try {
+      const clientName = invoice.client?.name || 'Unknown Client';
       await this.accountingService.postVoucher({
-        description: `Auto-generated: Payment received for Invoice ${invoice.invoice_number}`,
+        description: `Auto-generated: Payment received for Invoice ${invoice.invoice_number} (${clientName})`,
         amount: Number(amount),
         debit_code: '1010', // Bank Current Account
         credit_code: '1200', // Accounts Receivable

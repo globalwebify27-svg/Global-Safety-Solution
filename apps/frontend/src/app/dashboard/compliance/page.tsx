@@ -160,7 +160,7 @@ export default function CompliancePage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="space-y-1">
           <h1 className="text-3xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-foreground to-muted-foreground">
             Compliance & Registry
@@ -171,7 +171,7 @@ export default function CompliancePage() {
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger 
             render={
-              <Button className="bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-500/20 px-6 font-semibold transition-all hover:scale-105 active:scale-95" />
+              <Button className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-500/20 px-6 font-semibold transition-all hover:scale-105 active:scale-95" />
             }
           >
             <Plus className="w-4 h-4 mr-2" /> Track New Compliance

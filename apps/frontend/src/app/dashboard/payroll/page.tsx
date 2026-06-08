@@ -187,12 +187,12 @@ export default function PayrollPage() {
           <p className="text-muted-foreground font-medium">Process salaries, generate payslips, and manage disbursements.</p>
         </div>
 
-        <div className="flex items-center gap-3">
-          <div className="flex bg-card border border-border rounded-xl p-1 gap-1">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
+          <div className="flex bg-card border border-border rounded-xl p-1 gap-1 w-full sm:w-auto">
              <select 
                value={month} 
                onChange={(e) => setMonth(parseInt(e.target.value))}
-               className="bg-transparent text-sm font-bold px-3 py-1.5 focus:outline-none cursor-pointer text-foreground"
+               className="bg-transparent text-sm font-bold px-3 py-1.5 focus:outline-none cursor-pointer text-foreground flex-1 sm:flex-none text-center"
              >
                {[...Array(12)].map((_, i) => (
                  <option key={i+1} value={i+1} className="bg-card text-foreground">{getMonthName(i+1)}</option>
@@ -202,7 +202,7 @@ export default function PayrollPage() {
              <select 
                value={year} 
                onChange={(e) => setYear(parseInt(e.target.value))}
-               className="bg-transparent text-sm font-bold px-3 py-1.5 focus:outline-none cursor-pointer text-foreground"
+               className="bg-transparent text-sm font-bold px-3 py-1.5 focus:outline-none cursor-pointer text-foreground flex-1 sm:flex-none text-center"
              >
                {[2024, 2025, 2026].map(y => (
                  <option key={y} value={y} className="bg-card text-foreground">{y}</option>
@@ -211,7 +211,7 @@ export default function PayrollPage() {
           </div>
           <Button 
             onClick={handleGenerateBatch}
-            className="bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-500/20 px-6 h-11 font-bold rounded-xl transition-all hover:scale-105 active:scale-95"
+            className="w-full sm:w-auto bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-500/20 px-6 h-11 font-bold rounded-xl transition-all hover:scale-105 active:scale-95"
           >
             <Plus className="w-5 h-5 mr-2" /> Run Payroll
           </Button>

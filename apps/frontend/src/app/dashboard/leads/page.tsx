@@ -321,13 +321,13 @@ export default function LeadsPage() {
           <p className="text-muted-foreground font-medium text-sm lg:text-base">Track opportunities and nurture relationships across the sales pipeline.</p>
         </div>
 
-        <div className="flex items-center gap-4">
-          <div className="flex bg-card border border-border p-1 rounded-2xl shadow-sm">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
+          <div className="flex bg-card border border-border p-1 rounded-2xl shadow-sm w-full sm:w-auto">
             <Button
               variant={viewMode === "table" ? "secondary" : "ghost"}
               size="sm"
               onClick={() => setViewMode("table")}
-              className={cn("rounded-xl px-4 py-2 h-9 font-bold text-xs flex items-center gap-2 transition-all", 
+              className={cn("flex-1 sm:flex-none rounded-xl px-4 py-2 h-9 font-bold text-xs flex items-center justify-center gap-2 transition-all", 
                 viewMode === "table" ? "bg-accent text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
               )}
             >
@@ -337,7 +337,7 @@ export default function LeadsPage() {
               variant={viewMode === "kanban" ? "secondary" : "ghost"}
               size="sm"
               onClick={() => setViewMode("kanban")}
-              className={cn("rounded-xl px-4 py-2 h-9 font-bold text-xs flex items-center gap-2 transition-all", 
+              className={cn("flex-1 sm:flex-none rounded-xl px-4 py-2 h-9 font-bold text-xs flex items-center justify-center gap-2 transition-all", 
                 viewMode === "kanban" ? "bg-accent text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
               )}
             >
@@ -346,7 +346,7 @@ export default function LeadsPage() {
           </div>
 
           <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger render={<Button className="inline-flex items-center justify-center rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold shadow-xl shadow-indigo-500/20 px-8 h-12 transition-all active:scale-95 text-sm lg:text-base border-0" />}>
+            <DialogTrigger render={<Button className="w-full sm:w-auto inline-flex items-center justify-center rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold shadow-xl shadow-indigo-500/20 px-8 h-12 transition-all active:scale-95 text-sm lg:text-base border-0" />}>
               <Plus className="w-5 h-5 mr-2" /> Capture New Lead
             </DialogTrigger>
             <DialogContent className="sm:max-w-[600px] bg-card border-border text-foreground rounded-[2rem]">

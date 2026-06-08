@@ -454,16 +454,16 @@ export default function AttendancePage() {
 
           {/* Attendance History */}
           <div className="lg:col-span-2 space-y-4">
-            <div className="flex items-center justify-between px-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-2">
               <h3 className="text-xl font-bold flex items-center gap-2 text-foreground">
                 <History className="w-5 h-5 text-indigo-600 dark:text-indigo-400" /> Operational Logs
               </h3>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 w-full sm:w-auto">
                 <Button 
                   onClick={handleDownloadReport}
                   variant="outline" 
                   size="sm" 
-                  className="bg-card text-muted-foreground hover:text-foreground rounded-full px-4 text-xs font-bold uppercase tracking-widest border-border"
+                  className="w-full sm:w-auto bg-card text-muted-foreground hover:text-foreground rounded-full px-4 text-xs font-bold uppercase tracking-widest border-border"
                 >
                   Download Report
                 </Button>

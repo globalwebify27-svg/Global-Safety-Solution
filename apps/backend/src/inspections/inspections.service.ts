@@ -219,6 +219,23 @@ export class InspectionsService {
             status: 'ACTIVE',
           },
         });
+
+        // Automatically sync to Digital Vault (Documents table)
+        await this.prisma.document.create({
+          data: {
+            name: `${inspection.client.name} - ${serviceName} Certificate`,
+            file_url: `/api/inspections/${inspection.id}/certificate`,
+            file_type: 'PDF',
+            file_size: 102400,
+            category: 'CERTIFICATE',
+            client_id: inspection.client_id,
+            project_id: inspection.project_id,
+            expiry_date: expiryDate,
+            test_date: new Date(),
+            notes: `Auto-generated Certificate No. ${certNo} for completed inspection.`,
+            uploaded_by: inspection.engineer_id || null,
+          },
+        });
       }
 
       const pdfBuffer = await this.generateCertificate(id);

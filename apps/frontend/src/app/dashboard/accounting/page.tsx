@@ -506,7 +506,7 @@ export default function AccountingPage() {
                           </td>
                           <td className="py-4 px-6 text-right font-bold text-emerald-500">₹{Number(v.amount).toLocaleString()}</td>
                           <td className="py-4 px-6 text-right font-bold text-rose-500">₹{Number(v.amount).toLocaleString()}</td>
-                          <td className="py-4 px-6 text-muted-foreground max-w-xs truncate">{v.description}</td>
+                          <td className="py-4 px-6 text-muted-foreground max-w-xs truncate cursor-help" title={v.description}>{v.description}</td>
                           <td className="py-4 px-6 text-xs font-bold uppercase text-muted-foreground">{v.created_by}</td>
                         </tr>
                       ))

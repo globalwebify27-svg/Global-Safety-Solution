@@ -31,13 +31,13 @@ export function ProfileForm({ initialData, onSubmit, loading }: ProfileFormProps
 
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
-      <div className="flex items-center gap-6">
-        <div className="relative group">
-          <div className="w-24 h-24 rounded-3xl bg-gradient-to-tr from-blue-600 to-teal-400 flex items-center justify-center shadow-2xl overflow-hidden">
+      <div className="flex items-center gap-4 sm:gap-6">
+        <div className="relative group shrink-0">
+          <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-3xl bg-gradient-to-tr from-blue-600 to-teal-400 flex items-center justify-center shadow-2xl overflow-hidden">
             {formData.name ? (
-              <span className="text-3xl font-black text-white">{formData.name[0]}</span>
+              <span className="text-2xl sm:text-3xl font-black text-white">{formData.name[0]}</span>
             ) : (
-              <User className="w-10 h-10 text-white/50" />
+              <User className="w-8 h-8 sm:w-10 sm:h-10 text-white/50" />
             )}
           </div>
           <input 
@@ -54,9 +54,9 @@ export function ProfileForm({ initialData, onSubmit, loading }: ProfileFormProps
             <Camera className="w-4 h-4" />
           </label>
         </div>
-        <div>
-          <h3 className="text-xl font-bold text-foreground">{formData.name}</h3>
-          <p className="text-muted-foreground text-sm font-medium">{formData.email}</p>
+        <div className="min-w-0">
+          <h3 className="text-lg sm:text-xl font-bold text-foreground truncate">{formData.name}</h3>
+          <p className="text-muted-foreground text-xs sm:text-sm font-medium break-all">{formData.email}</p>
         </div>
       </div>
 

@@ -159,7 +159,7 @@ export class QuotationsService {
         orderBy: { created_at: 'desc' }
       });
       const currentBalance = (lastTx ? Number(lastTx.balance) : 0) - Number(quotation.total_amount);
-      
+
       await this.prisma.leadTransaction.create({
         data: {
           lead_id: quotation.lead_id,
@@ -353,7 +353,7 @@ export class QuotationsService {
               orderBy: { created_at: 'desc' }
             });
             const currentBalance = currentBalanceRecord ? currentBalanceRecord.balance : 0;
-            
+
             await tx.leadTransaction.create({
               data: {
                 lead_id: quotation.lead_id,
@@ -486,6 +486,41 @@ export class QuotationsService {
               },
             },
           });
+
+          // Post accounting voucher for the auto-created invoice
+          try {
+            const debitAcc = await tx.account.findUnique({ where: { code: '1200' } });
+            const creditAcc = await tx.account.findUnique({ where: { code: '4000' } });
+            if (debitAcc && creditAcc) {
+              const count = await tx.ledgerEntry.count();
+              const voucherNo = `JV-${year}-${String(count + 1).padStart(4, '0')}`;
+
+              await tx.ledgerEntry.create({
+                data: {
+                  voucher_no: voucherNo,
+                  description: `Auto-generated: Invoice created for ${invoiceNumber} (Converted from Quotation ${quotation.quote_number})`,
+                  amount: quotation.total_amount,
+                  debit_account_id: debitAcc.id,
+                  credit_account_id: creditAcc.id,
+                  created_by: 'System',
+                }
+              });
+
+              // Update Debit Account (Accounts Receivable is ASSET, increases on Debit)
+              await tx.account.update({
+                where: { id: debitAcc.id },
+                data: { balance: { increment: quotation.total_amount } }
+              });
+
+              // Update Credit Account (Sales Revenue is REVENUE, increases on Credit)
+              await tx.account.update({
+                where: { id: creditAcc.id },
+                data: { balance: { increment: quotation.total_amount } }
+              });
+            }
+          } catch (err) {
+            console.warn('[Auto-Accounting] Failed to post converted invoice voucher:', err.message);
+          }
 
           // Notify Admin
           await this.notificationsService.notifyAdmins(

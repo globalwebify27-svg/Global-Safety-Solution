@@ -543,6 +543,58 @@ export default function InspectionsPage() {
                     className="h-11 bg-background border-border"
                   />
                 </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-semibold">Inspection Checklist Items</Label>
+                    <Button 
+                      type="button" 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => {
+                        setScheduleForm(prev => ({
+                          ...prev,
+                          items: [...prev.items, { description: "" }]
+                        }));
+                      }} 
+                      className="text-blue-600 hover:text-blue-500 font-bold flex items-center gap-1"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Add Question
+                    </Button>
+                  </div>
+                  <div className="space-y-2 max-h-[180px] overflow-y-auto pr-1">
+                    {scheduleForm.items.map((item, idx) => (
+                      <div key={idx} className="flex items-center gap-2">
+                        <Input 
+                          required 
+                          value={item.description} 
+                          onChange={(e) => {
+                            const newItems = [...scheduleForm.items];
+                            newItems[idx] = { description: e.target.value };
+                            setScheduleForm(prev => ({ ...prev, items: newItems }));
+                          }} 
+                          placeholder={`Question ${idx + 1}`} 
+                          className="h-10 bg-background border-border"
+                        />
+                        {scheduleForm.items.length > 1 && (
+                          <Button 
+                            type="button" 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={() => {
+                              setScheduleForm(prev => ({
+                                ...prev,
+                                items: prev.items.filter((_, i) => i !== idx)
+                              }));
+                            }} 
+                            className="text-rose-500 hover:text-rose-600 shrink-0"
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
               <DialogFooter>
                 <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold h-12 rounded-xl shadow-lg shadow-blue-500/20">

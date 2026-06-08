@@ -394,20 +394,19 @@ export default function FinancePage() {
   ];
 
   const getPaymentTypeFromInvoice = (invoice: Invoice) => {
+    if (invoice.status === 'PAID') {
+      return { label: 'FULL PAYMENT', color: 'bg-emerald-500/10 text-emerald-600 ring-emerald-500/20' };
+    }
+
     let allNotes = (invoice.notes || "").toLowerCase();
     if (invoice.payments && invoice.payments.length > 0) {
       allNotes += " " + invoice.payments.map(p => p.notes || "").join(" ").toLowerCase();
     }
     
-    if (!allNotes.trim()) return { label: 'PENDING', color: 'bg-muted text-muted-foreground ring-border' };
-    
-    if (allNotes.includes('completed') || allNotes.includes('full')) {
-      return { label: 'FULL PAYMENT', color: 'bg-emerald-500/10 text-emerald-600 ring-emerald-500/20' };
-    }
     if (allNotes.includes('advance')) {
       return { label: 'ADVANCE', color: 'bg-indigo-500/10 text-indigo-600 ring-indigo-500/20' };
     }
-    if (allNotes.includes('partial')) {
+    if (allNotes.includes('partial') || invoice.status === 'PARTIAL') {
       return { label: 'PARTIAL', color: 'bg-amber-500/10 text-amber-600 ring-amber-500/20' };
     }
     
