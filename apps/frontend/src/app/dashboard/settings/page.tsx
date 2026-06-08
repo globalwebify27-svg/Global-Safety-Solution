@@ -357,9 +357,12 @@ export default function SettingsPage() {
                     </div>
                     <div 
                       onClick={() => setNotifs(prev => ({ ...prev, [item.id]: !prev[item.id as keyof typeof prev] }))}
-                      className={cn("w-12 h-6 rounded-full relative cursor-pointer transition-colors shadow-inner", item.checked ? "bg-primary" : "bg-muted")}
+                      className={cn(
+                        "w-12 h-6 rounded-full p-1 cursor-pointer transition-colors shadow-inner flex items-center", 
+                        item.checked ? "bg-primary justify-end" : "bg-muted justify-start"
+                      )}
                     >
-                      <div className={cn("absolute top-1 w-4 h-4 rounded-full bg-white transition-all shadow-md", item.checked ? "left-7" : "left-1")} />
+                      <div className="w-4 h-4 rounded-full bg-white transition-all shadow-md" />
                     </div>
                   </div>
                 ))}
