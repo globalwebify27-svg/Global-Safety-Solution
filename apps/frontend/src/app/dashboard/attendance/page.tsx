@@ -107,15 +107,20 @@ export default function AttendancePage() {
   const token = useAuthStore((state) => state.token);
   const user = useAuthStore((state) => state.user);
 
+  const userRole = user?.roles?.[0]?.role?.name || user?.role;
+  const isLegacyAdmin = user?.email === "admin@globalsafety.com";
+  const effectiveRole = isLegacyAdmin ? "SUPER_ADMIN" : userRole;
+  const isAuthorizedHR = effectiveRole === "SUPER_ADMIN" || effectiveRole === "HR_MANAGER";
+
   useEffect(() => {
     setMounted(true);
     fetchMyAttendance();
-    if (user?.role === 'SUPER_ADMIN') {
+    if (isAuthorizedHR) {
       fetchAllAttendance();
     }
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
-  }, [token, user]);
+  }, [token, user, isAuthorizedHR]);
 
   const fetchMyAttendance = async () => {
     if (!token) return;
@@ -225,7 +230,7 @@ export default function AttendancePage() {
       });
       if (res.ok) {
         fetchMyAttendance();
-        if (user?.role === 'SUPER_ADMIN') fetchAllAttendance();
+        if (isAuthorizedHR) fetchAllAttendance();
       } else {
         const err = await res.json();
         alert(err.message || "Check-in failed");
@@ -305,7 +310,7 @@ export default function AttendancePage() {
       });
       if (res.ok) {
         fetchMyAttendance();
-        if (user?.role === 'SUPER_ADMIN') fetchAllAttendance();
+        if (isAuthorizedHR) fetchAllAttendance();
       } else {
         const err = await res.json();
         alert(err.message || "Check-out failed");
@@ -351,7 +356,7 @@ export default function AttendancePage() {
         </div>
       </div>
 
-      {user?.role === 'SUPER_ADMIN' && (
+      {isAuthorizedHR && (
         <div className="flex bg-muted/50 p-1.5 rounded-2xl border border-border/80 w-fit gap-1.5 shadow-inner">
           <button
             type="button"
