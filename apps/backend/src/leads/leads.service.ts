@@ -156,6 +156,12 @@ export class LeadsService {
           },
         });
 
+        // 5. Update all associated quotations with the new client_id
+        await tx.quotation.updateMany({
+          where: { lead_id: id },
+          data: { client_id: createdClientId },
+        });
+
         // Log the audit
         await tx.auditLog.create({
           data: {

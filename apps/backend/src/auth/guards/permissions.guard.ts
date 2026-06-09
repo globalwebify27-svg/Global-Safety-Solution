@@ -25,6 +25,10 @@ export class PermissionsGuard implements CanActivate {
     const user = await this.usersService.findById(userPayload.userId);
     if (!user || !user.is_active) return false;
 
+    if (user.is_on_hold && request.method !== 'GET') {
+      return false;
+    }
+
     const populatedUser: any = await this.usersService.findByEmail(user.email);
     if (!populatedUser) return false;
 

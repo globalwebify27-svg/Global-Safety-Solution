@@ -7,6 +7,7 @@ import {
   Body,
   Param,
   UseGuards,
+  Req,
 } from '@nestjs/common';
 import { QuotationsService } from './quotations.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -17,8 +18,8 @@ export class QuotationsController {
   constructor(private readonly quotationsService: QuotationsService) { }
 
   @Get()
-  findAll() {
-    return this.quotationsService.findAll();
+  findAll(@Req() req: any) {
+    return this.quotationsService.findAll(req.user);
   }
 
   @Post()

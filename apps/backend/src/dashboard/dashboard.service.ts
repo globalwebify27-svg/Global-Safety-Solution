@@ -39,9 +39,92 @@ export class DashboardService {
       (user.designation || '').toUpperCase().includes('FIELD') ||
       (user.designation || '').toUpperCase().includes('ENGINEER');
 
+    const isClient =
+      user.roles?.some((ur: any) => ur.role.name === 'CLIENT' || ur.role.name === 'CLIENTS') ||
+      (user.designation || '').toUpperCase().includes('CLIENT');
+
     // Super Admin & HR Manager see company-wide stats
     if (isSuperAdmin || isHrManager) {
       return this.getSuperAdminOverviewStats();
+    }
+
+    // Client Dashboard Stats
+    if (isClient) {
+      const clientRecord = await this.prisma.client.findFirst({
+        where: { email: user.email },
+        include: {
+          inspections: true,
+          quotations: true,
+          invoices: true,
+          documents: true,
+        },
+      });
+
+      const activeQuotes = clientRecord?.quotations.filter(q => q.status === 'ACCEPTED' || q.status === 'PENDING').length || 0;
+      const scheduledAudits = clientRecord?.inspections.filter(i => i.status === 'SCHEDULED').length || 0;
+      const certificatesCount = clientRecord?.documents.filter(d => d.category === 'CERTIFICATE' || d.category === 'COMPLIANCE').length || 0;
+
+      // Get recent inspections
+      const recentInspections = clientRecord?.inspections
+        .sort((a, b) => b.updated_at.getTime() - a.updated_at.getTime())
+        .slice(0, 5)
+        .map(i => ({
+          id: i.id,
+          scheduledDate: i.scheduled_date,
+          status: i.status,
+          remarks: i.remarks || 'No remarks recorded yet.',
+        })) || [];
+
+      // Get recent quotes
+      const recentQuotations = clientRecord?.quotations
+        .sort((a, b) => b.updated_at.getTime() - a.updated_at.getTime())
+        .slice(0, 5)
+        .map(q => ({
+          id: q.id,
+          quoteNumber: q.quote_number,
+          totalAmount: Number(q.total_amount),
+          status: q.status,
+        })) || [];
+
+      // Get recent invoices
+      const recentInvoices = clientRecord?.invoices
+        .sort((a, b) => b.updated_at.getTime() - a.updated_at.getTime())
+        .slice(0, 5)
+        .map(inv => ({
+          id: inv.id,
+          invoiceNumber: inv.invoice_number,
+          amount: Number(inv.total_amount),
+          status: inv.status,
+        })) || [];
+
+      const recentActivity = [
+        ...recentInspections.map(i => ({
+          id: i.id,
+          type: 'CLIENT' as const,
+          title: `Site Inspection`,
+          detail: `Status: ${i.status} • Scheduled: ${new Date(i.scheduledDate).toLocaleDateString()}`,
+          date: i.scheduledDate.toISOString(),
+        })),
+        ...recentQuotations.map(q => ({
+          id: q.id,
+          type: 'QUOTE' as const,
+          title: `Quotation ${q.quoteNumber}`,
+          detail: `Value: ₹${q.totalAmount.toLocaleString()} • Status: ${q.status}`,
+          date: new Date().toISOString(),
+        })),
+      ].slice(0, 8);
+
+      return {
+        role: 'CLIENT',
+        clientName: clientRecord?.name || user.name,
+        activeQuotes,
+        scheduledAudits,
+        certificatesCount,
+        recentInspections,
+        recentQuotations,
+        recentInvoices,
+        recentActivity,
+      };
     }
 
     // Sales Executive Dashboard

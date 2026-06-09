@@ -65,7 +65,10 @@ function QuotationsContent() {
   const [openView, setOpenView] = useState(false);
   const [selectedQuote, setSelectedQuote] = useState<any>(null);
   const [submitting, setSubmitting] = useState(false);
-  const token = useAuthStore((state) => state.token);
+  const { token, user } = useAuthStore();
+  const roleName = user?.roles?.[0]?.role?.name || "";
+  const designation = (user?.designation || "").toUpperCase();
+  const isClient = roleName === "CLIENT" || designation.includes("CLIENT");
 
   const [editMode, setEditMode] = useState(false);
   const [editQuoteId, setEditQuoteId] = useState<string | null>(null);
@@ -384,210 +387,212 @@ function QuotationsContent() {
           <p className="text-muted-foreground font-medium text-sm lg:text-base">Generate and manage professional business proposals with ease.</p>
         </div>
 
-        <Dialog open={open} onOpenChange={(isOpen) => {
-          setOpen(isOpen);
-          if (!isOpen) {
-            setFormData({ lead_id: "", client_id: "", notes: "", apply_gst: true, discount_type: "flat", discount_value: 0, items: [{ description: "", quantity: 1, unit_price: 0 }] });
-            setEditMode(false);
-            setEditQuoteId(null);
-          }
-        }}>
-          <DialogTrigger render={<Button className="inline-flex items-center justify-center rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold shadow-xl shadow-emerald-500/20 px-8 h-12 transition-all active:scale-95 text-sm lg:text-base border-0" />}>
-            <Plus className="w-5 h-5 mr-2" /> Draft New Proposal
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[800px] bg-card border-border text-foreground max-h-[90vh] overflow-y-auto rounded-[2rem]">
-            <DialogHeader>
-              <DialogTitle className="text-2xl font-bold">{editMode ? "Edit Professional Proposal" : "Create Professional Quotation"}</DialogTitle>
-              <DialogDescription className="text-muted-foreground">Define scope, pricing, terms, and commercial discounts for the client.</DialogDescription>
-            </DialogHeader>
-            <form onSubmit={handleCreateQuotation} className="space-y-6 mt-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <Label className="text-foreground/80">Select Lead / Opportunity</Label>
-                  <select 
-                    className="w-full bg-background border border-border rounded-xl h-11 px-3 text-sm focus:ring-2 focus:ring-emerald-500 text-foreground"
-                    value={formData.lead_id}
-                    onChange={(e) => {
-                      setFormData({...formData, lead_id: e.target.value, client_id: ""});
-                    }}
-                    disabled={!!formData.client_id}
-                  >
-                    <option value="">Choose an active lead...</option>
-                    {leads.map(lead => (
-                      <option key={lead.id} value={lead.id}>{lead.company_name} ({lead.contact_person})</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="flex items-center justify-center pt-6 text-muted-foreground font-black text-xs">OR</div>
-
-                <div className="space-y-2">
-                  <Label className="text-foreground/80">Select Existing Client</Label>
-                  <select 
-                    className="w-full bg-background border border-border rounded-xl h-11 px-3 text-sm focus:ring-2 focus:ring-emerald-500 text-foreground"
-                    value={formData.client_id}
-                    onChange={(e) => {
-                      setFormData({...formData, client_id: e.target.value, lead_id: ""});
-                    }}
-                    disabled={!!formData.lead_id}
-                  >
-                    <option value="">Choose registered client...</option>
-                    {clients.map(client => (
-                      <option key={client.id} value={client.id}>{client.name}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <Label className="text-lg font-bold text-foreground">Line Items</Label>
-                </div>
-                
-                <div className="space-y-3">
-                  {formData.items.map((item, idx) => (
-                    <div key={idx} className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end bg-muted/50 p-4 rounded-2xl border border-border group">
-                      <div className="col-span-1 md:col-span-6 space-y-1.5">
-                        <Label className="text-[10px] uppercase font-black text-muted-foreground">Description</Label>
-                        <Input 
-                          value={item.description}
-                          onChange={(e) => updateItem(idx, 'description', e.target.value)}
-                          placeholder="Safety Audit, Training, etc."
-                          className="bg-background border-border h-10 text-sm rounded-lg text-foreground"
-                          required
-                        />
-                      </div>
-                      <div className="col-span-1 md:col-span-2 space-y-1.5">
-                        <Label className="text-[10px] uppercase font-black text-muted-foreground">Qty</Label>
-                        <Input 
-                          type="number"
-                          value={item.quantity === 0 ? "" : item.quantity.toString()}
-                          onChange={(e) => updateItem(idx, 'quantity', e.target.value)}
-                          className="bg-background border-border h-10 text-sm rounded-lg text-foreground"
-                          required
-                        />
-                      </div>
-                      <div className="col-span-1 md:col-span-3 space-y-1.5">
-                        <Label className="text-[10px] uppercase font-black text-muted-foreground">Rate (₹)</Label>
-                        <Input 
-                          type="number"
-                          value={item.unit_price === 0 ? "" : item.unit_price.toString()}
-                          onChange={(e) => updateItem(idx, 'unit_price', e.target.value)}
-                          className="bg-background border-border h-10 text-sm rounded-lg text-foreground"
-                          required
-                        />
-                      </div>
-                      <div className="col-span-1 flex justify-end md:justify-center pb-2">
-                        <Button type="button" onClick={() => removeItem(idx)} variant="ghost" size="icon" className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8 w-8 rounded-lg">
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="flex justify-start">
-                  <Button type="button" onClick={addItem} variant="ghost" size="sm" className="text-emerald-600 hover:text-emerald-500 hover:bg-emerald-500/10 font-bold rounded-xl h-9 px-3">
-                    <Plus className="w-4 h-4 mr-1" /> Add Item Row
-                  </Button>
-                </div>
-              </div>
-
-              {/* Terms & Notes */}
-              <div className="space-y-2">
-                <Label className="text-foreground/80">Terms & Special Notes</Label>
-                <textarea
-                  className="w-full bg-background border border-border rounded-xl p-3 text-sm focus:ring-2 focus:ring-emerald-500 text-foreground min-h-[80px] focus:outline-none"
-                  placeholder="Standard validities, milestone payments, etc."
-                  value={formData.notes}
-                  onChange={(e) => setFormData({...formData, notes: e.target.value})}
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 border-t border-border pt-6 w-full">
-                {/* Left Side: Tax & Discount Controls */}
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2">
-                    <input 
-                      type="checkbox"
-                      id="apply_gst"
-                      checked={formData.apply_gst}
-                      onChange={(e) => setFormData({ ...formData, apply_gst: e.target.checked })}
-                      className="w-4 h-4 text-emerald-600 border-border rounded focus:ring-emerald-500 bg-background accent-emerald-600 cursor-pointer"
-                    />
-                    <label htmlFor="apply_gst" className="text-xs font-bold uppercase tracking-wider text-muted-foreground cursor-pointer select-none">
-                      Apply 18% GST (9% CGST + 9% SGST)
-                    </label>
-                  </div>
-
+        {!isClient && (
+          <Dialog open={open} onOpenChange={(isOpen) => {
+            setOpen(isOpen);
+            if (!isOpen) {
+              setFormData({ lead_id: "", client_id: "", notes: "", apply_gst: true, discount_type: "flat", discount_value: 0, items: [{ description: "", quantity: 1, unit_price: 0 }] });
+              setEditMode(false);
+              setEditQuoteId(null);
+            }
+          }}>
+            <DialogTrigger render={<Button className="inline-flex items-center justify-center rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold shadow-xl shadow-emerald-500/20 px-8 h-12 transition-all active:scale-95 text-sm lg:text-base border-0" />}>
+              <Plus className="w-5 h-5 mr-2" /> Draft New Proposal
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[800px] bg-card border-border text-foreground max-h-[90vh] overflow-y-auto rounded-[2rem]">
+              <DialogHeader>
+                <DialogTitle className="text-2xl font-bold">{editMode ? "Edit Professional Proposal" : "Create Professional Quotation"}</DialogTitle>
+                <DialogDescription className="text-muted-foreground">Define scope, pricing, terms, and commercial discounts for the client.</DialogDescription>
+              </DialogHeader>
+              <form onSubmit={handleCreateQuotation} className="space-y-6 mt-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <Label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Apply Commercial Discount</Label>
-                    <div className="flex gap-2">
-                      <select
-                        className="bg-background border border-border rounded-xl h-10 px-2 text-xs focus:ring-2 focus:ring-emerald-500 text-foreground focus:outline-none"
-                        value={formData.discount_type}
-                        onChange={(e) => setFormData({ ...formData, discount_type: e.target.value, discount_value: 0 })}
-                      >
-                        <option value="flat">Flat (₹)</option>
-                        <option value="percent">Percentage (%)</option>
-                      </select>
-                      <Input
-                        type="number"
-                        placeholder="Discount value..."
-                        value={formData.discount_value === 0 ? "" : formData.discount_value.toString()}
-                        onChange={(e) => setFormData({ ...formData, discount_value: Math.max(0, parseFloat(e.target.value) || 0) })}
-                        className="bg-background border-border h-10 text-sm rounded-lg text-foreground w-full"
+                    <Label className="text-foreground/80">Select Lead / Opportunity</Label>
+                    <select 
+                      className="w-full bg-background border border-border rounded-xl h-11 px-3 text-sm focus:ring-2 focus:ring-emerald-500 text-foreground"
+                      value={formData.lead_id}
+                      onChange={(e) => {
+                        setFormData({...formData, lead_id: e.target.value, client_id: ""});
+                      }}
+                      disabled={!!formData.client_id}
+                    >
+                      <option value="">Choose an active lead...</option>
+                      {leads.map(lead => (
+                        <option key={lead.id} value={lead.id}>{lead.company_name} ({lead.contact_person})</option>
+                      ))}
+                    </select>
+                  </div>
+  
+                  <div className="flex items-center justify-center pt-6 text-muted-foreground font-black text-xs">OR</div>
+  
+                  <div className="space-y-2">
+                    <Label className="text-foreground/80">Select Existing Client</Label>
+                    <select 
+                      className="w-full bg-background border border-border rounded-xl h-11 px-3 text-sm focus:ring-2 focus:ring-emerald-500 text-foreground"
+                      value={formData.client_id}
+                      onChange={(e) => {
+                        setFormData({...formData, client_id: e.target.value, lead_id: ""});
+                      }}
+                      disabled={!!formData.lead_id}
+                    >
+                      <option value="">Choose registered client...</option>
+                      {clients.map(client => (
+                        <option key={client.id} value={client.id}>{client.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+  
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-lg font-bold text-foreground">Line Items</Label>
+                  </div>
+                  
+                  <div className="space-y-3">
+                    {formData.items.map((item, idx) => (
+                      <div key={idx} className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end bg-muted/50 p-4 rounded-2xl border border-border group">
+                        <div className="col-span-1 md:col-span-6 space-y-1.5">
+                          <Label className="text-[10px] uppercase font-black text-muted-foreground">Description</Label>
+                          <Input 
+                            value={item.description}
+                            onChange={(e) => updateItem(idx, 'description', e.target.value)}
+                            placeholder="Safety Audit, Training, etc."
+                            className="bg-background border-border h-10 text-sm rounded-lg text-foreground"
+                            required
+                          />
+                        </div>
+                        <div className="col-span-1 md:col-span-2 space-y-1.5">
+                          <Label className="text-[10px] uppercase font-black text-muted-foreground">Qty</Label>
+                          <Input 
+                            type="number"
+                            value={item.quantity === 0 ? "" : item.quantity.toString()}
+                            onChange={(e) => updateItem(idx, 'quantity', e.target.value)}
+                            className="bg-background border-border h-10 text-sm rounded-lg text-foreground"
+                            required
+                          />
+                        </div>
+                        <div className="col-span-1 md:col-span-3 space-y-1.5">
+                          <Label className="text-[10px] uppercase font-black text-muted-foreground">Rate (₹)</Label>
+                          <Input 
+                            type="number"
+                            value={item.unit_price === 0 ? "" : item.unit_price.toString()}
+                            onChange={(e) => updateItem(idx, 'unit_price', e.target.value)}
+                            className="bg-background border-border h-10 text-sm rounded-lg text-foreground"
+                            required
+                          />
+                        </div>
+                        <div className="col-span-1 flex justify-end md:justify-center pb-2">
+                          <Button type="button" onClick={() => removeItem(idx)} variant="ghost" size="icon" className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8 w-8 rounded-lg">
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+  
+                  <div className="flex justify-start">
+                    <Button type="button" onClick={addItem} variant="ghost" size="sm" className="text-emerald-600 hover:text-emerald-500 hover:bg-emerald-500/10 font-bold rounded-xl h-9 px-3">
+                      <Plus className="w-4 h-4 mr-1" /> Add Item Row
+                    </Button>
+                  </div>
+                </div>
+  
+                {/* Terms & Notes */}
+                <div className="space-y-2">
+                  <Label className="text-foreground/80">Terms & Special Notes</Label>
+                  <textarea
+                    className="w-full bg-background border border-border rounded-xl p-3 text-sm focus:ring-2 focus:ring-emerald-500 text-foreground min-h-[80px] focus:outline-none"
+                    placeholder="Standard validities, milestone payments, etc."
+                    value={formData.notes}
+                    onChange={(e) => setFormData({...formData, notes: e.target.value})}
+                  />
+                </div>
+  
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 border-t border-border pt-6 w-full">
+                  {/* Left Side: Tax & Discount Controls */}
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2">
+                      <input 
+                        type="checkbox"
+                        id="apply_gst"
+                        checked={formData.apply_gst}
+                        onChange={(e) => setFormData({ ...formData, apply_gst: e.target.checked })}
+                        className="w-4 h-4 text-emerald-600 border-border rounded focus:ring-emerald-500 bg-background accent-emerald-600 cursor-pointer"
                       />
+                      <label htmlFor="apply_gst" className="text-xs font-bold uppercase tracking-wider text-muted-foreground cursor-pointer select-none">
+                        Apply 18% GST (9% CGST + 9% SGST)
+                      </label>
+                    </div>
+  
+                    <div className="space-y-2">
+                      <Label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Apply Commercial Discount</Label>
+                      <div className="flex gap-2">
+                        <select
+                          className="bg-background border border-border rounded-xl h-10 px-2 text-xs focus:ring-2 focus:ring-emerald-500 text-foreground focus:outline-none"
+                          value={formData.discount_type}
+                          onChange={(e) => setFormData({ ...formData, discount_type: e.target.value, discount_value: 0 })}
+                        >
+                          <option value="flat">Flat (₹)</option>
+                          <option value="percent">Percentage (%)</option>
+                        </select>
+                        <Input
+                          type="number"
+                          placeholder="Discount value..."
+                          value={formData.discount_value === 0 ? "" : formData.discount_value.toString()}
+                          onChange={(e) => setFormData({ ...formData, discount_value: Math.max(0, parseFloat(e.target.value) || 0) })}
+                          className="bg-background border-border h-10 text-sm rounded-lg text-foreground w-full"
+                        />
+                      </div>
                     </div>
                   </div>
-                </div>
-
-                {/* Right Side: Financial Breakdown */}
-                <div className="flex flex-col items-end gap-2.5">
-                  <div className="flex items-center gap-10 text-muted-foreground text-sm">
-                    <span className="font-bold uppercase tracking-widest text-[10px]">Gross Subtotal:</span>
-                    <span className="font-bold text-foreground tabular-nums">₹{calculateTotal().toLocaleString()}</span>
-                  </div>
-                  {calculateDiscountAmount() > 0 && (
-                    <div className="flex items-center gap-10 text-rose-500 text-sm">
-                      <span className="font-bold uppercase tracking-widest text-[10px]">Discount Applied:</span>
-                      <span className="font-black tabular-nums">-₹{calculateDiscountAmount().toLocaleString()}</span>
-                    </div>
-                  )}
-                  
-                  <div className="flex items-center gap-10 text-muted-foreground text-sm font-semibold border-t border-border/30 pt-1.5 w-full justify-end">
-                    <span className="font-bold uppercase tracking-widest text-[10px]">Taxable Value:</span>
-                    <span className="font-black text-foreground tabular-nums">₹{Math.max(0, calculateTotal() - calculateDiscountAmount()).toLocaleString()}</span>
-                  </div>
-
-                  {formData.apply_gst && (
+  
+                  {/* Right Side: Financial Breakdown */}
+                  <div className="flex flex-col items-end gap-2.5">
                     <div className="flex items-center gap-10 text-muted-foreground text-sm">
-                      <span className="font-bold uppercase tracking-widest text-[10px]">GST (18%):</span>
-                      <span className="font-bold text-foreground tabular-nums">₹{(Math.max(0, calculateTotal() - calculateDiscountAmount()) * 0.18).toLocaleString()}</span>
+                      <span className="font-bold uppercase tracking-widest text-[10px]">Gross Subtotal:</span>
+                      <span className="font-bold text-foreground tabular-nums">₹{calculateTotal().toLocaleString()}</span>
                     </div>
-                  )}
-                  
-                  <div className="flex items-center gap-10 border-t-2 border-border pt-2 w-full justify-end">
-                    <span className="text-sm font-black uppercase tracking-widest text-emerald-600">Grand Total:</span>
-                    <span className="text-3xl font-black text-foreground tabular-nums">
-                      ₹{(
-                        Math.max(0, calculateTotal() - calculateDiscountAmount()) * (formData.apply_gst ? 1.18 : 1)
-                      ).toLocaleString()}
-                    </span>
+                    {calculateDiscountAmount() > 0 && (
+                      <div className="flex items-center gap-10 text-rose-500 text-sm">
+                        <span className="font-bold uppercase tracking-widest text-[10px]">Discount Applied:</span>
+                        <span className="font-black tabular-nums">-₹{calculateDiscountAmount().toLocaleString()}</span>
+                      </div>
+                    )}
+                    
+                    <div className="flex items-center gap-10 text-muted-foreground text-sm font-semibold border-t border-border/30 pt-1.5 w-full justify-end">
+                      <span className="font-bold uppercase tracking-widest text-[10px]">Taxable Value:</span>
+                      <span className="font-black text-foreground tabular-nums">₹{Math.max(0, calculateTotal() - calculateDiscountAmount()).toLocaleString()}</span>
+                    </div>
+  
+                    {formData.apply_gst && (
+                      <div className="flex items-center gap-10 text-muted-foreground text-sm">
+                        <span className="font-bold uppercase tracking-widest text-[10px]">GST (18%):</span>
+                        <span className="font-bold text-foreground tabular-nums">₹{(Math.max(0, calculateTotal() - calculateDiscountAmount()) * 0.18).toLocaleString()}</span>
+                      </div>
+                    )}
+                    
+                    <div className="flex items-center gap-10 border-t-2 border-border pt-2 w-full justify-end">
+                      <span className="text-sm font-black uppercase tracking-widest text-emerald-600">Grand Total:</span>
+                      <span className="text-3xl font-black text-foreground tabular-nums">
+                        ₹{(
+                          Math.max(0, calculateTotal() - calculateDiscountAmount()) * (formData.apply_gst ? 1.18 : 1)
+                        ).toLocaleString()}
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
-
-              <DialogFooter>
-                <Button type="submit" disabled={submitting} className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold w-full h-12 shadow-xl shadow-emerald-500/20 rounded-xl border-0">
-                  {submitting 
-                    ? (editMode ? "Updating Proposal..." : "Generating Proposal...") 
-                    : (editMode ? "Update & Save Proposal" : "Finalize & Send Quotation")}
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
+  
+                <DialogFooter>
+                  <Button type="submit" disabled={submitting} className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold w-full h-12 shadow-xl shadow-emerald-500/20 rounded-xl border-0">
+                    {submitting 
+                      ? (editMode ? "Updating Proposal..." : "Generating Proposal...") 
+                      : (editMode ? "Update & Save Proposal" : "Finalize & Send Quotation")}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
       <div className="bg-card/40 border border-border rounded-[2.5rem] overflow-hidden shadow-sm backdrop-blur-md">
@@ -657,29 +662,33 @@ function QuotationsContent() {
                           <DropdownMenuItem onClick={() => handleViewDetails(q)} className="hover:bg-emerald-500/10 cursor-pointer flex items-center gap-3 py-3 rounded-xl font-bold text-sm transition-colors">
                             <FileText className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> View Details
                           </DropdownMenuItem>
-                          {q.status === 'DRAFT' && (
+                          {!isClient && (
                             <>
-                              <DropdownMenuItem onClick={() => handleEditQuotation(q)} className="hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 cursor-pointer flex items-center gap-3 py-3 rounded-xl font-bold text-sm">
-                                <Calculator className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> Edit Proposal
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleUpdateStatus(q.id, 'SENT')} className="hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 cursor-pointer flex items-center gap-3 py-3 rounded-xl font-bold text-sm">
-                                <CheckCircle2 className="w-4 h-4" /> Mark as Sent
+                              {q.status === 'DRAFT' && (
+                                <>
+                                  <DropdownMenuItem onClick={() => handleEditQuotation(q)} className="hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 cursor-pointer flex items-center gap-3 py-3 rounded-xl font-bold text-sm">
+                                    <Calculator className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> Edit Proposal
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handleUpdateStatus(q.id, 'SENT')} className="hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 cursor-pointer flex items-center gap-3 py-3 rounded-xl font-bold text-sm">
+                                    <CheckCircle2 className="w-4 h-4" /> Mark as Sent
+                                  </DropdownMenuItem>
+                                </>
+                              )}
+                              {q.status === 'SENT' && (
+                                 <DropdownMenuItem onClick={() => handleUpdateStatus(q.id, 'ACCEPTED')} className="hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 cursor-pointer flex items-center gap-3 py-3 rounded-xl font-bold text-sm">
+                                  <CheckCircle2 className="w-4 h-4" /> Mark as Accepted
+                                </DropdownMenuItem>
+                              )}
+                              {(q.status === 'SENT' || q.status === 'ACCEPTED') && (
+                                 <DropdownMenuItem onClick={() => handleConvertQuotation(q)} className="hover:bg-blue-500/10 text-blue-600 dark:text-blue-400 cursor-pointer flex items-center gap-3 py-3 rounded-xl font-bold text-sm">
+                                  <Banknote className="w-4 h-4" /> {q.client_id ? "Generate Project & Invoice" : "Convert Lead to Client & Project"}
+                                </DropdownMenuItem>
+                              )}
+                              <DropdownMenuItem onClick={() => handleDeleteQuotation(q.id)} className="hover:bg-rose-500/10 text-rose-600 cursor-pointer flex items-center gap-3 py-3 rounded-xl font-bold text-sm mt-1 border-t border-border transition-colors">
+                                <Trash2 className="w-4 h-4" /> Delete Draft
                               </DropdownMenuItem>
                             </>
                           )}
-                          {q.status === 'SENT' && (
-                             <DropdownMenuItem onClick={() => handleUpdateStatus(q.id, 'ACCEPTED')} className="hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 cursor-pointer flex items-center gap-3 py-3 rounded-xl font-bold text-sm">
-                              <CheckCircle2 className="w-4 h-4" /> Mark as Accepted
-                            </DropdownMenuItem>
-                          )}
-                          {(q.status === 'SENT' || q.status === 'ACCEPTED') && (
-                             <DropdownMenuItem onClick={() => handleConvertQuotation(q)} className="hover:bg-blue-500/10 text-blue-600 dark:text-blue-400 cursor-pointer flex items-center gap-3 py-3 rounded-xl font-bold text-sm">
-                              <Banknote className="w-4 h-4" /> {q.client_id ? "Generate Project & Invoice" : "Convert Lead to Client & Project"}
-                            </DropdownMenuItem>
-                          )}
-                          <DropdownMenuItem onClick={() => handleDeleteQuotation(q.id)} className="hover:bg-rose-500/10 text-rose-600 cursor-pointer flex items-center gap-3 py-3 rounded-xl font-bold text-sm mt-1 border-t border-border transition-colors">
-                            <Trash2 className="w-4 h-4" /> Delete Draft
-                          </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>

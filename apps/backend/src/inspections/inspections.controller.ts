@@ -41,8 +41,8 @@ export class InspectionsController {
   }
 
   @Get()
-  findAll() {
-    return this.inspectionsService.findAll();
+  findAll(@Req() req: any) {
+    return this.inspectionsService.findAll(req.user);
   }
 
   @Get('my')

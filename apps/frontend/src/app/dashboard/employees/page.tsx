@@ -46,6 +46,7 @@ interface Employee {
   department?: string;
   employee_id?: string;
   is_active: boolean;
+  is_on_hold: boolean;
   base_salary?: any;
   leave_balance: number;
 }
@@ -328,6 +329,25 @@ export default function EmployeesPage() {
     }
   };
 
+  const handleToggleOnHold = async (emp: Employee) => {
+    if (!token) return;
+    const action = emp.is_on_hold ? 'resume duty for' : 'put on hold';
+    if (!confirm(`Are you sure you want to ${action} ${emp.name}?`)) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/users/${emp.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ is_on_hold: !emp.is_on_hold })
+      });
+      if (res.ok) fetchEmployees();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const filteredEmployees = employees.filter((emp) => {
     if (!searchQuery) return true;
     const query = searchQuery.toLowerCase();
@@ -382,10 +402,14 @@ export default function EmployeesPage() {
                       value={onboardForm.role_id} 
                       onChange={(e) => {
                         const selectedRole = roles.find(r => r.id === e.target.value);
+                        const roleName = selectedRole ? selectedRole.name : "";
+                        const isClient = roleName === "CLIENT" || roleName === "CLIENTS";
                         setOnboardForm({
                           ...onboardForm, 
                           role_id: e.target.value,
-                          designation: selectedRole ? selectedRole.name.replace(/_/g, ' ') : ""
+                          designation: selectedRole ? selectedRole.name.replace(/_/g, ' ') : "",
+                          department: isClient ? "" : onboardForm.department,
+                          base_salary: isClient ? "" : onboardForm.base_salary
                         });
                       }} 
                       required
@@ -397,34 +421,57 @@ export default function EmployeesPage() {
                       ))}
                     </select>
                   </div>
-                  <div className="space-y-2">
-                    <Label className="text-xs font-bold uppercase tracking-widest opacity-70">Department *</Label>
-                    <select 
-                      value={onboardForm.department} 
-                      onChange={(e) => setOnboardForm({...onboardForm, department: e.target.value})} 
-                      required
-                      className="w-full h-12 px-4 bg-background/50 border border-border rounded-xl focus:ring-emerald-500 focus:outline-none appearance-none"
-                    >
-                      <option value="" disabled>Select Department</option>
-                      <option value="Human Resources">Human Resources</option>
-                      <option value="Sales & CRM">Sales & CRM</option>
-                      <option value="Engineering & Field Operations">Engineering & Field Operations</option>
-                      <option value="Administration">Administration</option>
-                      <option value="Finance">Finance</option>
-                    </select>
-                  </div>
+                  {(() => {
+                    const selectedRole = roles.find(r => r.id === onboardForm.role_id);
+                    const isClient = selectedRole && (selectedRole.name === "CLIENT" || selectedRole.name === "CLIENTS");
+                    if (isClient) return null;
+                    return (
+                      <div className="space-y-2">
+                        <Label className="text-xs font-bold uppercase tracking-widest opacity-70">Department *</Label>
+                        <select 
+                          value={onboardForm.department} 
+                          onChange={(e) => setOnboardForm({...onboardForm, department: e.target.value})} 
+                          required
+                          className="w-full h-12 px-4 bg-background/50 border border-border rounded-xl focus:ring-emerald-500 focus:outline-none appearance-none"
+                        >
+                          <option value="" disabled>Select Department</option>
+                          <option value="Human Resources">Human Resources</option>
+                          <option value="Sales & CRM">Sales & CRM</option>
+                          <option value="Engineering & Field Operations">Engineering & Field Operations</option>
+                          <option value="Administration">Administration</option>
+                          <option value="Finance">Finance</option>
+                        </select>
+                      </div>
+                    );
+                  })()}
                 </div>
 
-                <div className="grid grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label className="text-xs font-bold uppercase tracking-widest opacity-70">Monthly Base Salary (₹) *</Label>
-                    <Input type="number" required value={onboardForm.base_salary} onChange={(e) => setOnboardForm({...onboardForm, base_salary: e.target.value})} className="h-12 bg-background/50 border-border rounded-xl focus:ring-emerald-500 font-mono" placeholder="45000" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-xs font-bold uppercase tracking-widest opacity-70">Contact Number</Label>
-                    <Input value={onboardForm.phone} onChange={(e) => setOnboardForm({...onboardForm, phone: e.target.value})} className="h-12 bg-background/50 border-border rounded-xl focus:ring-emerald-500" placeholder="+91 98765 43210" />
-                  </div>
-                </div>
+                {(() => {
+                  const selectedRole = roles.find(r => r.id === onboardForm.role_id);
+                  const isClient = selectedRole && (selectedRole.name === "CLIENT" || selectedRole.name === "CLIENTS");
+                  if (isClient) {
+                    return (
+                      <div className="grid grid-cols-1 gap-6">
+                        <div className="space-y-2">
+                          <Label className="text-xs font-bold uppercase tracking-widest opacity-70">Contact Number</Label>
+                          <Input value={onboardForm.phone} onChange={(e) => setOnboardForm({...onboardForm, phone: e.target.value})} className="h-12 bg-background/50 border-border rounded-xl focus:ring-emerald-500" placeholder="+91 98765 43210" />
+                        </div>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div className="grid grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <Label className="text-xs font-bold uppercase tracking-widest opacity-70">Monthly Base Salary (₹) *</Label>
+                        <Input type="number" required value={onboardForm.base_salary} onChange={(e) => setOnboardForm({...onboardForm, base_salary: e.target.value})} className="h-12 bg-background/50 border-border rounded-xl focus:ring-emerald-500 font-mono" placeholder="45000" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs font-bold uppercase tracking-widest opacity-70">Contact Number</Label>
+                        <Input value={onboardForm.phone} onChange={(e) => setOnboardForm({...onboardForm, phone: e.target.value})} className="h-12 bg-background/50 border-border rounded-xl focus:ring-emerald-500" placeholder="+91 98765 43210" />
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 <div className="grid grid-cols-2 gap-6">
                   <div className="space-y-2">
@@ -567,10 +614,20 @@ export default function EmployeesPage() {
                   <td className="px-8 py-6">
                     <div className={cn(
                       "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border",
-                      emp.is_active ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20" : "bg-rose-500/10 text-rose-600 border-rose-500/20"
+                      !emp.is_active 
+                        ? "bg-rose-500/10 text-rose-600 border-rose-500/20" 
+                        : emp.is_on_hold 
+                          ? "bg-amber-500/10 text-amber-600 border-amber-500/20" 
+                          : "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
                     )}>
-                      {emp.is_active ? <CheckCircle2 className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
-                      {emp.is_active ? "Active" : "On Hold"}
+                      {!emp.is_active ? (
+                        <XCircle className="w-3 h-3" />
+                      ) : emp.is_on_hold ? (
+                        <AlertCircle className="w-3 h-3" />
+                      ) : (
+                        <CheckCircle2 className="w-3 h-3" />
+                      )}
+                      {!emp.is_active ? "Deactivated" : emp.is_on_hold ? "On Hold" : "Active"}
                     </div>
                   </td>
                   <td className="px-8 py-6 text-right">
@@ -588,6 +645,11 @@ export default function EmployeesPage() {
                         <DropdownMenuItem onClick={() => openEdit(emp)} className="flex items-center gap-3 p-3 rounded-xl cursor-pointer focus:bg-blue-500/10 focus:text-blue-500 font-bold text-sm">
                           <ExternalLink className="w-4 h-4" /> Modify Credentials
                         </DropdownMenuItem>
+                        {emp.is_active && (
+                          <DropdownMenuItem onClick={() => handleToggleOnHold(emp)} className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer font-bold text-sm ${emp.is_on_hold ? 'text-emerald-600 focus:bg-emerald-500/10' : 'text-amber-600 focus:bg-amber-500/10'}`}>
+                            {emp.is_on_hold ? <><CheckCircle2 className="w-4 h-4" /> Resume Duty</> : <><AlertCircle className="w-4 h-4" /> Put on Hold</>}
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuItem onClick={() => handleDeactivateEmployee(emp)} className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer font-bold text-sm mt-1 border-t border-border ${emp.is_active ? 'text-rose-600 focus:bg-rose-500/10' : 'text-emerald-600 focus:bg-emerald-500/10'}`}>
                           {emp.is_active ? <><UserX className="w-4 h-4" /> Deactivate Staff</> : <><CheckCircle2 className="w-4 h-4" /> Reactivate Staff</>}
                         </DropdownMenuItem>

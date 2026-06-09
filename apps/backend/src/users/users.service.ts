@@ -46,6 +46,7 @@ export class UsersService {
         email: true,
         phone: true,
         is_active: true,
+        is_on_hold: true,
         designation: true,
         department: true,
         employee_id: true,
@@ -65,6 +66,7 @@ export class UsersService {
         email: data.email || undefined,
         phone: data.phone || undefined,
         is_active: data.is_active !== undefined ? data.is_active : undefined,
+        is_on_hold: data.is_on_hold !== undefined ? data.is_on_hold : undefined,
         designation: data.designation || undefined,
         department: data.department || undefined,
         address: data.address || undefined,
@@ -102,7 +104,7 @@ export class UsersService {
 
     const { role_id, ...userData } = data;
 
-    return this.prisma.user.create({
+    const createdUser = await this.prisma.user.create({
       data: {
         ...userData,
         employee_id: employeeId,
@@ -117,6 +119,72 @@ export class UsersService {
         } : undefined
       },
     });
+
+    // Handle automatically linking or creating Client company record when CLIENT user is added
+    let isClientRole = false;
+    if (role_id) {
+      const role = await this.prisma.role.findUnique({
+        where: { id: role_id },
+      });
+      if (role?.name === 'CLIENT' || role?.name === 'CLIENTS') {
+        isClientRole = true;
+      }
+    }
+    const isClientDesignation = (userData.designation || '').toUpperCase().includes('CLIENT');
+    const isClient = isClientRole || isClientDesignation;
+
+    if (isClient && userData.email) {
+      let clientRecord = await this.prisma.client.findFirst({
+        where: { email: userData.email },
+      });
+
+      if (!clientRecord) {
+        clientRecord = await this.prisma.client.create({
+          data: {
+            name: userData.name,
+            email: userData.email,
+            phone: userData.phone || '',
+            industry: 'General',
+            is_active: true,
+          },
+        });
+      }
+
+      // Link any matching leads with this email to the client record
+      await this.prisma.lead.updateMany({
+        where: {
+          email: userData.email,
+          client_id: null,
+        },
+        data: {
+          client_id: clientRecord.id,
+          status: 'WON',
+        },
+      });
+
+      // Find any quotations belonging to leads with the same email
+      const matchingQuotations = await this.prisma.quotation.findMany({
+        where: {
+          client_id: null,
+          lead: {
+            email: userData.email,
+          },
+        },
+      });
+
+      if (matchingQuotations.length > 0) {
+        await this.prisma.quotation.updateMany({
+          where: {
+            id: { in: matchingQuotations.map(q => q.id) },
+          },
+          data: {
+            client_id: clientRecord.id,
+          },
+        });
+      }
+    }
+
+    return createdUser;
   }
 
   async getEmployeeProfile(id: string) {

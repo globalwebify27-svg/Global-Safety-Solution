@@ -224,6 +224,10 @@ export class RBACService {
         name: 'OFFICE_ADMIN',
         description: 'General office management access.',
       },
+      {
+        name: 'CLIENT',
+        description: 'Access to project reports, invoices, and certificates.',
+      },
     ];
 
     for (const role of roles) {
@@ -243,6 +247,7 @@ export class RBACService {
       SALES_EXECUTIVE: allPerms.filter(p => ['DASHBOARD', 'SALES', 'FINANCE', 'CLIENTS'].includes(p.module)).map(p => p.id),
       FIELD_ENGINEER: allPerms.filter(p => ['DASHBOARD', 'FIELD_TASKS'].includes(p.module)).map(p => p.id),
       OFFICE_ADMIN: allPerms.filter(p => p.module !== 'FIELD_TASKS' && p.module !== 'SYSTEM').map(p => p.id),
+      CLIENT: allPerms.filter(p => p.name === 'READ_DOCUMENT').map(p => p.id),
     };
 
     for (const [roleName, permIds] of Object.entries(rolePermissionMapping)) {

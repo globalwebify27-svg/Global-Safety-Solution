@@ -85,6 +85,10 @@ export default function DocumentVaultPage() {
   const [activeQrDoc, setActiveQrDoc] = useState<Document | null>(null);
 
   const token = useAuthStore((state) => state.token);
+  const user = useAuthStore((state) => state.user);
+  const roleName = user?.roles?.[0]?.role?.name || "";
+  const designation = (user?.designation || "").toUpperCase();
+  const isClient = roleName === "CLIENT" || designation.includes("CLIENT");
 
   const [formData, setFormData] = useState({
     name: "",
@@ -238,101 +242,103 @@ export default function DocumentVaultPage() {
           <p className="text-muted-foreground font-medium">Enterprise-grade storage for safety certificates, audit reports, and contracts.</p>
         </div>
 
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger render={<Button className="bg-blue-600 hover:bg-blue-500 text-white font-bold shadow-xl shadow-blue-500/20 px-8 h-12 transition-all active:scale-95 border-0" />}>
-            <FilePlus className="w-5 h-5 mr-2" /> Deposit Document
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[600px] bg-card border-border text-foreground shadow-2xl rounded-[2rem]">
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-600 via-cyan-500 to-emerald-600" />
-            <DialogHeader>
-              <DialogTitle className="text-2xl font-bold">Secure Document Deposit</DialogTitle>
-              <DialogDescription className="text-muted-foreground">Register a new document in the centralized safety registry.</DialogDescription>
-            </DialogHeader>
-            <form onSubmit={handleUpload} className="space-y-4 mt-4">
-              <div className="space-y-2">
-                <Label>Document Name / Title *</Label>
-                <Input required value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="e.g. Fire Safety Certificate 2026" className="bg-background border-border text-foreground" />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
+        {!isClient && (
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger render={<Button className="bg-blue-600 hover:bg-blue-500 text-white font-bold shadow-xl shadow-blue-500/20 px-8 h-12 transition-all active:scale-95 border-0" />}>
+              <FilePlus className="w-5 h-5 mr-2" /> Deposit Document
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[600px] bg-card border-border text-foreground shadow-2xl rounded-[2rem]">
+              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-600 via-cyan-500 to-emerald-600" />
+              <DialogHeader>
+                <DialogTitle className="text-2xl font-bold">Secure Document Deposit</DialogTitle>
+                <DialogDescription className="text-muted-foreground">Register a new document in the centralized safety registry.</DialogDescription>
+              </DialogHeader>
+              <form onSubmit={handleUpload} className="space-y-4 mt-4">
                 <div className="space-y-2">
-                  <Label>Category</Label>
-                  <select value={formData.category} onChange={(e) => setFormData({ ...formData, category: e.target.value })} className="w-full bg-background border border-border rounded-md h-10 px-3 text-sm text-foreground">
-                    <option value="CERTIFICATE">CERTIFICATE</option>
-                    <option value="REPORT">AUDIT REPORT</option>
-                    <option value="CONTRACT">CONTRACT / SLA</option>
-                    <option value="INVOICE">INVOICE</option>
-                    <option value="OTHER">OTHER</option>
-                  </select>
+                  <Label>Document Name / Title *</Label>
+                  <Input required value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="e.g. Fire Safety Certificate 2026" className="bg-background border-border text-foreground" />
                 </div>
-                <div className="space-y-2">
-                  <Label>File Type</Label>
-                  <select value={formData.file_type} onChange={(e) => setFormData({ ...formData, file_type: e.target.value })} className="w-full bg-background border border-border rounded-md h-10 px-3 text-sm text-foreground">
-                    <option value="PDF">PDF Document</option>
-                    <option value="IMAGE">Image / JPEG</option>
-                    <option value="DOC">Word Document</option>
-                  </select>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Upload Document File *</Label>
-                <div className="relative group cursor-pointer">
-                  <input
-                    type="file"
-                    required
-                    onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
-                    className="absolute inset-0 opacity-0 cursor-pointer z-10"
-                  />
-                  <div className="w-full h-24 bg-background border-2 border-dashed border-border rounded-xl flex flex-col items-center justify-center group-hover:border-blue-500/50 transition-all">
-                    <FilePlus className="w-6 h-6 text-muted-foreground mb-2 group-hover:text-blue-600 dark:group-hover:text-blue-400" />
-                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
-                      {selectedFile ? selectedFile.name : "Select or Drop File"}
-                    </span>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Category</Label>
+                    <select value={formData.category} onChange={(e) => setFormData({ ...formData, category: e.target.value })} className="w-full bg-background border border-border rounded-md h-10 px-3 text-sm text-foreground">
+                      <option value="CERTIFICATE">CERTIFICATE</option>
+                      <option value="REPORT">AUDIT REPORT</option>
+                      <option value="CONTRACT">CONTRACT / SLA</option>
+                      <option value="INVOICE">INVOICE</option>
+                      <option value="OTHER">OTHER</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>File Type</Label>
+                    <select value={formData.file_type} onChange={(e) => setFormData({ ...formData, file_type: e.target.value })} className="w-full bg-background border border-border rounded-md h-10 px-3 text-sm text-foreground">
+                      <option value="PDF">PDF Document</option>
+                      <option value="IMAGE">Image / JPEG</option>
+                      <option value="DOC">Word Document</option>
+                    </select>
                   </div>
                 </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Link to Client</Label>
-                  <select value={formData.client_id} onChange={(e) => setFormData({ ...formData, client_id: e.target.value })} className="w-full bg-background border border-border rounded-md h-10 px-3 text-sm text-foreground">
-                    <option value="">None (General)</option>
-                    {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </select>
+                  <Label>Upload Document File *</Label>
+                  <div className="relative group cursor-pointer">
+                    <input
+                      type="file"
+                      required
+                      onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                      className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                    />
+                    <div className="w-full h-24 bg-background border-2 border-dashed border-border rounded-xl flex flex-col items-center justify-center group-hover:border-blue-500/50 transition-all">
+                      <FilePlus className="w-6 h-6 text-muted-foreground mb-2 group-hover:text-blue-600 dark:group-hover:text-blue-400" />
+                      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                        {selectedFile ? selectedFile.name : "Select or Drop File"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Link to Client</Label>
+                    <select value={formData.client_id} onChange={(e) => setFormData({ ...formData, client_id: e.target.value })} className="w-full bg-background border border-border rounded-md h-10 px-3 text-sm text-foreground">
+                      <option value="">None (General)</option>
+                      {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Link to Project</Label>
+                    <select value={formData.project_id} onChange={(e) => setFormData({ ...formData, project_id: e.target.value })} className="w-full bg-background border border-border rounded-md h-10 px-3 text-sm text-foreground">
+                      <option value="">None</option>
+                      {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Test Date</Label>
+                    <Input type="date" value={formData.test_date} onChange={(e) => setFormData({ ...formData, test_date: e.target.value })} className="bg-background border-border text-foreground" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Expiry Date</Label>
+                    <Input type="date" value={formData.expiry_date} onChange={(e) => setFormData({ ...formData, expiry_date: e.target.value })} className="bg-background border-border text-foreground" />
+                  </div>
                 </div>
                 <div className="space-y-2">
-                  <Label>Link to Project</Label>
-                  <select value={formData.project_id} onChange={(e) => setFormData({ ...formData, project_id: e.target.value })} className="w-full bg-background border border-border rounded-md h-10 px-3 text-sm text-foreground">
-                    <option value="">None</option>
-                    {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                  </select>
+                  <Label>Internal Notes / Context</Label>
+                  <textarea
+                    value={formData.notes}
+                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                    placeholder="e.g. Area 3 mechanical inspection clearance certificate..."
+                    className="w-full bg-background border border-border rounded-xl p-3 text-sm text-foreground focus:ring-1 focus:ring-blue-500 focus:outline-none min-h-[80px] resize-none"
+                  />
                 </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Test Date</Label>
-                  <Input type="date" value={formData.test_date} onChange={(e) => setFormData({ ...formData, test_date: e.target.value })} className="bg-background border-border text-foreground" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Expiry Date</Label>
-                  <Input type="date" value={formData.expiry_date} onChange={(e) => setFormData({ ...formData, expiry_date: e.target.value })} className="bg-background border-border text-foreground" />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Internal Notes / Context</Label>
-                <textarea
-                  value={formData.notes}
-                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  placeholder="e.g. Area 3 mechanical inspection clearance certificate..."
-                  className="w-full bg-background border border-border rounded-xl p-3 text-sm text-foreground focus:ring-1 focus:ring-blue-500 focus:outline-none min-h-[80px] resize-none"
-                />
-              </div>
-              <DialogFooter className="pt-4">
-                <Button type="submit" disabled={submitting} className="bg-blue-600 hover:bg-blue-500 text-white font-bold w-full h-12 border-0">
-                  {submitting ? "Encrypting & Storing..." : "Commit to Vault"}
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
+                <DialogFooter className="pt-4">
+                  <Button type="submit" disabled={submitting} className="bg-blue-600 hover:bg-blue-500 text-white font-bold w-full h-12 border-0">
+                    {submitting ? "Encrypting & Storing..." : "Commit to Vault"}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">

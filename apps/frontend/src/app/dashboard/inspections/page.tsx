@@ -115,8 +115,10 @@ export default function InspectionsPage() {
     items: [{ description: "General Safety Check" }]
   });
 
-  const token = useAuthStore((state) => state.token);
-  const user = useAuthStore((state) => state.user);
+  const { token, user } = useAuthStore();
+  const roleName = user?.roles?.[0]?.role?.name || "";
+  const designation = (user?.designation || "").toUpperCase();
+  const isClient = roleName === "CLIENT" || designation.includes("CLIENT");
 
   useEffect(() => {
     if (selectedInspection) {
@@ -459,6 +461,7 @@ export default function InspectionsPage() {
   const isAuthorized = user?.email === "admin@globalsafety.com" ||
     user?.name?.toLowerCase().includes("admin") ||
     user?.role === "ADMIN" || 
+    isClient ||
     ((user?.designation && (
       user.designation.toLowerCase().includes("admin") || 
       user.designation.toLowerCase().includes("executive") ||
@@ -494,116 +497,116 @@ export default function InspectionsPage() {
           <h1 className="text-4xl font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">
             Site Inspections
           </h1>
-          <p className="text-muted-foreground font-medium">Manage field safety audits, engineer visits, and checklists.</p>
         </div>
-
-        <Dialog open={openSchedule} onOpenChange={setOpenSchedule}>
-          <DialogTrigger render={
-            <Button className="rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-bold shadow-xl shadow-blue-500/20 px-8 h-12 transition-all active:scale-95">
-              <Plus className="w-5 h-5 mr-2" /> Schedule Visit
-            </Button>
-          } />
-          <DialogContent className="sm:max-w-[600px] bg-card border-border rounded-[2.5rem]">
-            <DialogHeader>
-              <DialogTitle className="text-2xl font-bold">Schedule Safety Audit</DialogTitle>
-              <DialogDescription>Assign an engineer and set the inspection scope.</DialogDescription>
-            </DialogHeader>
-            <form onSubmit={handleSchedule} className="space-y-6 mt-4">
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Target Client</Label>
-                  <select 
-                    required
-                    value={scheduleForm.client_id}
-                    onChange={(e) => setScheduleForm({...scheduleForm, client_id: e.target.value})}
-                    className="w-full h-11 px-4 bg-background border border-border rounded-xl text-sm"
-                  >
-                    <option value="">Select client...</option>
-                    {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Assign Engineer</Label>
-                  <select 
-                    required
-                    value={scheduleForm.engineer_id}
-                    onChange={(e) => setScheduleForm({...scheduleForm, engineer_id: e.target.value})}
-                    className="w-full h-11 px-4 bg-background border border-border rounded-xl text-sm"
-                  >
-                    <option value="">Select engineer...</option>
-                    {engineers.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Scheduled Date</Label>
-                  <Input 
-                    type="date"
-                    value={scheduleForm.scheduled_date}
-                    onChange={(e) => setScheduleForm({...scheduleForm, scheduled_date: e.target.value})}
-                    className="h-11 bg-background border-border"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-sm font-semibold">Inspection Checklist Items</Label>
-                    <Button 
-                      type="button" 
-                      variant="ghost" 
-                      size="sm" 
-                      onClick={() => {
-                        setScheduleForm(prev => ({
-                          ...prev,
-                          items: [...prev.items, { description: "" }]
-                        }));
-                      }} 
-                      className="text-blue-600 hover:text-blue-500 font-bold flex items-center gap-1"
+        {!isClient && (
+          <Dialog open={openSchedule} onOpenChange={setOpenSchedule}>
+            <DialogTrigger render={
+              <Button className="rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-bold shadow-xl shadow-blue-500/20 px-8 h-12 transition-all active:scale-95">
+                <Plus className="w-5 h-5 mr-2" /> Schedule Visit
+              </Button>
+            } />
+            <DialogContent className="sm:max-w-[600px] bg-card border-border rounded-[2.5rem]">
+              <DialogHeader>
+                <DialogTitle className="text-2xl font-bold">Schedule Safety Audit</DialogTitle>
+                <DialogDescription>Assign an engineer and set the inspection scope.</DialogDescription>
+              </DialogHeader>
+              <form onSubmit={handleSchedule} className="space-y-6 mt-4">
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Target Client</Label>
+                    <select 
+                      required
+                      value={scheduleForm.client_id}
+                      onChange={(e) => setScheduleForm({...scheduleForm, client_id: e.target.value})}
+                      className="w-full h-11 px-4 bg-background border border-border rounded-xl text-sm"
                     >
-                      <Plus className="w-3.5 h-3.5" /> Add Question
-                    </Button>
+                      <option value="">Select client...</option>
+                      {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    </select>
                   </div>
-                  <div className="space-y-2 max-h-[180px] overflow-y-auto pr-1">
-                    {scheduleForm.items.map((item, idx) => (
-                      <div key={idx} className="flex items-center gap-2">
-                        <Input 
-                          required 
-                          value={item.description} 
-                          onChange={(e) => {
-                            const newItems = [...scheduleForm.items];
-                            newItems[idx] = { description: e.target.value };
-                            setScheduleForm(prev => ({ ...prev, items: newItems }));
-                          }} 
-                          placeholder={`Question ${idx + 1}`} 
-                          className="h-10 bg-background border-border"
-                        />
-                        {scheduleForm.items.length > 1 && (
-                          <Button 
-                            type="button" 
-                            variant="ghost" 
-                            size="icon" 
-                            onClick={() => {
-                              setScheduleForm(prev => ({
-                                ...prev,
-                                items: prev.items.filter((_, i) => i !== idx)
-                              }));
+                  <div className="space-y-2">
+                    <Label>Assign Engineer</Label>
+                    <select 
+                      required
+                      value={scheduleForm.engineer_id}
+                      onChange={(e) => setScheduleForm({...scheduleForm, engineer_id: e.target.value})}
+                      className="w-full h-11 px-4 bg-background border border-border rounded-xl text-sm"
+                    >
+                      <option value="">Select engineer...</option>
+                      {engineers.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Scheduled Date</Label>
+                    <Input 
+                      type="date"
+                      value={scheduleForm.scheduled_date}
+                      onChange={(e) => setScheduleForm({...scheduleForm, scheduled_date: e.target.value})}
+                      className="h-11 bg-background border-border"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm font-semibold">Inspection Checklist Items</Label>
+                      <Button 
+                        type="button" 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => {
+                          setScheduleForm(prev => ({
+                            ...prev,
+                            items: [...prev.items, { description: "" }]
+                          }));
+                        }} 
+                        className="text-blue-600 hover:text-blue-500 font-bold flex items-center gap-1"
+                      >
+                        <Plus className="w-3.5 h-3.5" /> Add Question
+                      </Button>
+                    </div>
+                    <div className="space-y-2 max-h-[180px] overflow-y-auto pr-1">
+                      {scheduleForm.items.map((item, idx) => (
+                        <div key={idx} className="flex items-center gap-2">
+                          <Input 
+                            required 
+                            value={item.description} 
+                            onChange={(e) => {
+                              const newItems = [...scheduleForm.items];
+                              newItems[idx] = { description: e.target.value };
+                              setScheduleForm(prev => ({ ...prev, items: newItems }));
                             }} 
-                            className="text-rose-500 hover:text-rose-600 shrink-0"
-                          >
-                            <X className="w-4 h-4" />
-                          </Button>
-                        )}
-                      </div>
-                    ))}
+                            placeholder={`Question ${idx + 1}`} 
+                            className="h-10 bg-background border-border"
+                          />
+                          {scheduleForm.items.length > 1 && (
+                            <Button 
+                              type="button" 
+                              variant="ghost" 
+                              size="icon" 
+                              onClick={() => {
+                                setScheduleForm(prev => ({
+                                  ...prev,
+                                  items: prev.items.filter((_, i) => i !== idx)
+                                }));
+                              }} 
+                              className="text-rose-500 hover:text-rose-600 shrink-0"
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
-              </div>
-              <DialogFooter>
-                <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold h-12 rounded-xl shadow-lg shadow-blue-500/20">
-                  Confirm Schedule
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
+                <DialogFooter>
+                  <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold h-12 rounded-xl shadow-lg shadow-blue-500/20">
+                    Confirm Schedule
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -707,7 +710,31 @@ export default function InspectionsPage() {
                     </td>
                     <td className="px-8 py-6 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        {i.status === 'COMPLETED' ? (
+                        {isClient ? (
+                          <>
+                            <Button 
+                              variant="ghost" 
+                              className="h-9 px-3 rounded-xl text-xs font-bold text-muted-foreground hover:bg-muted/10 flex items-center gap-1"
+                              onClick={() => {
+                                setSelectedInspection(i);
+                                setUploadedPhotoUrls(parseRemarksPhotos(i.remarks));
+                                setOpenVisit(true);
+                              }}
+                            >
+                              View Details
+                            </Button>
+                            {i.status === 'COMPLETED' && (
+                              <Button 
+                                variant="ghost" 
+                                size="icon"
+                                className="h-9 w-9 rounded-xl text-emerald-600 hover:bg-emerald-500/10"
+                                onClick={() => handleDownloadCertificate(i.id)}
+                              >
+                                <Download className="w-4 h-4" />
+                              </Button>
+                            )}
+                          </>
+                        ) : i.status === 'COMPLETED' ? (
                           <>
                             <Button 
                               variant="ghost" 
@@ -756,144 +783,51 @@ export default function InspectionsPage() {
       <Dialog open={openVisit} onOpenChange={setOpenVisit}>
         <DialogContent className="sm:max-w-[700px] bg-card border-border rounded-[2.5rem] max-h-[90vh] overflow-y-auto">
           {selectedInspection && (
-            <div className="space-y-6">
-              <DialogHeader>
-                <DialogTitle className="text-2xl font-black flex items-center gap-3">
-                  <ClipboardCheck className="w-6 h-6 text-blue-600" /> {selectedInspection.status === 'PENDING_REVIEW' ? 'Office Review & Issuance' : 'Inspection Checklist'}
-                </DialogTitle>
-                <DialogDescription>
-                  Site Visit for <span className="font-bold text-foreground">{selectedInspection.client?.name}</span>
-                </DialogDescription>
-              </DialogHeader>
+            isClient ? (
+              <div className="space-y-6">
+                <DialogHeader>
+                  <DialogTitle className="text-2xl font-black flex items-center gap-3">
+                    <ClipboardCheck className="w-6 h-6 text-blue-600" /> Site Audit Details
+                  </DialogTitle>
+                  <DialogDescription>
+                    Inspection status and checklist for <span className="font-bold text-foreground">{selectedInspection.client?.name}</span>
+                  </DialogDescription>
+                </DialogHeader>
 
-              {/* Rejection Banner */}
-              {selectedInspection.status === 'REJECTED' && selectedInspection.admin_feedback && (
-                <div className="p-4 bg-rose-500/10 border border-rose-500/25 rounded-2xl flex items-start gap-3">
-                  <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                {/* Audit Basic Info */}
+                <div className="p-5 bg-muted/20 border border-border rounded-2xl grid grid-cols-2 gap-4 text-sm">
                   <div>
-                    <h5 className="text-sm font-bold text-rose-800">Changes Requested by Office Staff</h5>
-                    <p className="text-xs text-rose-600 mt-1">{selectedInspection.admin_feedback}</p>
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase">Scheduled Date</span>
+                    <p className="font-bold mt-0.5">{new Date(selectedInspection.scheduled_date).toLocaleDateString()}</p>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase">Audit Status</span>
+                    <p className="mt-0.5">
+                      <span className={cn("px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-tight ring-1",
+                        selectedInspection.status === 'COMPLETED' ? 'bg-emerald-500/10 text-emerald-600 ring-emerald-500/20' :
+                        selectedInspection.status === 'REJECTED' ? 'bg-rose-500/10 text-rose-600 ring-rose-500/20' :
+                        selectedInspection.status === 'PENDING_REVIEW' ? 'bg-amber-500/10 text-amber-600 ring-amber-500/20' :
+                        selectedInspection.status === 'SCHEDULED' ? 'bg-blue-500/10 text-blue-600 ring-blue-500/20' :
+                        'bg-slate-500/10 text-slate-600 ring-slate-500/20'
+                      )}>
+                        {selectedInspection.status}
+                      </span>
+                    </p>
+                  </div>
+                  <div className="col-span-2">
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase">Assigned Field Engineer</span>
+                    <p className="font-bold mt-0.5">{selectedInspection.engineer?.name || "Unassigned"}</p>
                   </div>
                 </div>
-              )}
 
-              {/* Sleek inline Audit Management & Settings Bar */}
-              <div className="p-5 bg-blue-500/5 border border-blue-500/10 rounded-2xl space-y-4 shadow-inner">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-black text-blue-600 uppercase tracking-widest">Audit settings & assignment</h4>
-                  <span className={cn("px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-tight ring-1",
-                    selectedInspection.status === 'COMPLETED' ? 'bg-emerald-500/10 text-emerald-600 ring-emerald-500/20' :
-                    selectedInspection.status === 'REJECTED' ? 'bg-rose-500/10 text-rose-600 ring-rose-500/20' :
-                    selectedInspection.status === 'PENDING_REVIEW' ? 'bg-amber-500/10 text-amber-600 ring-amber-500/20' :
-                    selectedInspection.status === 'SCHEDULED' ? 'bg-blue-500/10 text-blue-600 ring-blue-500/20' :
-                    'bg-slate-500/10 text-slate-600 ring-slate-500/20'
-                  )}>
-                    CURRENT STATE: {selectedInspection.status}
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-muted-foreground uppercase">Assign Engineer</label>
-                    <select
-                      value={selectedInspection.engineer_id || ""}
-                      onChange={async (e) => {
-                        const newEngineerId = e.target.value;
-                        if (!token) return;
-                        try {
-                          const res = await fetch(`${API_BASE_URL}/inspections/${selectedInspection.id}`, {
-                            method: 'PATCH',
-                            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                            body: JSON.stringify({ engineer_id: newEngineerId || null })
-                          });
-                          if (res.ok) {
-                            toast.success("Engineer reassigned successfully!");
-                            await fetchSingleInspection(selectedInspection.id);
-                          }
-                        } catch (err) {
-                          toast.error("Failed to reassign engineer");
-                        }
-                      }}
-                      className="w-full h-10 px-3 bg-background border border-border rounded-xl text-xs font-semibold focus:outline-none"
-                    >
-                      <option value="">Unassigned</option>
-                      {engineers.map(eng => (
-                        <option key={eng.id} value={eng.id}>{eng.name}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-muted-foreground uppercase">Schedule Date</label>
-                    <input
-                      type="date"
-                      value={selectedInspection.scheduled_date ? selectedInspection.scheduled_date.split('T')[0] : ""}
-                      onChange={async (e) => {
-                        const newDate = e.target.value;
-                        if (!token) return;
-                        try {
-                          const res = await fetch(`${API_BASE_URL}/inspections/${selectedInspection.id}`, {
-                            method: 'PATCH',
-                            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                            body: JSON.stringify({ scheduled_date: newDate })
-                          });
-                          if (res.ok) {
-                            toast.success("Inspection rescheduled successfully!");
-                            await fetchSingleInspection(selectedInspection.id);
-                          }
-                        } catch (err) {
-                          toast.error("Failed to reschedule inspection");
-                        }
-                      }}
-                      className="w-full h-10 px-3 bg-background border border-border rounded-xl text-xs font-semibold focus:outline-none"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-muted-foreground uppercase">Override Status</label>
-                    <select
-                      value={selectedInspection.status}
-                      onChange={async (e) => {
-                        const newStatus = e.target.value;
-                        if (!token) return;
-                        try {
-                          const res = await fetch(`${API_BASE_URL}/inspections/${selectedInspection.id}`, {
-                            method: 'PATCH',
-                            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                            body: JSON.stringify({ status: newStatus })
-                          });
-                          if (res.ok) {
-                            toast.success(`Status updated to ${newStatus}!`);
-                            await fetchSingleInspection(selectedInspection.id);
-                          } else {
-                            const err = await res.json();
-                            toast.error(err.message || "Failed to update status");
-                          }
-                        } catch (err) {
-                          toast.error("Failed to update status");
-                        }
-                      }}
-                      className="w-full h-10 px-3 bg-background border border-border rounded-xl text-xs font-bold text-foreground focus:outline-none"
-                    >
-                      <option value="SCHEDULED">SCHEDULED</option>
-                      <option value="IN_PROGRESS">IN_PROGRESS</option>
-                      <option value="PENDING_REVIEW">PENDING_REVIEW</option>
-                      <option value="COMPLETED">COMPLETED</option>
-                      <option value="REJECTED">REJECTED</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-
-              {selectedInspection.status === 'PENDING_REVIEW' ? (
-                <div className="space-y-6">
-                  {/* Draft Certificate details card */}
+                {/* Prepared Certificate details card (if completed or pending review) */}
+                {(selectedInspection.status === 'COMPLETED' || selectedInspection.status === 'PENDING_REVIEW') && selectedInspection.draft_cert_type && (
                   <div className="p-6 bg-blue-600/5 border border-blue-600/10 rounded-2xl space-y-4">
                     <div className="flex items-center justify-between border-b border-blue-600/10 pb-3">
-                      <h4 className="font-black text-blue-600 uppercase text-xs tracking-wider">Prepared Draft Certificate</h4>
+                      <h4 className="font-black text-blue-600 uppercase text-xs tracking-wider">Compliance Certificate</h4>
                       <span className="text-[10px] font-bold bg-blue-600/10 text-blue-600 px-2.5 py-1 rounded-full uppercase">
-                        {draftCertType === 'FIRE_SAFETY' ? '🔥 Fire Safety' :
-                         draftCertType === 'ELECTRICAL_SAFETY' ? '⚡ Electrical Safety' :
+                        {selectedInspection.draft_cert_type === 'FIRE_SAFETY' ? '🔥 Fire Safety' :
+                         selectedInspection.draft_cert_type === 'ELECTRICAL_SAFETY' ? '⚡ Electrical Safety' :
                          '🏗️ Structural Safety'}
                       </span>
                     </div>
@@ -906,327 +840,556 @@ export default function InspectionsPage() {
                         <span className="text-[10px] font-bold text-muted-foreground uppercase">Expiry Date</span>
                         <p className="font-bold mt-0.5">{draftCertExpiry ? new Date(draftCertExpiry).toLocaleDateString() : 'N/A'}</p>
                       </div>
-                      <div className="col-span-2">
-                        <span className="text-[10px] font-bold text-muted-foreground uppercase">Scope of Inspection</span>
-                        <p className="font-semibold mt-0.5 text-foreground/80">{draftCertScope || 'N/A'}</p>
-                      </div>
-                      <div className="col-span-2">
-                        <span className="text-[10px] font-bold text-muted-foreground uppercase">Remarks & Recommendations</span>
-                        <p className="font-semibold mt-0.5 text-foreground/80">{draftCertNotes || 'N/A'}</p>
-                      </div>
+                      {draftCertScope && (
+                        <div className="col-span-2">
+                          <span className="text-[10px] font-bold text-muted-foreground uppercase">Scope of Inspection</span>
+                          <p className="font-semibold mt-0.5 text-foreground/80">{draftCertScope}</p>
+                        </div>
+                      )}
+                      {draftCertNotes && (
+                        <div className="col-span-2">
+                          <span className="text-[10px] font-bold text-muted-foreground uppercase">Remarks & Recommendations</span>
+                          <p className="font-semibold mt-0.5 text-foreground/80">{draftCertNotes}</p>
+                        </div>
+                      )}
                     </div>
                   </div>
+                )}
 
-                  {/* Checklist Summary */}
-                  <div className="space-y-3">
-                    <h4 className="font-black text-xs uppercase tracking-widest text-muted-foreground">Checklist Results</h4>
-                    <div className="max-h-48 overflow-y-auto space-y-2 border border-border/50 rounded-xl p-3 bg-muted/10">
-                      {(selectedInspection.items || []).map((item) => (
-                        <div key={item.id} className="flex items-center justify-between text-xs p-2.5 bg-background rounded-lg border border-border/50">
-                          <span className="font-medium text-foreground">{item.description}</span>
-                          <span className={cn("px-2 py-0.5 rounded text-[10px] font-black uppercase",
-                            item.status === 'PASS' ? 'bg-emerald-500/10 text-emerald-600' :
-                            item.status === 'FAIL' ? 'bg-rose-500/10 text-rose-600' : 'bg-muted text-muted-foreground'
+                {/* Checklist Results */}
+                <div className="space-y-3">
+                  <h4 className="font-black text-xs uppercase tracking-widest text-muted-foreground">Audit Checklist</h4>
+                  <div className="max-h-60 overflow-y-auto space-y-2 border border-border/50 rounded-xl p-3 bg-muted/10">
+                    {(selectedInspection.items || []).map((item) => (
+                      <div key={item.id} className="flex flex-col gap-2 p-3 bg-background rounded-lg border border-border/50">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-xs text-foreground">{item.description}</span>
+                          <span className={cn("px-2 py-0.5 rounded text-[10px] font-black uppercase ring-1",
+                            item.status === 'PASS' ? 'bg-emerald-500/10 text-emerald-600 ring-emerald-500/20' :
+                            item.status === 'FAIL' ? 'bg-rose-500/10 text-rose-600 ring-rose-500/20' : 
+                            item.status === 'NA' ? 'bg-slate-500/10 text-slate-600 ring-slate-500/20' :
+                            'bg-amber-500/10 text-amber-600 ring-amber-500/20'
                           )}>
                             {item.status}
                           </span>
                         </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Verification Photos Preview */}
-                  {uploadedPhotoUrls.length > 0 && (
-                    <div className="space-y-2">
-                      <h4 className="font-black text-xs uppercase tracking-widest text-muted-foreground">Site Photos</h4>
-                      <div className="grid grid-cols-4 sm:grid-cols-6 gap-3 p-4 bg-muted/20 border border-border/50 rounded-2xl">
-                        {uploadedPhotoUrls.map((url, index) => (
-                          <div key={index} className="relative aspect-square rounded-xl overflow-hidden border border-border group shadow-sm bg-background">
-                            <img 
-                              src={url} 
-                              alt={`Verification preview ${index + 1}`} 
-                              className="w-full h-full object-cover transition-all duration-300 group-hover:scale-110 cursor-pointer" 
-                              onClick={() => window.open(url, '_blank')}
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Office Review Controls */}
-                  {(() => {
-                    const isOfficeUser = user?.role === 'ADMIN' || 
-                      user?.designation?.toLowerCase().includes('admin') || 
-                      user?.designation?.toLowerCase().includes('executive') ||
-                      user?.designation?.toLowerCase().includes('staff') ||
-                      user?.email?.toLowerCase().includes('admin');
-                    
-                    if (isOfficeUser) {
-                      return (
-                        <div className="p-6 bg-amber-500/5 border border-amber-500/10 rounded-2xl space-y-4 shadow-sm">
-                          <h4 className="font-black text-amber-600 uppercase text-xs tracking-wider">Office Review Actions</h4>
-                          <div className="space-y-2">
-                            <Label className="text-xs font-semibold">Rejection Feedback (Required only if requesting changes)</Label>
-                            <Input
-                              placeholder="e.g., Please re-check the sprinkler systems on the 3rd floor..."
-                              value={feedbackInput}
-                              onChange={(e) => setFeedbackInput(e.target.value)}
-                              className="bg-background text-sm h-11"
-                            />
-                          </div>
-                          <div className="flex gap-3 pt-2">
-                            <Button 
-                              onClick={() => handleRejectInspection(selectedInspection.id)}
-                              disabled={submittingReview || !feedbackInput.trim()}
-                              className="flex-1 rounded-xl font-bold bg-rose-600 hover:bg-rose-500 text-white h-11 transition-all"
-                            >
-                              Reject & Request Changes
-                            </Button>
-                            <Button 
-                              onClick={() => handleApproveInspection(selectedInspection.id)}
-                              disabled={submittingReview}
-                              className="flex-1 rounded-xl font-bold bg-emerald-600 hover:bg-emerald-500 text-white h-11 transition-all"
-                            >
-                              Approve & Issue Certificate
-                            </Button>
-                          </div>
-                        </div>
-                      );
-                    } else {
-                      return (
-                        <div className="p-4 bg-amber-500/5 border border-amber-500/10 rounded-2xl text-center">
-                          <p className="text-xs font-bold text-amber-700">
-                            ⏳ Under Review: This draft certificate is currently awaiting office review and formal approval.
+                        {item.notes && (
+                          <p className="text-[11px] text-muted-foreground italic bg-muted/50 p-2 rounded border border-border/10">
+                            {item.notes}
                           </p>
-                        </div>
-                      );
-                    }
-                  })()}
-                </div>
-              ) : (
-                <>
-                  <div className="space-y-4">
-                    {(selectedInspection?.items || []).map((item) => (
-                      <div key={item.id} className="p-5 bg-muted/20 border border-border rounded-2xl space-y-3">
-                        <div className="flex items-center justify-between">
-                          <span className="font-bold text-foreground">{item.description}</span>
-                          <div className="flex items-center gap-2">
-                            <Button 
-                              size="sm" 
-                              variant={item.status === 'PASS' ? 'default' : 'outline'} 
-                              className={cn("h-8 rounded-lg", item.status === 'PASS' && "bg-emerald-600 hover:bg-emerald-500")}
-                              onClick={() => handleUpdateItem(item.id, 'PASS', item.notes, item.expenditure)}
-                            >
-                              <Check className="w-4 h-4" />
-                            </Button>
-                            <Button 
-                              size="sm" 
-                              variant={item.status === 'FAIL' ? 'destructive' : 'outline'} 
-                              className="h-8 rounded-lg"
-                              onClick={() => handleUpdateItem(item.id, 'FAIL', item.notes, item.expenditure)}
-                            >
-                              <X className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <Input 
-                            placeholder="Add observations..." 
-                            className="bg-background h-10 text-sm flex-1"
-                            defaultValue={item.notes || ""}
-                            onBlur={(e) => {
-                              if (e.target.value !== (item.notes || "")) {
-                                handleUpdateItem(item.id, item.status, e.target.value, item.expenditure);
-                              }
-                            }}
-                          />
-                          <div className="flex items-center gap-2">
-                            <span className="text-[10px] font-bold text-muted-foreground uppercase">Exp (₹)</span>
-                            <Input
-                              type="number"
-                              placeholder="0.00"
-                              className="bg-background h-10 text-sm w-28"
-                              defaultValue={item.expenditure || ""}
-                              onBlur={(e) => {
-                                if (e.target.value !== String(item.expenditure || "")) {
-                                  handleUpdateItem(item.id, item.status, item.notes, e.target.value);
-                                }
-                              }}
-                            />
-                          </div>
-                        </div>
+                        )}
                       </div>
                     ))}
                   </div>
+                </div>
 
-                  <div className="space-y-4">
-                    <div className="p-4 bg-blue-500/5 border border-blue-500/10 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
-                      <div className="flex items-center gap-4">
-                        <div className="p-3 bg-blue-500/10 rounded-xl">
-                          <Camera className="w-6 h-6 text-blue-600 animate-pulse" />
+                {/* Photos */}
+                {uploadedPhotoUrls.length > 0 && (
+                  <div className="space-y-2">
+                    <h4 className="font-black text-xs uppercase tracking-widest text-muted-foreground">Site Photos</h4>
+                    <div className="grid grid-cols-4 sm:grid-cols-6 gap-3 p-4 bg-muted/20 border border-border/50 rounded-2xl">
+                      {uploadedPhotoUrls.map((url, index) => (
+                        <div key={index} className="relative aspect-square rounded-xl overflow-hidden border border-border group shadow-sm bg-background">
+                          <img 
+                            src={url} 
+                            alt={`Verification preview ${index + 1}`} 
+                            className="w-full h-full object-cover transition-all duration-300 group-hover:scale-110 cursor-pointer" 
+                            onClick={() => window.open(url, '_blank')}
+                          />
                         </div>
-                        <div>
-                          <p className="text-sm font-bold text-foreground">Site Verification Photos</p>
-                          <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">
-                            Upload multiple verification photos for this visit
-                          </p>
-                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <DialogFooter className="pt-4 border-t border-border">
+                  <Button variant="ghost" onClick={() => setOpenVisit(false)}>Close</Button>
+                  {selectedInspection.status === 'COMPLETED' && (
+                    <Button 
+                      onClick={() => handleDownloadCertificate(selectedInspection.id)}
+                      className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl"
+                    >
+                      <Download className="w-4 h-4 mr-2" /> Download Certificate
+                    </Button>
+                  )}
+                </DialogFooter>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                <DialogHeader>
+                  <DialogTitle className="text-2xl font-black flex items-center gap-3">
+                    <ClipboardCheck className="w-6 h-6 text-blue-600" /> {selectedInspection.status === 'PENDING_REVIEW' ? 'Office Review & Issuance' : 'Inspection Checklist'}
+                  </DialogTitle>
+                  <DialogDescription>
+                    Site Visit for <span className="font-bold text-foreground">{selectedInspection.client?.name}</span>
+                  </DialogDescription>
+                </DialogHeader>
+  
+                {/* Rejection Banner */}
+                {selectedInspection.status === 'REJECTED' && selectedInspection.admin_feedback && (
+                  <div className="p-4 bg-rose-500/10 border border-rose-500/25 rounded-2xl flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                    <div>
+                      <h5 className="text-sm font-bold text-rose-800">Changes Requested by Office Staff</h5>
+                      <p className="text-xs text-rose-600 mt-1">{selectedInspection.admin_feedback}</p>
+                    </div>
+                  </div>
+                )}
+  
+                {/* Sleek inline Audit Management & Settings Bar */}
+                {!isClient && (
+                  <div className="p-5 bg-blue-500/5 border border-blue-500/10 rounded-2xl space-y-4 shadow-inner">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-xs font-black text-blue-600 uppercase tracking-widest">Audit settings & assignment</h4>
+                      <span className={cn("px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-tight ring-1",
+                        selectedInspection.status === 'COMPLETED' ? 'bg-emerald-500/10 text-emerald-600 ring-emerald-500/20' :
+                        selectedInspection.status === 'REJECTED' ? 'bg-rose-500/10 text-rose-600 ring-rose-500/20' :
+                        selectedInspection.status === 'PENDING_REVIEW' ? 'bg-amber-500/10 text-amber-600 ring-amber-500/20' :
+                        selectedInspection.status === 'SCHEDULED' ? 'bg-blue-500/10 text-blue-600 ring-blue-500/20' :
+                        'bg-slate-500/10 text-slate-600 ring-slate-500/20'
+                      )}>
+                        CURRENT STATE: {selectedInspection.status}
+                      </span>
+                    </div>
+    
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-muted-foreground uppercase">Assign Engineer</label>
+                        <select
+                          value={selectedInspection.engineer_id || ""}
+                          onChange={async (e) => {
+                            const newEngineerId = e.target.value;
+                            if (!token) return;
+                            try {
+                              const res = await fetch(`${API_BASE_URL}/inspections/${selectedInspection.id}`, {
+                                method: 'PATCH',
+                                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                                body: JSON.stringify({ engineer_id: newEngineerId || null })
+                              });
+                              if (res.ok) {
+                                toast.success("Engineer reassigned successfully!");
+                                await fetchSingleInspection(selectedInspection.id);
+                              }
+                            } catch (err) {
+                              toast.error("Failed to reassign engineer");
+                            }
+                          }}
+                          className="w-full h-10 px-3 bg-background border border-border rounded-xl text-xs font-semibold focus:outline-none"
+                        >
+                          <option value="">Unassigned</option>
+                          {engineers.map(eng => (
+                            <option key={eng.id} value={eng.id}>{eng.name}</option>
+                          ))}
+                        </select>
                       </div>
-
-                      <div className="flex items-center gap-3 self-end md:self-auto">
-                        <input 
-                          type="file" 
-                          ref={fileInputRef} 
-                          onChange={handlePhotoUpload} 
-                          accept="image/*" 
-                          className="hidden" 
-                          multiple
+    
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-muted-foreground uppercase">Schedule Date</label>
+                        <input
+                          type="date"
+                          value={selectedInspection.scheduled_date ? selectedInspection.scheduled_date.split('T')[0] : ""}
+                          onChange={async (e) => {
+                            const newDate = e.target.value;
+                            if (!token) return;
+                            try {
+                              const res = await fetch(`${API_BASE_URL}/inspections/${selectedInspection.id}`, {
+                                method: 'PATCH',
+                                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                                body: JSON.stringify({ scheduled_date: newDate })
+                              });
+                              if (res.ok) {
+                                toast.success("Inspection rescheduled successfully!");
+                                await fetchSingleInspection(selectedInspection.id);
+                              }
+                            } catch (err) {
+                              toast.error("Failed to reschedule inspection");
+                            }
+                          }}
+                          className="w-full h-10 px-3 bg-background border border-border rounded-xl text-xs font-semibold focus:outline-none"
                         />
-                        
-                        {uploadingPhoto ? (
-                          <Button disabled variant="outline" className="rounded-xl h-10 border-blue-500/20 text-blue-600 flex items-center gap-2">
-                            <Loader2 className="w-4 h-4 animate-spin" /> Uploading...
-                          </Button>
-                        ) : selectedInspection.status !== 'COMPLETED' ? (
-                          <Button 
-                            type="button"
-                            variant="outline" 
-                            onClick={() => fileInputRef.current?.click()}
-                            className="rounded-xl h-10 border-blue-500/20 text-blue-600 hover:bg-blue-500/10 font-bold transition-all"
-                          >
-                            {uploadedPhotoUrls.length > 0 ? "Add More Photos" : "Upload Photos"}
-                          </Button>
-                        ) : null}
+                      </div>
+    
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-muted-foreground uppercase">Override Status</label>
+                        <select
+                          value={selectedInspection.status}
+                          onChange={async (e) => {
+                            const newStatus = e.target.value;
+                            if (!token) return;
+                            try {
+                              const res = await fetch(`${API_BASE_URL}/inspections/${selectedInspection.id}`, {
+                                method: 'PATCH',
+                                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                                body: JSON.stringify({ status: newStatus })
+                              });
+                              if (res.ok) {
+                                toast.success(`Status updated to ${newStatus}!`);
+                                await fetchSingleInspection(selectedInspection.id);
+                              } else {
+                                const err = await res.json();
+                                toast.error(err.message || "Failed to update status");
+                              }
+                            } catch (err) {
+                              toast.error("Failed to update status");
+                            }
+                          }}
+                          className="w-full h-10 px-3 bg-background border border-border rounded-xl text-xs font-bold text-foreground focus:outline-none"
+                        >
+                          <option value="SCHEDULED">SCHEDULED</option>
+                          <option value="IN_PROGRESS">IN_PROGRESS</option>
+                          <option value="PENDING_REVIEW">PENDING_REVIEW</option>
+                          <option value="COMPLETED">COMPLETED</option>
+                          <option value="REJECTED">REJECTED</option>
+                        </select>
                       </div>
                     </div>
-
-                    {uploadedPhotoUrls.length > 0 && (
-                      <div className="grid grid-cols-4 sm:grid-cols-6 gap-3 p-4 bg-muted/20 border border-border/50 rounded-2xl">
-                        {uploadedPhotoUrls.map((url, index) => (
-                          <div key={index} className="relative aspect-square rounded-xl overflow-hidden border border-border group shadow-sm bg-background">
-                            <img 
-                              src={url} 
-                              alt={`Verification preview ${index + 1}`} 
-                              className="w-full h-full object-cover transition-all duration-300 group-hover:scale-110 cursor-pointer" 
-                              onClick={() => window.open(url, '_blank')}
-                            />
-                            {selectedInspection.status !== 'COMPLETED' && (
-                              <button
-                                type="button"
-                                onClick={() => setUploadedPhotoUrls(prev => prev.filter((_, idx) => idx !== index))}
-                                className="absolute top-1.5 right-1.5 bg-rose-500 hover:bg-rose-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow duration-200 cursor-pointer"
-                              >
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-3 h-3">
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                              </button>
-                            )}
+                  </div>
+                )}
+  
+                {selectedInspection.status === 'PENDING_REVIEW' ? (
+                  <div className="space-y-6">
+                    {/* Draft Certificate details card */}
+                    <div className="p-6 bg-blue-600/5 border border-blue-600/10 rounded-2xl space-y-4">
+                      <div className="flex items-center justify-between border-b border-blue-600/10 pb-3">
+                        <h4 className="font-black text-blue-600 uppercase text-xs tracking-wider">Prepared Draft Certificate</h4>
+                        <span className="text-[10px] font-bold bg-blue-600/10 text-blue-600 px-2.5 py-1 rounded-full uppercase">
+                          {draftCertType === 'FIRE_SAFETY' ? '🔥 Fire Safety' :
+                           draftCertType === 'ELECTRICAL_SAFETY' ? '⚡ Electrical Safety' :
+                           '🏗️ Structural Safety'}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <span className="text-[10px] font-bold text-muted-foreground uppercase">Validity Period</span>
+                          <p className="font-bold mt-0.5">{draftCertValidity === '1y' ? '1 Year' : '3 Years'}</p>
+                        </div>
+                        <div>
+                          <span className="text-[10px] font-bold text-muted-foreground uppercase">Expiry Date</span>
+                          <p className="font-bold mt-0.5">{draftCertExpiry ? new Date(draftCertExpiry).toLocaleDateString() : 'N/A'}</p>
+                        </div>
+                        <div className="col-span-2">
+                          <span className="text-[10px] font-bold text-muted-foreground uppercase">Scope of Inspection</span>
+                          <p className="font-semibold mt-0.5 text-foreground/80">{draftCertScope || 'N/A'}</p>
+                        </div>
+                        <div className="col-span-2">
+                          <span className="text-[10px] font-bold text-muted-foreground uppercase">Remarks & Recommendations</span>
+                          <p className="font-semibold mt-0.5 text-foreground/80">{draftCertNotes || 'N/A'}</p>
+                        </div>
+                      </div>
+                    </div>
+  
+                    {/* Checklist Summary */}
+                    <div className="space-y-3">
+                      <h4 className="font-black text-xs uppercase tracking-widest text-muted-foreground">Checklist Results</h4>
+                      <div className="max-h-48 overflow-y-auto space-y-2 border border-border/50 rounded-xl p-3 bg-muted/10">
+                        {(selectedInspection.items || []).map((item) => (
+                          <div key={item.id} className="flex items-center justify-between text-xs p-2.5 bg-background rounded-lg border border-border/50">
+                            <span className="font-medium text-foreground">{item.description}</span>
+                            <span className={cn("px-2 py-0.5 rounded text-[10px] font-black uppercase",
+                              item.status === 'PASS' ? 'bg-emerald-500/10 text-emerald-600' :
+                              item.status === 'FAIL' ? 'bg-rose-500/10 text-rose-600' : 'bg-muted text-muted-foreground'
+                            )}>
+                              {item.status}
+                            </span>
                           </div>
                         ))}
                       </div>
-                    )}
-                  </div>
-
-                  {/* Safety Officer Certificate Preparation section */}
-                  {selectedInspection.status !== 'COMPLETED' && (
-                    <div className="p-6 bg-blue-600/5 border border-blue-600/10 rounded-2xl space-y-4 mt-6">
-                      <div className="flex items-center gap-2 border-b border-blue-600/10 pb-3">
-                        <ClipboardCheck className="w-5 h-5 text-blue-600" />
-                        <h4 className="font-black text-blue-600 uppercase text-xs tracking-wider">Prepare Draft Certificate</h4>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1">
-                          <Label className="text-xs font-semibold">Certificate Template</Label>
-                          <select
-                            value={draftCertType}
-                            onChange={(e) => setDraftCertType(e.target.value)}
-                            className="w-full h-10 px-3 bg-background border border-border rounded-xl text-xs font-bold focus:outline-none"
-                          >
-                            <option value="FIRE_SAFETY">🔥 Fire Safety Compliance Certificate</option>
-                            <option value="ELECTRICAL_SAFETY">⚡ Electrical Safety Audit Certificate</option>
-                            <option value="STRUCTURAL_SAFETY">🏗️ Construction & Structural Safety Certificate</option>
-                          </select>
-                        </div>
-                        <div className="space-y-1">
-                          <Label className="text-xs font-semibold">Validity Period</Label>
-                          <select
-                            value={draftCertValidity}
-                            onChange={(e) => setDraftCertValidity(e.target.value)}
-                            className="w-full h-10 px-3 bg-background border border-border rounded-xl text-xs font-bold focus:outline-none"
-                          >
-                            <option value="1y">1 Year</option>
-                            <option value="3y">3 Years</option>
-                          </select>
-                        </div>
-                        <div className="space-y-1 col-span-2">
-                          <Label className="text-xs font-semibold">Expiry Date</Label>
-                          <Input
-                            type="date"
-                            value={draftCertExpiry}
-                            onChange={(e) => setDraftCertExpiry(e.target.value)}
-                            className="bg-background text-xs h-10"
-                          />
-                        </div>
-                        <div className="space-y-1 col-span-2">
-                          <Label className="text-xs font-semibold">Scope of Inspection</Label>
-                          <Input
-                            placeholder="e.g., Annual Fire Alarm, Extinguisher & Hydrant compliance check"
-                            value={draftCertScope}
-                            onChange={(e) => setDraftCertScope(e.target.value)}
-                            className="bg-background text-xs h-10"
-                          />
-                        </div>
-                        <div className="space-y-1 col-span-2">
-                          <Label className="text-xs font-semibold">Remarks & Recommendations</Label>
-                          <Input
-                            placeholder="e.g., All devices tested; replacement of 2 expired fire extinguishers recommended"
-                            value={draftCertNotes}
-                            onChange={(e) => setDraftCertNotes(e.target.value)}
-                            className="bg-background text-xs h-10"
-                          />
-                        </div>
-                      </div>
                     </div>
-                  )}
-                </>
-              )}
-
-              <DialogFooter className="pt-4 border-t border-border">
-                <Button variant="ghost" onClick={() => setOpenVisit(false)}>Discard</Button>
-                {selectedInspection.status !== 'PENDING_REVIEW' && (() => {
-                  const pendingCount = (selectedInspection.items || []).filter(it => it.status === 'PENDING').length;
-                  const isAlreadyDone = selectedInspection.status === 'COMPLETED';
-                  const isBlocked = pendingCount > 0;
-                  return (
-                    <Button
-                      disabled={isAlreadyDone || isBlocked || submittingReview}
-                      onClick={handleSubmitForReview}
-                      className={cn(
-                        "text-white font-bold h-12 px-10 rounded-xl shadow-lg transition-all",
-                        isAlreadyDone
-                          ? "bg-muted text-muted-foreground cursor-not-allowed"
-                          : isBlocked
-                            ? "bg-amber-500/80 shadow-amber-500/20 cursor-not-allowed opacity-80"
-                            : "bg-blue-600 hover:bg-blue-500 shadow-blue-500/20"
+  
+                    {/* Verification Photos Preview */}
+                    {uploadedPhotoUrls.length > 0 && (
+                      <div className="space-y-2">
+                        <h4 className="font-black text-xs uppercase tracking-widest text-muted-foreground">Site Photos</h4>
+                        <div className="grid grid-cols-4 sm:grid-cols-6 gap-3 p-4 bg-muted/20 border border-border/50 rounded-2xl">
+                          {uploadedPhotoUrls.map((url, index) => (
+                            <div key={index} className="relative aspect-square rounded-xl overflow-hidden border border-border group shadow-sm bg-background">
+                              <img 
+                                src={url} 
+                                alt={`Verification preview ${index + 1}`} 
+                                className="w-full h-full object-cover transition-all duration-300 group-hover:scale-110 cursor-pointer" 
+                                onClick={() => window.open(url, '_blank')}
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+  
+                    {/* Office Review Controls */}
+                    {(() => {
+                      const isOfficeUser = user?.role === 'ADMIN' || 
+                        user?.designation?.toLowerCase().includes('admin') || 
+                        user?.designation?.toLowerCase().includes('executive') ||
+                        user?.designation?.toLowerCase().includes('staff') ||
+                        user?.email?.toLowerCase().includes('admin');
+                      
+                      if (isOfficeUser) {
+                        return (
+                          <div className="p-6 bg-amber-500/5 border border-amber-500/10 rounded-2xl space-y-4 shadow-sm">
+                            <h4 className="font-black text-amber-600 uppercase text-xs tracking-wider">Office Review Actions</h4>
+                            <div className="space-y-2">
+                              <Label className="text-xs font-semibold">Rejection Feedback (Required only if requesting changes)</Label>
+                              <Input
+                                placeholder="e.g., Please re-check the sprinkler systems on the 3rd floor..."
+                                value={feedbackInput}
+                                onChange={(e) => setFeedbackInput(e.target.value)}
+                                className="bg-background text-sm h-11"
+                              />
+                            </div>
+                            <div className="flex gap-3 pt-2">
+                              <Button 
+                                onClick={() => handleRejectInspection(selectedInspection.id)}
+                                disabled={submittingReview || !feedbackInput.trim()}
+                                className="flex-1 rounded-xl font-bold bg-rose-600 hover:bg-rose-500 text-white h-11 transition-all"
+                              >
+                                Reject & Request Changes
+                              </Button>
+                              <Button 
+                                onClick={() => handleApproveInspection(selectedInspection.id)}
+                                disabled={submittingReview}
+                                className="flex-1 rounded-xl font-bold bg-emerald-600 hover:bg-emerald-500 text-white h-11 transition-all"
+                              >
+                                Approve & Issue Certificate
+                              </Button>
+                            </div>
+                          </div>
+                        );
+                      } else {
+                        return (
+                          <div className="p-4 bg-amber-500/5 border border-amber-500/10 rounded-2xl text-center">
+                            <p className="text-xs font-bold text-amber-700">
+                              ⏳ Under Review: This draft certificate is currently awaiting office review and formal approval.
+                            </p>
+                          </div>
+                        );
+                      }
+                    })()
+                    }
+                  </div>
+                ) : (
+                  <>
+                    <div className="space-y-4">
+                      {(selectedInspection?.items || []).map((item) => (
+                        <div key={item.id} className="p-5 bg-muted/20 border border-border rounded-2xl space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-foreground">{item.description}</span>
+                            <div className="flex items-center gap-2">
+                              <Button 
+                                size="sm" 
+                                variant={item.status === 'PASS' ? 'default' : 'outline'} 
+                                className={cn("h-8 rounded-lg", item.status === 'PASS' && "bg-emerald-600 hover:bg-emerald-500")}
+                                onClick={() => handleUpdateItem(item.id, 'PASS', item.notes, item.expenditure)}
+                              >
+                                <Check className="w-4 h-4" />
+                              </Button>
+                              <Button 
+                                size="sm" 
+                                variant={item.status === 'FAIL' ? 'destructive' : 'outline'} 
+                                className="h-8 rounded-lg"
+                                onClick={() => handleUpdateItem(item.id, 'FAIL', item.notes, item.expenditure)}
+                              >
+                                <X className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <Input 
+                              placeholder="Add observations..." 
+                              className="bg-background h-10 text-sm flex-1"
+                              defaultValue={item.notes || ""}
+                              onBlur={(e) => {
+                                if (e.target.value !== (item.notes || "")) {
+                                  handleUpdateItem(item.id, item.status, e.target.value, item.expenditure);
+                                }
+                              }}
+                            />
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] font-bold text-muted-foreground uppercase">Exp (₹)</span>
+                              <Input
+                                type="number"
+                                placeholder="0.00"
+                                className="bg-background h-10 text-sm w-28"
+                                defaultValue={item.expenditure || ""}
+                                onBlur={(e) => {
+                                  if (e.target.value !== String(item.expenditure || "")) {
+                                    handleUpdateItem(item.id, item.status, item.notes, e.target.value);
+                                  }
+                                }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+    
+                    <div className="space-y-4">
+                      <div className="p-4 bg-blue-500/5 border border-blue-500/10 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div className="flex items-center gap-4">
+                          <div className="p-3 bg-blue-500/10 rounded-xl">
+                            <Camera className="w-6 h-6 text-blue-600 animate-pulse" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-bold text-foreground">Site Verification Photos</p>
+                            <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">
+                              Upload multiple verification photos for this visit
+                            </p>
+                          </div>
+                        </div>
+    
+                        <div className="flex items-center gap-3 self-end md:self-auto">
+                          <input 
+                            type="file" 
+                            ref={fileInputRef} 
+                            onChange={handlePhotoUpload} 
+                            accept="image/*" 
+                            className="hidden" 
+                            multiple
+                          />
+                          
+                          {uploadingPhoto ? (
+                            <Button disabled variant="outline" className="rounded-xl h-10 border-blue-500/20 text-blue-600 flex items-center gap-2">
+                              <Loader2 className="w-4 h-4 animate-spin" /> Uploading...
+                            </Button>
+                          ) : selectedInspection.status !== 'COMPLETED' ? (
+                            <Button 
+                              type="button"
+                              variant="outline" 
+                              onClick={() => fileInputRef.current?.click()}
+                              className="rounded-xl h-10 border-blue-500/20 text-blue-600 hover:bg-blue-500/10 font-bold transition-all"
+                            >
+                              {uploadedPhotoUrls.length > 0 ? "Add More Photos" : "Upload Photos"}
+                            </Button>
+                          ) : null}
+                        </div>
+                      </div>
+    
+                      {uploadedPhotoUrls.length > 0 && (
+                        <div className="grid grid-cols-4 sm:grid-cols-6 gap-3 p-4 bg-muted/20 border border-border/50 rounded-2xl">
+                          {uploadedPhotoUrls.map((url, index) => (
+                            <div key={index} className="relative aspect-square rounded-xl overflow-hidden border border-border group shadow-sm bg-background">
+                              <img 
+                                src={url} 
+                                alt={`Verification preview ${index + 1}`} 
+                                className="w-full h-full object-cover transition-all duration-300 group-hover:scale-110 cursor-pointer" 
+                                onClick={() => window.open(url, '_blank')}
+                              />
+                              {selectedInspection.status !== 'COMPLETED' && (
+                                <button
+                                  type="button"
+                                  onClick={() => setUploadedPhotoUrls(prev => prev.filter((_, idx) => idx !== index))}
+                                  className="absolute top-1.5 right-1.5 bg-rose-500 hover:bg-rose-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow duration-200 cursor-pointer"
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-3 h-3">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                  </svg>
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
                       )}
-                    >
-                      {submittingReview ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : isAlreadyDone ? (
-                        "Already Completed"
-                      ) : isBlocked ? (
-                        `${pendingCount} Item${pendingCount > 1 ? "s" : ""} Pending — Mark All First`
-                      ) : selectedInspection.status === "REJECTED" ? (
-                        "Re-Submit Certificate Request"
-                      ) : (
-                        "Submit Certificate Request"
-                      )}
-                    </Button>
-                  );
-                })()}
-              </DialogFooter>
-            </div>
+                    </div>
+    
+                    {/* Safety Officer Certificate Preparation section */}
+                    {selectedInspection.status !== 'COMPLETED' && (
+                      <div className="p-6 bg-blue-600/5 border border-blue-600/10 rounded-2xl space-y-4 mt-6">
+                        <div className="flex items-center gap-2 border-b border-blue-600/10 pb-3">
+                          <ClipboardCheck className="w-5 h-5 text-blue-600" />
+                          <h4 className="font-black text-blue-600 uppercase text-xs tracking-wider">Prepare Draft Certificate</h4>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-1">
+                            <Label className="text-xs font-semibold">Certificate Template</Label>
+                            <select
+                              value={draftCertType}
+                              onChange={(e) => setDraftCertType(e.target.value)}
+                              className="w-full h-10 px-3 bg-background border border-border rounded-xl text-xs font-bold focus:outline-none"
+                            >
+                              <option value="FIRE_SAFETY">🔥 Fire Safety Compliance Certificate</option>
+                              <option value="ELECTRICAL_SAFETY">⚡ Electrical Safety Audit Certificate</option>
+                              <option value="STRUCTURAL_SAFETY">🏗️ Construction & Structural Safety Certificate</option>
+                            </select>
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs font-semibold">Validity Period</Label>
+                            <select
+                              value={draftCertValidity}
+                              onChange={(e) => setDraftCertValidity(e.target.value)}
+                              className="w-full h-10 px-3 bg-background border border-border rounded-xl text-xs font-bold focus:outline-none"
+                            >
+                              <option value="1y">1 Year</option>
+                              <option value="3y">3 Years</option>
+                            </select>
+                          </div>
+                          <div className="space-y-1 col-span-2">
+                            <Label className="text-xs font-semibold">Expiry Date</Label>
+                            <Input
+                              type="date"
+                              value={draftCertExpiry}
+                              onChange={(e) => setDraftCertExpiry(e.target.value)}
+                              className="bg-background text-xs h-10"
+                            />
+                          </div>
+                          <div className="space-y-1 col-span-2">
+                            <Label className="text-xs font-semibold">Scope of Inspection</Label>
+                            <Input
+                              placeholder="e.g., Annual Fire Alarm, Extinguisher & Hydrant compliance check"
+                              value={draftCertScope}
+                              onChange={(e) => setDraftCertScope(e.target.value)}
+                              className="bg-background text-xs h-10"
+                            />
+                          </div>
+                          <div className="space-y-1 col-span-2">
+                            <Label className="text-xs font-semibold">Remarks & Recommendations</Label>
+                            <Input
+                              placeholder="e.g., All devices tested; replacement of 2 expired fire extinguishers recommended"
+                              value={draftCertNotes}
+                              onChange={(e) => setDraftCertNotes(e.target.value)}
+                              className="bg-background text-xs h-10"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+  
+                <DialogFooter className="pt-4 border-t border-border">
+                  <Button variant="ghost" onClick={() => setOpenVisit(false)}>Discard</Button>
+                  {selectedInspection.status !== 'PENDING_REVIEW' && (() => {
+                    const pendingCount = (selectedInspection.items || []).filter(it => it.status === 'PENDING').length;
+                    const isAlreadyDone = selectedInspection.status === 'COMPLETED';
+                    const isBlocked = pendingCount > 0;
+                    return (
+                      <Button
+                        disabled={isAlreadyDone || isBlocked || submittingReview}
+                        onClick={handleSubmitForReview}
+                        className={cn(
+                          "text-white font-bold h-12 px-10 rounded-xl shadow-lg transition-all",
+                          isAlreadyDone
+                            ? "bg-muted text-muted-foreground cursor-not-allowed"
+                            : isBlocked
+                              ? "bg-amber-500/80 shadow-amber-500/20 cursor-not-allowed opacity-80"
+                              : "bg-blue-600 hover:bg-blue-500 shadow-blue-500/20"
+                        )}
+                      >
+                        {submittingReview ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : isAlreadyDone ? (
+                          "Already Completed"
+                        ) : isBlocked ? (
+                          `${pendingCount} Item${pendingCount > 1 ? "s" : ""} Pending — Mark All First`
+                        ) : selectedInspection.status === "REJECTED" ? (
+                          "Re-Submit Certificate Request"
+                        ) : (
+                          "Submit Certificate Request"
+                        )}
+                      </Button>
+                    );
+                  })()}
+                </DialogFooter>
+              </div>
+            )
           )}
         </DialogContent>
       </Dialog>

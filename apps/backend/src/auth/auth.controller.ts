@@ -29,10 +29,17 @@ export class AuthController {
 
   @Post('login')
   async login(@Body() body: any) {
-    const user = await this.authService.validateUser(body.email, body.password);
-    if (!user) {
-      throw new UnauthorizedException('Invalid credentials');
+    try {
+      const user = await this.authService.validateUser(body.email, body.password);
+      if (!user) {
+        throw new UnauthorizedException('Invalid credentials');
+      }
+      return this.authService.login(user);
+    } catch (e) {
+      if (e.message === 'DEACTIVATED') {
+        throw new UnauthorizedException('Account is deactivated. Please contact support.');
+      }
+      throw e;
     }
-    return this.authService.login(user);
   }
 }

@@ -28,12 +28,16 @@ export class DocumentsController {
   @Get()
   @Permissions('READ_DOCUMENT')
   findAll(
+    @Req() req: any,
     @Query('category') category?: string,
     @Query('client_id') client_id?: string,
     @Query('project_id') project_id?: string,
     @Query('lead_id') lead_id?: string,
   ) {
-    return this.documentsService.findAll({ category, client_id, project_id, lead_id });
+    return this.documentsService.findAll(
+      { category, client_id, project_id, lead_id },
+      req.user,
+    );
   }
 
   @Get(':id')

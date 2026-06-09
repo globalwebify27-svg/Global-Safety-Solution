@@ -13,8 +13,37 @@ export class QuotationsService {
     private notificationsService: NotificationsService,
   ) { }
 
-  async findAll() {
+  async findAll(userPayload?: any) {
+    let clientId: string | undefined;
+
+    if (userPayload) {
+      const user = await this.prisma.user.findUnique({
+        where: { id: userPayload.userId },
+        include: {
+          roles: {
+            include: {
+              role: true,
+            },
+          },
+        },
+      });
+
+      const isClient =
+        user?.roles?.some(
+          (ur: any) =>
+            ur.role.name === 'CLIENT' || ur.role.name === 'CLIENTS',
+        ) || (user?.designation || '').toUpperCase().includes('CLIENT');
+
+      if (isClient && user?.email) {
+        const clientRecord = await this.prisma.client.findFirst({
+          where: { email: user.email },
+        });
+        clientId = clientRecord?.id;
+      }
+    }
+
     return this.prisma.quotation.findMany({
+      where: clientId ? { client_id: clientId } : undefined,
       include: {
         items: true,
         lead: true,

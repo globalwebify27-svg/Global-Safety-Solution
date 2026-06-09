@@ -141,7 +141,147 @@ export default function DashboardPage() {
     </div>
   );
 
-  const userRole = user?.role || "STAFF";
+  // 1. Try to get the dynamic DB role
+  let roleName = user?.roles?.[0]?.role?.name;
+  
+  // 2. Fallback to legacy designation if DB role is missing
+  if (!roleName) {
+    const designation = (user?.designation || "").toUpperCase();
+    if (designation.includes("HR")) roleName = "HR_MANAGER";
+    else if (designation.includes("FIELD") || designation.includes("ENGINEER")) roleName = "FIELD_ENGINEER";
+    else if (designation.includes("SALES")) roleName = "SALES_EXECUTIVE";
+    else if (designation.includes("CLIENT")) roleName = "CLIENT";
+    else roleName = "STAFF";
+  }
+  
+  // 3. Admin override
+  const isLegacyAdmin = user?.email === "admin@globalsafety.com";
+  const userRole = isLegacyAdmin ? "SUPER_ADMIN" : roleName;
+
+  // CLIENT Portal Dashboard
+  if (userRole === "CLIENT") {
+    return (
+      <div className="space-y-10 pb-12 animate-in fade-in duration-700">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="space-y-2">
+            <h1 className="text-4xl font-black tracking-tighter text-foreground">
+              Client <span className="text-primary">Portal</span>
+            </h1>
+            <p className="text-muted-foreground font-medium max-w-md">Welcome back, {stats.clientName || user?.name || 'Valued Client'}. Here is your compliance and safety overview.</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <Button onClick={() => router.push('/dashboard/inspections')} className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold h-12 px-6 shadow-xl shadow-primary/20">
+              <ClipboardCheck className="w-4 h-4 mr-2" /> View Audits
+            </Button>
+          </div>
+        </div>
+
+        {/* Client Stats Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {[
+            { title: "Active Quotations", value: stats.activeQuotes || 0, icon: FileText, color: "blue", desc: "Open proposals & quotations" },
+            { title: "Scheduled Inspections", value: stats.scheduledAudits || 0, icon: ClipboardCheck, color: "emerald", desc: "Upcoming safety checks" },
+            { title: "Compliance Documents", value: stats.certificatesCount || 0, icon: ShieldCheck, color: "purple", desc: "Digital vault certificates" }
+          ].map((stat, i) => (
+            <div key={i} className="group p-5 lg:p-8 rounded-[2rem] bg-card/40 border border-border relative overflow-hidden transition-all hover:border-primary/20 hover:translate-y-[-4px] flex flex-col justify-between">
+              <div className={cn("absolute top-0 right-0 w-32 h-32 blur-[80px] opacity-20 transition-opacity group-hover:opacity-30", 
+                stat.color === 'blue' ? 'bg-blue-500' : stat.color === 'emerald' ? 'bg-emerald-500' : 'bg-purple-500'
+              )} />
+              <div className="relative z-10 space-y-4 lg:space-y-6 flex-1 flex flex-col">
+                <div className="flex items-center justify-between">
+                  <div className={cn("p-2 lg:p-3 rounded-2xl shrink-0", 
+                    stat.color === 'blue' ? 'bg-blue-500/10 text-blue-500' : stat.color === 'emerald' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-purple-500/10 text-purple-500'
+                  )}>
+                    <stat.icon className="w-5 h-5 lg:w-6 lg:h-6" />
+                  </div>
+                </div>
+                <div className="space-y-1 mt-auto">
+                  <p className="text-3xl lg:text-4xl font-black text-foreground tracking-tighter truncate">{stat.value}</p>
+                  <p className="text-muted-foreground text-xs lg:text-sm font-bold truncate">{stat.title}</p>
+                  <p className="text-muted-foreground/60 text-[9px] lg:text-[10px] uppercase font-black tracking-widest line-clamp-1">{stat.desc}</p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Content sections */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          {/* Recent Audits & Inspections */}
+          <div className="lg:col-span-6 p-8 rounded-[2.5rem] bg-card/30 border border-border backdrop-blur-md">
+            <h3 className="text-xl font-bold text-foreground mb-6 flex items-center gap-2">
+              <ClipboardCheck className="w-5 h-5 text-emerald-500" /> Recent Site Inspections
+            </h3>
+            <div className="space-y-4 max-h-[350px] overflow-y-auto pr-2 scrollbar-hide">
+              {stats.recentInspections?.map((insp: any) => (
+                <div key={insp.id} className="p-4 rounded-2xl bg-muted/30 border border-border/80 hover:border-emerald-500/30 transition-all flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+                  <div>
+                    <p className="font-bold text-foreground">Safety Audit</p>
+                    <p className="text-xs text-muted-foreground">Scheduled: {new Date(insp.scheduledDate).toLocaleDateString()}</p>
+                    <p className="text-xs text-muted-foreground/80 mt-1 line-clamp-1 italic">&ldquo;{insp.remarks}&rdquo;</p>
+                  </div>
+                  <span className={cn("text-[9px] font-black uppercase px-3 py-1 rounded-full self-start sm:self-auto",
+                    insp.status === 'COMPLETED' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-blue-500/10 text-blue-500'
+                  )}>{insp.status}</span>
+                </div>
+              ))}
+              {(!stats.recentInspections || stats.recentInspections.length === 0) && (
+                <p className="text-muted-foreground italic text-sm text-center py-8">No inspections logged yet.</p>
+              )}
+            </div>
+          </div>
+
+          {/* Recent Safety Quotations */}
+          <div className="lg:col-span-6 p-8 rounded-[2.5rem] bg-card/30 border border-border backdrop-blur-md">
+            <h3 className="text-xl font-bold text-foreground mb-6 flex items-center gap-2">
+              <FileText className="w-5 h-5 text-blue-500" /> Safety Quotations
+            </h3>
+            <div className="space-y-4 max-h-[350px] overflow-y-auto pr-2 scrollbar-hide">
+              {stats.recentQuotations?.map((quote: any) => (
+                <div key={quote.id} className="p-4 rounded-2xl bg-muted/30 border border-border/80 hover:border-blue-500/30 transition-all flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+                  <div>
+                    <p className="font-bold text-foreground">{quote.quoteNumber}</p>
+                    <p className="text-xs text-emerald-600 dark:text-emerald-400 font-mono mt-0.5">₹{quote.totalAmount.toLocaleString()}</p>
+                  </div>
+                  <span className={cn("text-[9px] font-black uppercase px-3 py-1 rounded-full self-start sm:self-auto",
+                    quote.status === 'ACCEPTED' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-amber-500/10 text-amber-500'
+                  )}>{quote.status}</span>
+                </div>
+              ))}
+              {(!stats.recentQuotations || stats.recentQuotations.length === 0) && (
+                <p className="text-muted-foreground italic text-sm text-center py-8">No quotations issued yet.</p>
+              )}
+            </div>
+          </div>
+
+          {/* Financial Summary & Invoices */}
+          <div className="lg:col-span-12 p-8 rounded-[2.5rem] bg-card/30 border border-border backdrop-blur-md">
+            <h3 className="text-xl font-bold text-foreground mb-6 flex items-center gap-2">
+              <FileSpreadsheet className="w-5 h-5 text-purple-500" /> Invoices & Billing
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {stats.recentInvoices?.map((invoice: any) => (
+                <div key={invoice.id} className="p-5 rounded-3xl bg-muted/20 border border-border hover:border-purple-500/20 transition-all flex flex-col justify-between">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="font-bold text-foreground text-sm">{invoice.invoiceNumber}</p>
+                      <p className="text-lg font-black text-foreground font-mono mt-1">₹{invoice.amount.toLocaleString()}</p>
+                    </div>
+                    <span className={cn("text-[8px] font-black uppercase px-2 py-0.5 rounded-md",
+                      invoice.status === 'PAID' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'
+                    )}>{invoice.status}</span>
+                  </div>
+                </div>
+              ))}
+              {(!stats.recentInvoices || stats.recentInvoices.length === 0) && (
+                <div className="col-span-full text-center py-8 text-muted-foreground italic text-sm">No invoices recorded yet.</div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // 1. Sales Executive Dashboard
   if (userRole === "SALES_EXECUTIVE") {
@@ -659,10 +799,10 @@ export default function DashboardPage() {
                   <stat.icon className="w-5 h-5 lg:w-6 lg:h-6" />
                 </div>
                 <div className={cn("flex items-center gap-1 text-[10px] lg:text-xs font-black uppercase tracking-tighter", 
-                  stat.trend.startsWith('+') || stat.trend === 'Secure' ? 'text-emerald-500' : 'text-rose-500'
+                  stat.trend?.startsWith('+') || stat.trend === 'Secure' ? 'text-emerald-500' : 'text-rose-500'
                 )}>
                   {stat.trend === 'Secure' ? <ShieldCheck className="w-3 h-3" /> : <ArrowUpRight className="w-3 h-3" />}
-                  <span className="truncate">{stat.trend}</span>
+                  <span className="truncate">{stat.trend || '0%'}</span>
                 </div>
               </div>
               

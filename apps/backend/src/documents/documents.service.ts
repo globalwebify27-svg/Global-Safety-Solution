@@ -5,11 +5,39 @@ import { PrismaService } from '../prisma/prisma.service';
 export class DocumentsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findAll(filters: any) {
+  async findAll(filters: any, userPayload?: any) {
+    let clientId: string | undefined;
+
+    if (userPayload) {
+      const user = await this.prisma.user.findUnique({
+        where: { id: userPayload.userId },
+        include: {
+          roles: {
+            include: {
+              role: true,
+            },
+          },
+        },
+      });
+
+      const isClient =
+        user?.roles?.some(
+          (ur: any) =>
+            ur.role.name === 'CLIENT' || ur.role.name === 'CLIENTS',
+        ) || (user?.designation || '').toUpperCase().includes('CLIENT');
+
+      if (isClient && user?.email) {
+        const clientRecord = await this.prisma.client.findFirst({
+          where: { email: user.email },
+        });
+        clientId = clientRecord?.id;
+      }
+    }
+
     return this.prisma.document.findMany({
       where: {
         category: filters.category,
-        client_id: filters.client_id,
+        client_id: clientId ? clientId : filters.client_id,
         project_id: filters.project_id,
         lead_id: filters.lead_id,
       },
