@@ -313,6 +313,14 @@ export class QuotationsService {
               where: { id: quotation.lead_id },
             });
             if (lead) {
+              let assignedStaffId = lead.assigned_to;
+              if (!assignedStaffId) {
+                const superAdmin = await tx.user.findFirst({
+                  where: { email: 'admin@globalsafety.com' }
+                });
+                assignedStaffId = superAdmin?.id || null;
+              }
+
               // 1. Create the Client record
               const client = await tx.client.create({
                 data: {
@@ -321,6 +329,7 @@ export class QuotationsService {
                   phone: lead.phone,
                   industry: lead.source || 'General',
                   is_active: true,
+                  assigned_staff_id: assignedStaffId,
                 },
               });
 

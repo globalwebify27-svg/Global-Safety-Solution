@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Spectra - Advanced Color Palette & Harmony Generator</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+    /* Custom scrollbars */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 4px;
+    }
+    .dark ::-webkit-scrollbar-thumb {
+      background: #334155;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+    .dark ::-webkit-scrollbar-thumb:hover {
+      background: #475569;
+    }
+    /* Smooth transitions */
+    .transition-all {
+      transition-property: all;
+      transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+      transition-duration: 200ms;
+    }
+    /* Color card hover scale */
+    .color-card:hover .color-actions {
+      opacity: 1;
+    }
+  </style>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Plus Jakarta Sans', 'sans-serif'],
+          },
+          colors: {
+            darkbg: '#090d16',
+            darkcard: '#111827',
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-slate-50 text-slate-800 dark:bg-darkbg dark:text-slate-100 min-h-screen transition-colors duration-200">
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- Main Layout -->
+  <div class="flex min-h-screen">
+    
+    <!-- Sidebar -->
+    <aside class="w-64 border-r border-slate-200 dark:border-slate-800 hidden md:flex flex-col justify-between p-6 bg-white dark:bg-slate-900/50 backdrop-blur-md sticky top-0 h-screen shrink-0">
+      <div>
+        <!-- Brand/Logo -->
+        <div class="flex items-center gap-3 mb-8">
+          <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-indigo-500/30">
+            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"></path></svg>
+          </div>
+          <div>
+            <h1 class="text-xl font-bold tracking-tight bg-gradient-to-r from-slate-900 to-slate-700 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">Spectra</h1>
+            <p class="text-xs text-slate-400 dark:text-slate-500">Palette & Color Studio</p>
+          </div>
+        </div>
+
+        <!-- Navigation -->
+        <nav class="space-y-1.5">
+          <a href="#all" onclick="filterCategory('all')" class="nav-item flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
+            All Palettes
+          </a>
+          <a href="#random" onclick="filterCategory('random')" class="nav-item flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/40 dark:hover:text-white transition-all">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
+            Classic Random
+          </a>
+          <a href="#pastels" onclick="filterCategory('pastels')" class="nav-item flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/40 dark:hover:text-white transition-all">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"></path></svg>
+            Pastels
+          </a>
+          <a href="#neons" onclick="filterCategory('neons')" class="nav-item flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/40 dark:hover:text-white transition-all">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+            Neon Vibe
+          </a>
+          <a href="#warm" onclick="filterCategory('warm')" class="nav-item flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/40 dark:hover:text-white transition-all">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m2.828-9.9a5 5 0 117.072 7.072l-.707.707M6.343 6.343l.707.707m9.9 9.9l.707-.707"></path></svg>
+            Warm Tones
+          </a>
+          <a href="#cool" onclick="filterCategory('cool')" class="nav-item flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/40 dark:hover:text-white transition-all">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"></path></svg>
+            Cool Tones
+          </a>
+          <a href="#neutrals" onclick="filterCategory('neutrals')" class="nav-item flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/40 dark:hover:text-white transition-all">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            Neutrals
+          </a>
+          <a href="#gradients" onclick="filterCategory('gradients')" class="nav-item flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/40 dark:hover:text-white transition-all">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1v-2zM4 21a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1v-2z"></path></svg>
+            Gradients
+          </a>
+          <a href="#favorites" onclick="filterCategory('favorites')" class="nav-item flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/40 dark:hover:text-white transition-all">
+            <span class="flex items-center gap-3">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path></svg>
+              My Favorites
+            </span>
+            <span id="fav-badge" class="bg-indigo-500 text-white text-xs px-2 py-0.5 rounded-full hidden">0</span>
+          </a>
+        </nav>
+      </div>
+
+      <!-- Theme & Help footer -->
+      <div class="space-y-4">
+        <button id="theme-toggle" class="flex items-center justify-between w-full px-4 py-2.5 rounded-xl text-sm font-medium border border-slate-200 dark:border-slate-800 text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/40 dark:hover:text-white transition-all">
+          <span class="flex items-center gap-3">
+            <svg id="theme-icon-light" class="w-5 h-5 hidden dark:block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m2.828-9.9a5 5 0 117.072 7.072l-.707.707M6.343 6.343l.707.707m9.9 9.9l.707-.707"></path></svg>
+            <svg id="theme-icon-dark" class="w-5 h-5 block dark:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
+            <span id="theme-text">Dark Mode</span>
+          </span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Content Area -->
+    <main class="flex-1 flex flex-col min-h-screen">
+      <!-- Top Header -->
+      <header class="border-b border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-darkbg/70 backdrop-blur-md sticky top-0 z-40 px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div>
+          <h2 class="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
+            Explore Color Palettes
+          </h2>
+          <p class="text-sm text-slate-500 dark:text-slate-400">Beautiful hand-picked and generated palettes for your design projects.</p>
+        </div>
+
+        <div class="flex items-center gap-3 w-full sm:w-auto">
+          <!-- Search Bar -->
+          <div class="relative w-full sm:w-64">
+            <span class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+              <svg class="h-5 w-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+            </span>
+            <input type="text" id="search-input" placeholder="Search hex or name..." class="w-full pl-9 pr-4 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700 dark:text-slate-300">
+          </div>
+
+          <button onclick="generateAll()" class="whitespace-nowrap px-4 py-2 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-medium text-sm rounded-xl shadow-md shadow-indigo-600/10 flex items-center gap-2 transition-all">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.228 9H18.91"></path></svg>
+            Generate All
+          </button>
+
+          <button onclick="openExportModal()" class="whitespace-nowrap px-4 py-2 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/40 text-sm font-medium rounded-xl flex items-center gap-2 transition-all">
+            Export
+          </button>
+        </div>
+      </header>
+
+      <!-- Main Body Scroll -->
+      <div class="flex-1 p-6 space-y-12">
+
+        <!-- Banner Alert if Local is replaced -->
+        <div id="connection-banner" class="hidden flex items-center justify-between p-4 mb-6 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+          <div class="flex items-center gap-3">
+            <svg class="w-5 h-5 text-emerald-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            <span class="text-sm">Database connection successfully switched to <strong>Main (Hostinger Server)</strong>!</span>
+          </div>
+          <button onclick="document.getElementById('connection-banner').remove()" class="text-emerald-400 hover:text-emerald-300">
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+
+        <!-- Section: Random Colors -->
+        <section id="section-random" class="category-section">
+          <div class="flex justify-between items-center mb-6">
+            <div>
+              <h3 class="text-xl font-bold text-slate-800 dark:text-white">Classic Random</h3>
+              <p class="text-xs text-slate-500 dark:text-slate-400">Perfectly randomized vibrant hues for creative starters.</p>
+            </div>
+            <button onclick="regenerateSection('random')" class="p-2 border border-slate-200 dark:border-slate-800 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 transition-all">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.228 9H18.91"></path></svg>
+            </button>
+          </div>
+          <div id="grid-random" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6"></div>
+        </section>
+
+        <!-- Section: Pastels -->
+        <section id="section-pastels" class="category-section">
+          <div class="flex justify-between items-center mb-6">
+            <div>
+              <h3 class="text-xl font-bold text-slate-800 dark:text-white">Soft Pastels</h3>
+              <p class="text-xs text-slate-500 dark:text-slate-400">Gentle, muted, and light colors for clean, modern interfaces.</p>
+            </div>
+            <button onclick="regenerateSection('pastels')" class="p-2 border border-slate-200 dark:border-slate-800 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 transition-all">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.228 9H18.91"></path></svg>
+            </button>
+          </div>
+          <div id="grid-pastels" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6"></div>
+        </section>
+
+        <!-- Section: Neons -->
+        <section id="section-neons" class="category-section">
+          <div class="flex justify-between items-center mb-6">
+            <div>
+              <h3 class="text-xl font-bold text-slate-800 dark:text-white">Neon Vibe</h3>
+              <p class="text-xs text-slate-500 dark:text-slate-400">Bright, high-energy colors that stand out dramatically.</p>
+            </div>
+            <button onclick="regenerateSection('neons')" class="p-2 border border-slate-200 dark:border-slate-800 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 transition-all">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.228 9H18.91"></path></svg>
+            </button>
+          </div>
+          <div id="grid-neons" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6"></div>
+        </section>
+
+        <!-- Section: Warm -->
+        <section id="section-warm" class="category-section">
+          <div class="flex justify-between items-center mb-6">
+            <div>
+              <h3 class="text-xl font-bold text-slate-800 dark:text-white">Warm Tones</h3>
+              <p class="text-xs text-slate-500 dark:text-slate-400">Fiery, passionate, and comforting shades of red, orange, and yellow.</p>
+            </div>
+            <button onclick="regenerateSection('warm')" class="p-2 border border-slate-200 dark:border-slate-800 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 transition-all">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.228 9H18.91"></path></svg>
+            </button>
+          </div>
+          <div id="grid-warm" class="grid grid-cols-2 Peg-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6"></div>
+        </section>
+
+        <!-- Section: Cool -->
+        <section id="section-cool" class="category-section">
+          <div class="flex justify-between items-center mb-6">
+            <div>
+              <h3 class="text-xl font-bold text-slate-800 dark:text-white">Cool Tones</h3>
+              <p class="text-xs text-slate-500 dark:text-slate-400">Calming, serene, and refreshing greens, blues, and purples.</p>
+            </div>
+            <button onclick="regenerateSection('cool')" class="p-2 border border-slate-200 dark:border-slate-800 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 transition-all">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.228 9H18.91"></path></svg>
+            </button>
+          </div>
+          <div id="grid-cool" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6"></div>
+        </section>
+
+        <!-- Section: Neutrals -->
+        <section id="section-neutrals" class="category-section">
+          <div class="flex justify-between items-center mb-6">
+            <div>
+              <h3 class="text-xl font-bold text-slate-800 dark:text-white">Neutrals</h3>
+              <p class="text-xs text-slate-500 dark:text-slate-400">Balanced, elegant, and grounding greys, browns, and off-whites.</p>
+            </div>
+            <button onclick="regenerateSection('neutrals')" class="p-2 border border-slate-200 dark:border-slate-800 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 transition-all">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.228 9H18.91"></path></svg>
+            </button>
+          </div>
+          <div id="grid-neutrals" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6"></div>
+        </section>
+
+        <!-- Section: Gradients -->
+        <section id="section-gradients" class="category-section">
+          <div class="flex justify-between items-center mb-6">
+            <div>
+              <h3 class="text-xl font-bold text-slate-800 dark:text-white">Beautiful Gradients</h3>
+              <p class="text-xs text-slate-500 dark:text-slate-400">Modern transitions and combinations for backdrops and UI cards.</p>
+            </div>
+            <button onclick="regenerateSection('gradients')" class="p-2 border border-slate-200 dark:border-slate-800 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 transition-all">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.228 9H18.91"></path></svg>
+            </button>
+          </div>
+          <div id="grid-gradients" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+        </section>
+
+        <!-- Section: Favorites -->
+        <section id="section-favorites" class="category-section">
+          <div class="flex justify-between items-center mb-6">
+            <div>
+              <h3 class="text-xl font-bold text-slate-800 dark:text-white">My Saved Colors</h3>
+              <p class="text-xs text-slate-500 dark:text-slate-400">Your curated collection. Saved to local storage for permanence.</p>
+            </div>
+          </div>
+          <div id="grid-favorites" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6"></div>
+          <div id="empty-favorites" class="flex flex-col items-center justify-center p-12 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl">
+            <svg class="w-12 h-12 text-slate-300 dark:text-slate-700 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path></svg>
+            <p class="text-sm text-slate-500 dark:text-slate-400 text-center">No colors saved yet. Click the heart icon on any color to save it here!</p>
+          </div>
+        </section>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- Color Detail Modal -->
+  <div id="detail-modal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center hidden opacity-0 transition-opacity duration-200">
+    <div class="bg-white dark:bg-slate-900 rounded-3xl max-w-lg w-full m-4 overflow-hidden border border-slate-100 dark:border-slate-800 shadow-2xl transform scale-95 transition-transform duration-200">
+      <div id="detail-swatch" class="w-full h-44 relative flex items-end p-6">
+        <button onclick="closeDetailModal()" class="absolute top-4 right-4 bg-white/20 hover:bg-white/40 text-white rounded-full p-2 backdrop-blur-sm transition-all">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+        <span id="detail-name" class="text-2xl font-bold text-white drop-shadow-md"></span>
+      </div>
+
+      <div class="p-6 space-y-6">
+        <div class="grid grid-cols-3 gap-3">
+          <button onclick="copyDetailFormat('hex')" class="flex flex-col items-center p-3 rounded-xl border border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-all text-center">
+            <span class="text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-wider font-bold">HEX</span>
+            <span id="detail-hex" class="text-sm font-semibold mt-1"></span>
+          </button>
+          <button onclick="copyDetailFormat('rgb')" class="flex flex-col items-center p-3 rounded-xl border border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-all text-center">
+            <span class="text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-wider font-bold">RGB</span>
+            <span id="detail-rgb" class="text-xs font-semibold mt-1 truncate w-full"></span>
+          </button>
+          <button onclick="copyDetailFormat('hsl')" class="flex flex-col items-center p-3 rounded-xl border border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-all text-center">
+            <span class="text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-wider font-bold">HSL</span>
+            <span id="detail-hsl" class="text-xs font-semibold mt-1 truncate w-full"></span>
+          </button>
+        </div>
+
+        <div>
+          <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-3">Color Harmonies</h4>
+          <div id="harmonies-container" class="space-y-4">
+            <!-- Dynamic Harmonies list -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Export Modal -->
+  <div id="export-modal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center hidden opacity-0 transition-opacity duration-200">
+    <div class="bg-white dark:bg-slate-900 rounded-3xl max-w-2xl w-full m-4 overflow-hidden border border-slate-100 dark:border-slate-800 shadow-2xl transform scale-95 transition-transform duration-200">
+      <div class="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
+        <h3 class="text-lg font-bold text-slate-800 dark:text-white">Export Palette</h3>
+        <button onclick="closeExportModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-all">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+      </div>
+
+      <div class="p-6">
+        <div class="flex gap-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl mb-4">
+          <button onclick="switchExportTab('json')" id="tab-json" class="export-tab flex-1 py-2 text-sm font-semibold rounded-lg text-center transition-all bg-white dark:bg-slate-700 shadow-sm text-slate-800 dark:text-white">JSON</button>
+          <button onclick="switchExportTab('css')" id="tab-css" class="export-tab flex-1 py-2 text-sm font-semibold rounded-lg text-center transition-all text-slate-500 hover:text-slate-800 dark:hover:text-white">CSS Variables</button>
+          <button onclick="switchExportTab('tailwind')" id="tab-tailwind" class="export-tab flex-1 py-2 text-sm font-semibold rounded-lg text-center transition-all text-slate-500 hover:text-slate-800 dark:hover:text-white">Tailwind</button>
+        </div>
+
+        <div class="relative">
+          <textarea id="export-code" readonly class="w-full h-64 p-4 font-mono text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl resize-none focus:outline-none focus:ring-0"></textarea>
+          <button onclick="copyExportCode()" class="absolute bottom-4 right-4 px-4 py-2 bg-indigo-600 text-white rounded-lg text-xs font-semibold hover:bg-indigo-500 shadow transition-all">Copy Code</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // State management
+    let activeCategory = 'all';
+    let currentPalette = {
+      random: [],
+      pastels: [],
+      neons: [],
+      warm: [],
+      cool: [],
+      neutrals: [],
+      gradients: []
+    };
+    let favorites = JSON.parse(localStorage.getItem('spectra_favorites') || '[]');
+    let currentActiveColor = '';
+    let currentExportTab = 'json';
+
+    // Theme Management
+    if (localStorage.theme === 'light' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: light)').matches)) {
+      document.documentElement.classList.remove('dark');
+      document.getElementById('theme-text').textContent = 'Dark Mode';
+    } else {
+      document.documentElement.classList.add('dark');
+      document.getElementById('theme-text').textContent = 'Light Mode';
+    }
+
+    document.getElementById('theme-toggle').addEventListener('click', () => {
+      if (document.documentElement.classList.contains('dark')) {
+        document.documentElement.classList.remove('dark');
+        localStorage.theme = 'light';
+        document.getElementById('theme-text').textContent = 'Dark Mode';
+      } else {
+        document.documentElement.classList.add('dark');
+        localStorage.theme = 'dark';
+        document.getElementById('theme-text').textContent = 'Light Mode';
+      }
+    });
+
+    // Helper functions
+    function hexToRgb(hex) {
+      const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+      return result ? {
+        r: parseInt(result[1], 16),
+        g: parseInt(result[2], 16),
+        b: parseInt(result[3], 16)
+      } : null;
+    }
+
+    function rgbToHsl(r, g, b) {
+      r /= 255; g /= 255; b /= 255;
+      const max = Math.max(r, g, b), min = Math.min(r, g, b);
+      let h, s, l = (max + min) / 2;
+
+      if (max === min) {
+        h = s = 0;
+      } else {
+        const d = max - min;
+        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+        switch (max) {
+          case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+          case g: h = (b - r) / d + 2; break;
+          case b: h = (r - g) / d + 4; break;
+        }
+        h /= 6;
+      }
+      return {
+        h: Math.round(h * 360),
+        s: Math.round(s * 100),
+        l: Math.round(l * 100)
+      };
+    }
+
+    function hslToHex(h, s, l) {
+      l /= 100;
+      const a = s * Math.min(l, 1 - l) / 100;
+      const f = n => {
+        const k = (n + h / 30) % 12;
+        const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+        return Math.round(255 * color).toString(16).padStart(2, '0');
+      };
+      return `#${f(0)}${f(8)}${f(4)}`;
+    }
+
+    function getContrastColor(hex) {
+      const rgb = hexToRgb(hex);
+      if (!rgb) return '#000000';
+      const yiq = ((rgb.r * 299) + (rgb.g * 587) + (rgb.b * 114)) / 1000;
+      return (yiq >= 128) ? '#0f172a' : '#ffffff';
+    }
+
+    function getColorName(hex) {
+      const rgb = hexToRgb(hex);
+      if (!rgb) return 'Color';
+      const hsl = rgbToHsl(rgb.r, rgb.g, rgb.b);
+      const h = hsl.h;
+      const s = hsl.s;
+      const l = hsl.l;
+
+      let HueName = '';
+      if (h >= 345 || h < 15) HueName = 'Red';
+      else if (h >= 15 && h < 45) HueName = 'Orange';
+      else if (h >= 45 && h < 75) HueName = 'Yellow';
+      else if (h >= 75 && h < 155)  HueName = 'Green';
+      else if (h >= 155 && h < 185) HueName = 'Teal';
+      else if (h >= 185 && h < 255) HuenName = 'Blue';
+      else if (h >= 255 && h < 290) HueName = 'Purple';
+      else if (h >= 290 && h < 345) HueName = 'Pink';
+      if (!HueName) HueName = 'Blue';
+
+      let tone = '';
+      if (s < 10) {
+        if (l < 15) return 'Obsidian';
+        if (l > 85) return 'Snow';
+        return 'Gray';
+      }
+      
+      if (l > 80 && s > 30) {
+        tone = 'Soft ';
+      } else if (l < 25) {
+        tone = 'Deep ';
+      } else if (s > 80 && l > 40 && l < 70) {
+        tone = 'Vibrant ';
+      } else if (s < 40) {
+        tone = 'Muted ';
+      }
+
+      return `${tone}${HueName}`;
+    }
+
+    // Color generation helpers
+    function generateRandomColor() {
+      const letters = '0123456789ABCDEF';
+      let color = '#';
+      for (let i = 0; i < 6; i++) {
+        color += letters[Math.floor(Math.random() * 16)];
+      }
+      return color;
+    }
+
+    function generatePastelColor() {
+      const h = Math.floor(Math.random() * 360);
+      const s = Math.floor(Math.random() * 20) + 50; // 50-70%
+      const l = Math.floor(Math.random() * 10) + 80; // 80-90%
+      return hslToHex(h, s, l);
+    }
+
+    // Fixed color name assignment for Blue:
+    function generateNeonColor() {
+      const h = Math.floor(Math.random() * 360);
+      const s = Math.floor(Math.random() * 15) + 85; // 85-100%
+      const l = Math.floor(Math.random() * 10) + 50; // 50-60%
+      return hslToHex(h, s, l);
+    }
+
+    function generateWarmColor() {
+      // Warm: 0-50, 340-360
+      const h = Math.random() > 0.5 ? Math.floor(Math.random() * 50) : Math.floor(Math.random() * 20) + 340;
+      const s = Math.floor(Math.random() * 20) + 70;
+      const l = Math.floor(Math.random() * 20) + 45;
+      return hslToHex(h, s, l);
+    }
+
+    function generateCoolColor() {
+      // Cool: 160-280
+      const h = Math.floor(Math.random() * 120) + 160;
+      const s = Math.floor(Math.random() * 20) + 65;
+      const l = Math.floor(Math.random() * 20) + 45;
+      return hslToHex(h, s, l);
+    }
+
+    function generateNeutralColor() {
+      const h = Math.floor(Math.random() * 360);
+      const s = Math.floor(Math.random() * 10) + 2; // Very low saturation
+      const l = Math.floor(Math.random() * 60) + 20; // Varied lightness
+      return hslToHex(h, s, l);
+    }
+
+    function generateGradient() {
+      const deg = Math.floor(Math.random() * 360);
+      const startH = Math.floor(Math.random() * 360);
+      const startS = Math.floor(Math.random() * 20) + 70;
+      const startL = Math.floor(Math.random() * 20) + 40;
+      const start = hslToHex(startH, startS, startL);
+
+      // End color is analogous (H + 45) for beautiful gradients
+      const endH = (startH + 45) % 360;
+      const end = hslToHex(endH, startS, startL);
+
+      return {
+        from: start,
+        to: end,
+        deg: deg,
+        name: `${getColorName(start)} to ${getColorName(end)}`
+      };
+    }
+
+    // Render logic
+    function createColorCard(hex, index, type) {
+      const isFav = favorites.includes(hex);
+      const textColor = getContrastColor(hex);
+      return `
+        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all color-card group">
+          <div class="h-32 w-full relative transition-all" style="background-color: ${hex};">
+            <div class="color-actions absolute inset-0 flex items-center justify-center gap-2 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity">
+              <button onclick="toggleFavorite('${hex}')" class="p-2 bg-white/90 dark:bg-slate-900/90 text-slate-800 dark:text-white rounded-full hover:scale-105 active:scale-95 transition-all">
+                <svg class="w-5 h-5 ${isFav ? 'fill-red-500 text-red-500' : 'text-slate-500'}" fill="${isFav ? 'currentColor' : 'none'}" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
+                </svg>
+              </button>
+              <button onclick="openDetailModal('${hex}')" class="p-2 bg-white/90 dark:bg-slate-900/90 text-slate-800 dark:text-white rounded-full hover:scale-105 active:scale-95 transition-all">
+                <svg class="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+              </button>
+            </div>
+            <button onclick="copyToClipboard('${hex}')" class="absolute bottom-2 right-2 px-2 py-1 bg-black/40 text-white rounded text-[10px] uppercase font-bold tracking-wider hover:bg-black/60 transition-all opacity-0 group-hover:opacity-100">
+              Copy
+            </button>
+          </div>
+          <div class="p-4" onclick="openDetailModal('${hex}')" style="cursor: pointer;">
+            <div class="font-bold text-sm text-slate-800 dark:text-slate-100 truncate">${getColorName(hex)}</div>
+            <div class="text-xs text-slate-500 dark:text-slate-400 mt-0.5 uppercase tracking-wider font-semibold">${hex}</div>
+          </div>
+        </div>
+      `;
+    }
+
+    function createGradientCard(gradient, index) {
+      const gradientStyle = `linear-gradient(${gradient.deg}deg, ${gradient.from}, ${gradient.to})`;
+      return `
+        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all color-card group">
+          <div class="h-36 w-full relative transition-all" style="background: ${gradientStyle};">
+            <button onclick="copyToClipboard('background: ${gradientStyle};')" class="absolute top-2 right-2 px-2.5 py-1.5 bg-white/90 dark:bg-slate-900/90 text-slate-800 dark:text-white rounded-lg text-xs font-bold shadow-md hover:scale-105 active:scale-95 transition-all flex items-center gap-1">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8  5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
+              Copy CSS
+            </button>
+          </div>
+          <div class="p-4 flex justify-between items-center">
+            <div>
+              <div class="font-bold text-sm text-slate-800 dark:text-slate-100 truncate max-w-[160px]">${gradient.name}</div>
+              <div class="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 uppercase font-semibold">${gradient.from} → ${gradient.to}</div>
+            </div>
+            <div class="flex gap-1">
+              <span class="w-4 h-4 rounded-full border border-white/50 shadow" style="background-color: ${gradient.from}"></span>
+              <span class="w-4 h-4 rounded-full border border-white/50 shadow" style="background-color: ${gradient.to}"></span>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function generateSection(type) {
+      if (type === 'gradients') {
+        currentPalette.gradients = [];
+        for (let i = 0; i < 9; i++) {
+          currentPalette.gradients.push(generateGradient());
+        }
+      } else {
+        currentPalette[type] = [];
+        const generatorMap = {
+          random: generateRandomColor,
+          pastels: generatePastelColor,
+          neons: generateNeonColor,
+          warm: generateWarmColor,
+          cool: generateCoolColor,
+          neutrals: generateNeutralColor
+        };
+        for (let i = 0; i < 12; i++) {
+          currentPalette[type].push(generatorMap[type]());
+        }
+      }
+      renderSection(type);
+    }
+
+    function renderSection(type) {
+      const container = document.getElementById(`grid-${type}`);
+      if (!container) return;
+
+      container.innerHTML = '';
+      if (type === 'gradients') {
+        currentPalette.gradients.forEach((grad, index) => {
+          container.innerHTML += createGradientCard(grad, index);
+        });
+      } else {
+        currentPalette[type].forEach((hex, index) => {
+          container.innerHTML += createColorCard(hex, index, type);
+        });
+      }
+    }
+
+    function renderFavorites() {
+      const container = document.getElementById('grid-favorites');
+      const emptyState = document.getElementById('empty-favorites');
+      const favBadge = document.getElementById('fav-badge');
+
+      if (!container) return;
+
+      container.innerHTML = '';
+      
+      if (favorites.length === 0) {
+        emptyState.style.display = 'flex';
+        favBadge.classList.add('hidden');
+      } else {
+        emptyState.style.display = 'none';
+        favBadge.classList.remove('hidden');
+        favBadge.textContent = favorites.length;
+
+        favorites.forEach((hex, index) => {
+          container.innerHTML += createColorCard(hex, index, 'favorites');
+        });
+      }
+    }
+
+    function toggleFavorite(hex) {
+      const index = favorites.indexOf(hex);
+      if (index === -1) {
+        favorites.push(hex);
+        showToast('Added to Favorites');
+      } else {
+        favorites.splice(index, 1);
+        showToast('Removed from Favorites');
+      }
+      localStorage.setItem('spectra_favorites', JSON.stringify(favorites));
+      
+      // Re-render everything affected
+      renderFavorites();
+      ['random', 'pastels', 'neons', 'warm', 'cool', 'neutrals'].forEach(renderSection);
+    }
+
+    function generateAll() {
+      const keys = Object.keys(currentPalette);
+      keys.forEach(key => generateSection(key));
+      showToast('New Palette Generated');
+    }
+
+    function showToast(message) {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      toast.className = 'flex items-center gap-3 bg-slate-900 text-white dark:bg-white dark:text-slate-900 px-4 py-3 rounded-xl shadow-lg border border-slate-800 dark:border-slate-200 transition-all transform translate-y-2 opacity-0 pointer-events-auto max-w-sm';
+      toast.innerHTML = `
+        <svg class="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+        <span class="text-xs font-semibold">${message}</span>
+      `;
+      container.appendChild(toast);
+      
+      setTimeout(() => {
+        toast.classList.remove('opacity-0', 'translate-y-2');
+      }, 50);
+
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-2');
+        setTimeout(() => toast.remove(), 200);
+      }, 3000);
+    }
+
+    function copyToClipboard(text) {
+      navigator.clipboard.writeText(text).then(() => {
+        showToast(`Copied: ${text}`);
+      });
+    }
+
+    // Filter by category
+    function filterCategory(cat) {
+      const sections = document.querySelectorAll('.category-section');
+      const navItems = document.querySelectorAll('.nav-item');
+
+      navItems.forEach(item => {
+        item.classList.remove('bg-indigo-50', 'text-indigo-600', 'dark:bg-indigo-950/40', 'dark:text-indigo-400');
+        item.classList.add('text-slate-600', 'dark:text-slate-400', 'hover:bg-slate-100', 'dark:hover:bg-slate-800/40');
+      });
+
+      const activeLink = document.querySelector(`a[href="#${cat}"]`);
+      if (activeLink) {
+        activeLink.classList.remove('text-slate-600', 'dark:text-slate-400', 'hover:bg-slate-100', 'dark:hover:bg-slate-800/40');
+        activeLink.classList.add('bg-indigo-50', 'text-indigo-600', 'dark:bg-indigo-950/40', 'dark:text-indigo-400');
+      }
+
+      sections.forEach(section => {
+        if (cat === 'all') {
+          section.style.display = 'block';
+        } else {
+          if (section.id === `section-${cat}`) {
+            section.style.display = 'block';
+          } else {
+            section.style.display = 'none';
+          }
+        }
+      });
+    }
+
+    // Color Details Modal
+    function openDetailModal(hex) {
+      currentActiveColor = hex;
+      const modal = document.getElementById('detail-modal');
+      const swatch = document.getElementById('detail-swatch');
+      const name = document.getElementById('detail-name');
+      const hexEl = document.getElementById('detail-hex');
+      const rgbEl = document.getElementById('detail-rgb');
+      const hslEl = document.getElementById('detail-hsl');
+
+      const rgb = hexToRgb(hex);
+      const hsl = rgbToHsl(rgb.r, rgb.g, rgb.b);
+
+      swatch.style.backgroundColor = hex;
+      name.textContent = getColorName(hex);
+      name.style.color = getContrastColor(hex);
+      hexEl.textContent = hex;
+      rgbEl.textContent = `rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`;
+      hslEl.textContent = `hsl(${hsl.h}, ${hsl.s}%, ${hsl.l}%)`;
+
+      // Build harmonies
+      buildHarmonies(hsl);
+
+      modal.classList.remove('hidden');
+      setTimeout(() => {
+        modal.classList.remove('opacity-0');
+        modal.querySelector('.transform').classList.remove('scale-95');
+      }, 50);
+    }
+
+    function closeDetailModal() {
+      const modal = document.getElementById('detail-modal');
+      modal.classList.add('opacity-0');
+      modal.querySelector('.transform').classList.add('scale-95');
+      setTimeout(() => {
+        modal.classList.add('hidden');
+      }, 200);
+    }
+
+    function copyDetailFormat(type) {
+      const rgb = hexToRgb(currentActiveColor);
+      const hsl = rgbToHsl(rgb.r, rgb.g, rgb.b);
+      if (type === 'hex') copyToClipboard(currentActiveColor);
+      if (type === 'rgb') copyToClipboard(`rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`);
+      if (type === 'hsl') copyToClipboard(`hsl(${hsl.h}, ${hsl.s}%, ${hsl.l}%)`);
+    }
+
+    function buildHarmonies(hsl) {
+      const container = document.getElementById('harmonies-container');
+      container.innerHTML = '';
+
+      const complementary = hslToHex((hsl.h + 180) % 360, hsl.s, hsl.l);
+      const analogous1 = hslToHex((hsl.h + 30) % 360, hsl.s, hsl.l);
+      const analogous2 = hslToHex((hsl.h - 30 + 360) % 360, hsl.s, hsl.l);
+      const triadic1 = hslToHex((hsl.h + 120) % 360, hsl.s, hsl.l);
+      const triadic2 = hslToHex((hsl.h + 240) % 360, hsl.s, hsl.l);
+
+      const harmonies = [
+        { label: 'Complementary', colors: [complementary] },
+        { label: 'Analogous', colors: [analogous1, analogous2] },
+        { label: 'Triadic', colors: [triadic1, triadic2] }
+      ];
+
+      harmonies.forEach(harm => {
+        const itemHtml = `
+          <div>
+            <div class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">${harm.label}</div>
+            <div class="flex gap-2">
+              ${harm.colors.map(color => `
+                <div onclick="openDetailModal('${color}')" class="flex-1 flex items-center justify-between p-2 rounded-lg border border-slate-100 dark:border-slate-800 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-all">
+                  <div class="flex items-center gap-2">
+                    <span class="w-6 h-6 rounded-md border border-black/10" style="background-color: ${color}"></span>
+                    <span class="text-xs font-semibold uppercase">${color}</span>
+                  </div>
+                  <span class="text-[10px] text-indigo-500 font-bold">Select</span>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `;
+        container.innerHTML += itemHtml;
+      });
+    }
+
+    // Export Modal functions
+    function openExportModal() {
+      const modal = document.getElementById('export-modal');
+      modal.classList.remove('hidden');
+      setTimeout(() => {
+        modal.classList.remove('opacity-0');
+        modal.querySelector('.transform').classList.remove('scale-95');
+      }, 50);
+      updateExportText();
+    }
+
+    function closeExportModal() {
+      const modal = document.getElementById('export-modal');
+      modal.classList.add('opacity-0');
+      modal.querySelector('.transform').classList.add('scale-95');
+      setTimeout(() => {
+        modal.classList.add('hidden');
+      }, 200);
+    }
+
+    function switchExportTab(tab) {
+      document.querySelectorAll('.export-tab').forEach(el => {
+        el.classList.remove('bg-white', 'dark:bg-slate-700', 'shadow-sm', 'text-slate-800', 'dark:text-white');
+        el.classList.add('text-slate-500', 'hover:text-slate-800', 'dark:hover:text-white');
+      });
+      document.getElementById(`tab-${tab}`).classList.remove('text-slate-500');
+      document.getElementById(`tab-${tab}`).classList.add('bg-white', 'dark:bg-slate-700', 'shadow-sm', 'text-slate-800', 'dark:text-white');
+      currentExportTab = tab;
+      updateExportText();
+    }
+
+    function updateExportText() {
+      const textarea = document.getElementById('export-code');
+      const allColors = [...currentPalette.random, ...currentPalette.pastels, ...currentPalette.neons, ...currentPalette.warm, ...currentPalette.cool, ...currentPalette.neutrals];
+      
+      if (currentExportTab === 'json') {
+        const jsonExp = allColors.map((hex, index) => {
+          return { name: getColorName(hex), hex: hex };
+        });
+        textarea.value = JSON.stringify(jsonExp, null, 2);
+      } else if (currentExportTab === 'css') {
+        let cssExp = ':root {\n';
+        allColors.forEach((hex, index) => {
+          const formattedName = getColorName(hex).toLowerCase().replace(/\s+/g, '-');
+          cssExp += `  --color-${formattedName}-${index}: ${hex};\n`;
+        });
+        cssExp += '}';
+        textarea.value = cssExp;
+      } else if (currentExportTab === 'tailwind') {
+        let twExp = 'module.exports = {\n  theme: {\n    extend: {\n      colors: {\n';
+        allColors.forEach((hex, index) => {
+          const formattedName = getColorName(hex).toLowerCase().replace(/\s+/g, '-');
+          twExp += `        '${formattedName}-${index}': '${hex}',\n`;
+        });
+        twExp += '      }\n    }\n  }\n}';
+        textarea.value = twExp;
+      }
+    }
+
+    function copyExportCode() {
+      const code = document.getElementById('export-code').value;
+      copyToClipboard(code);
+    }
+
+    // Search functionality
+    document.getElementById('search-input').addEventListener('input', (e) => {
+      const term = e.target.value.toLowerCase().trim();
+      const allCards = document.querySelectorAll('.color-card');
+      
+      allCards.forEach(card => {
+        const name = card.querySelector('.font-bold').textContent.toLowerCase();
+        const hex = card.querySelector('.text-xs').textContent.toLowerCase();
+        
+        if (name.includes(term) || hex.includes(term)) {
+          card.style.display = 'block';
+        } else {
+          card.style.display = 'none';
+        }
+      });
+    });
+
+    // Close modals on backdrop click
+    window.addEventListener('click', (e) => {
+      const detailModal = document.getElementById('detail-modal');
+      const exportModal = document.getElementById('export-modal');
+      if (e.target === detailModal) closeDetailModal();
+      if (e.target === exportModal) closeExportModal();
+    });
+
+    // Initial load
+    generateAll();
+    renderFavorites();
+
+    // Trigger showing connection banner for users reassurance
+    setTimeout(() => {
+      document.getElementById('connection-banner').classList.remove('hidden');
+    }, 500);
+
+  </script>
+</body>
+</html>

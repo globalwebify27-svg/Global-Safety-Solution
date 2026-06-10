@@ -20,13 +20,15 @@ export class LeadsService {
     });
   }
 
-  async create(data: any) {
+  async create(data: any, userPayload?: any) {
     const next_follow_up = data.next_follow_up
       ? new Date(data.next_follow_up)
       : null;
+    const assigned_to = data.assigned_to || userPayload?.userId || null;
     const lead = await this.prisma.lead.create({
       data: {
         ...data,
+        assigned_to,
         next_follow_up,
       },
     });
@@ -38,7 +40,7 @@ export class LeadsService {
         entity_id: lead.id,
         action: 'CREATED',
         new_data: JSON.stringify({ company_name: lead.company_name, contact_person: lead.contact_person, expected_value: lead.expected_value }),
-        user_id: 'System'
+        user_id: userPayload?.userId || 'System'
       }
     });
 
@@ -123,6 +125,14 @@ export class LeadsService {
           });
         }
 
+        let assignedStaffId = lead.assigned_to;
+        if (!assignedStaffId) {
+          const superAdmin = await tx.user.findFirst({
+            where: { email: 'admin@globalsafety.com' }
+          });
+          assignedStaffId = superAdmin?.id || null;
+        }
+
         // 2. Create the Client record
         const client = await tx.client.create({
           data: {
@@ -131,6 +141,7 @@ export class LeadsService {
             phone: lead.phone,
             industry: lead.source || 'General',
             is_active: true,
+            assigned_staff_id: assignedStaffId,
           },
         });
 

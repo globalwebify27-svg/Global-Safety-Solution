@@ -6,6 +6,7 @@ import {
   Body,
   Param,
   UseGuards,
+  Req,
 } from '@nestjs/common';
 import { LeadsService } from './leads.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -21,8 +22,8 @@ export class LeadsController {
   }
 
   @Post()
-  create(@Body() data: any) {
-    return this.leadsService.create(data);
+  create(@Body() data: any, @Req() req: any) {
+    return this.leadsService.create(data, req.user);
   }
 
   @Get(':id')

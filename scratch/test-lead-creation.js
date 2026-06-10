@@ -1,8 +1,8 @@
 const http = require('http');
 
 const loginPayload = JSON.stringify({
-  email: 'admin@globalsafety.com',
-  password: 'superadmin123'
+  email: 'sourav@globalsafety.com',
+  password: 'Staff@123'
 });
 
 function request(options, body) {

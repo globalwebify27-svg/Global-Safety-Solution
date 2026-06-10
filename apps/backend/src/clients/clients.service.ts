@@ -73,6 +73,14 @@ export class ClientsService {
     } else {
       delete data.contacts;
     }
+    if (!data.assigned_staff_id) {
+      const superAdmin = await this.prisma.user.findFirst({
+        where: { email: 'admin@globalsafety.com' }
+      });
+      if (superAdmin) {
+        data.assigned_staff_id = superAdmin.id;
+      }
+    }
     return this.prisma.client.create({ data });
   }
 
