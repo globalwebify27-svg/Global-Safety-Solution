@@ -60,7 +60,16 @@ export class DashboardService {
         },
       });
 
-      const activeQuotes = clientRecord?.quotations.filter(q => q.status === 'ACCEPTED' || q.status === 'PENDING').length || 0;
+      const clientQuotes = clientRecord ? await this.prisma.quotation.findMany({
+        where: {
+          OR: [
+            { client_id: clientRecord.id },
+            { lead: { client_id: clientRecord.id } }
+          ]
+        }
+      }) : [];
+
+      const activeQuotes = clientQuotes.filter(q => q.status === 'ACCEPTED' || q.status === 'PENDING').length;
       const scheduledAudits = clientRecord?.inspections.filter(i => i.status === 'SCHEDULED').length || 0;
       const certificatesCount = clientRecord?.documents.filter(d => d.category === 'CERTIFICATE' || d.category === 'COMPLIANCE').length || 0;
 
@@ -76,7 +85,7 @@ export class DashboardService {
         })) || [];
 
       // Get recent quotes
-      const recentQuotations = clientRecord?.quotations
+      const recentQuotations = clientQuotes
         .sort((a, b) => b.updated_at.getTime() - a.updated_at.getTime())
         .slice(0, 5)
         .map(q => ({
@@ -84,7 +93,7 @@ export class DashboardService {
           quoteNumber: q.quote_number,
           totalAmount: Number(q.total_amount),
           status: q.status,
-        })) || [];
+        }));
 
       // Get recent invoices
       const recentInvoices = clientRecord?.invoices

@@ -43,7 +43,12 @@ export class QuotationsService {
     }
 
     return this.prisma.quotation.findMany({
-      where: clientId ? { client_id: clientId } : undefined,
+      where: clientId ? {
+        OR: [
+          { client_id: clientId },
+          { lead: { client_id: clientId } }
+        ]
+      } : undefined,
       include: {
         items: true,
         lead: true,

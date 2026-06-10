@@ -120,7 +120,7 @@ interface AuditLog {
 export default function ClientProfilePage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const { id } = use(params);
-  
+
   const token = useAuthStore((state) => state.token);
   const user = useAuthStore((state) => state.user);
   const [client, setClient] = useState<Client | null>(null);
@@ -129,15 +129,15 @@ export default function ClientProfilePage({ params }: { params: Promise<{ id: st
   const [actionError, setActionError] = useState<string | null>(null);
   const [expandedProject, setExpandedProject] = useState<string | null>(null);
   const [isWorkloadAnalyzed, setIsWorkloadAnalyzed] = useState(false);
-  
+
   // Reallocation States
   const [usersList, setUsersList] = useState<any[]>([]);
   const [isTransferring, setIsTransferring] = useState(false);
   const [selectedStaffId, setSelectedStaffId] = useState<string>("");
   const [savingTransfer, setSavingTransfer] = useState(false);
-  const isSuperAdmin = 
-    user?.role === 'SUPER_ADMIN' || 
-    user?.role === 'ADMIN' || 
+  const isSuperAdmin =
+    user?.role === 'SUPER_ADMIN' ||
+    user?.role === 'ADMIN' ||
     (user as any)?.roles?.some((ur: any) => ur.role?.name === 'SUPER_ADMIN' || ur.role?.name === 'ADMIN');
 
   const fetchClientDetails = () => {
@@ -146,22 +146,22 @@ export default function ClientProfilePage({ params }: { params: Promise<{ id: st
     fetch(url, {
       headers: { Authorization: `Bearer ${token}` }
     })
-    .then(async (r) => {
-      if (!r.ok) {
-        const errorData = await r.json().catch(() => ({}));
-        throw new Error(errorData.message || `Server responded with ${r.status}`);
-      }
-      return r.json();
-    })
-    .then(data => {
-      setClient(data);
-      setLoading(false);
-    })
-    .catch((e) => {
-      console.error("[ClientProfilePage] Fetch error:", e.message || e);
-      setActionError(`Fetch Failed: ${e.message || 'Check connection'}`);
-      setLoading(false);
-    });
+      .then(async (r) => {
+        if (!r.ok) {
+          const errorData = await r.json().catch(() => ({}));
+          throw new Error(errorData.message || `Server responded with ${r.status}`);
+        }
+        return r.json();
+      })
+      .then(data => {
+        setClient(data);
+        setLoading(false);
+      })
+      .catch((e) => {
+        console.error("[ClientProfilePage] Fetch error:", e.message || e);
+        setActionError(`Fetch Failed: ${e.message || 'Check connection'}`);
+        setLoading(false);
+      });
   };
 
   useEffect(() => {
@@ -173,18 +173,18 @@ export default function ClientProfilePage({ params }: { params: Promise<{ id: st
     fetch(`${API_BASE_URL}/users`, {
       headers: { Authorization: `Bearer ${token}` }
     })
-    .then(r => {
-      if (!r.ok) throw new Error("Could not load users list");
-      return r.json();
-    })
-    .then(data => {
-      if (Array.isArray(data)) {
-        setUsersList(data.filter((u: any) => u.is_active));
-      }
-    })
-    .catch(err => {
-      console.warn("Failed to load user list:", err.message);
-    });
+      .then(r => {
+        if (!r.ok) throw new Error("Could not load users list");
+        return r.json();
+      })
+      .then(data => {
+        if (Array.isArray(data)) {
+          setUsersList(data.filter((u: any) => u.is_active));
+        }
+      })
+      .catch(err => {
+        console.warn("Failed to load user list:", err.message);
+      });
   }, [token]);
 
   const handleTransfer = async () => {
@@ -194,9 +194,9 @@ export default function ClientProfilePage({ params }: { params: Promise<{ id: st
     try {
       const res = await fetch(`${API_BASE_URL}/clients/${id}`, {
         method: 'PATCH',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}` 
+          Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({ assigned_staff_id: selectedStaffId })
       });
@@ -231,9 +231,9 @@ export default function ClientProfilePage({ params }: { params: Promise<{ id: st
     try {
       const res = await fetch(`${API_BASE_URL}/clients/${id}`, {
         method: 'PATCH',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}` 
+          Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({ is_active: !client.is_active })
       });
@@ -269,16 +269,15 @@ export default function ClientProfilePage({ params }: { params: Promise<{ id: st
             <p className="text-muted-foreground text-xs font-mono mt-1 uppercase tracking-widest bg-accent/5 px-2 py-0.5 rounded inline-block">Client ID: {client.id.split('-')[0]}</p>
           </div>
         </div>
-        
+
         <div className="flex flex-col items-end gap-2">
-          <Button 
+          <Button
             disabled={toggling}
             onClick={toggleStatus}
-            className={`font-black uppercase tracking-widest text-[10px] px-6 h-10 rounded-xl shadow-lg transition-all active:scale-95 border-0 ${
-              client.is_active 
-                ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 hover:bg-rose-500/20 shadow-rose-500/10" 
+            className={`font-black uppercase tracking-widest text-[10px] px-6 h-10 rounded-xl shadow-lg transition-all active:scale-95 border-0 ${client.is_active
+                ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 hover:bg-rose-500/20 shadow-rose-500/10"
                 : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 shadow-emerald-500/10"
-            }`}
+              }`}
           >
             {toggling ? "Updating..." : (client.is_active ? "Deactivate Client" : "Re-Activate Client")}
           </Button>
@@ -299,7 +298,7 @@ export default function ClientProfilePage({ params }: { params: Promise<{ id: st
               </div>
               Corporate Intelligence
             </h3>
-            
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-10">
               <div className="space-y-6">
                 <div className="space-y-1.5">
@@ -331,7 +330,7 @@ export default function ClientProfilePage({ params }: { params: Promise<{ id: st
               </div>
               Organization Headquarters
             </h3>
-            
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-10">
               <div className="space-y-6">
                 <div className="space-y-1.5">
@@ -355,26 +354,26 @@ export default function ClientProfilePage({ params }: { params: Promise<{ id: st
               </div>
               Key Contact Persons
             </h3>
-            
+
             {client.contacts && client.contacts.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                 {client.contacts.map((contact: any) => (
-                    <div key={contact.id} className="flex flex-col p-5 rounded-2xl bg-background border border-border shadow-sm">
-                      <p className="font-bold text-foreground text-lg mb-1">{contact.name || "Unnamed Contact"}</p>
-                      <p className="text-sm font-semibold text-primary mb-4">{contact.designation || "Designation not provided"}</p>
-                      
-                      <div className="space-y-2 mt-auto">
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Mail className="w-3.5 h-3.5" />
-                          <span className="truncate">{contact.email || "No email"}</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Phone className="w-3.5 h-3.5" />
-                          <span>{contact.phone || "No phone"}</span>
-                        </div>
+                {client.contacts.map((contact: any) => (
+                  <div key={contact.id} className="flex flex-col p-5 rounded-2xl bg-background border border-border shadow-sm">
+                    <p className="font-bold text-foreground text-lg mb-1">{contact.name || "Unnamed Contact"}</p>
+                    <p className="text-sm font-semibold text-primary mb-4">{contact.designation || "Designation not provided"}</p>
+
+                    <div className="space-y-2 mt-auto">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Mail className="w-3.5 h-3.5" />
+                        <span className="truncate">{contact.email || "No email"}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Phone className="w-3.5 h-3.5" />
+                        <span>{contact.phone || "No phone"}</span>
                       </div>
                     </div>
-                 ))}
+                  </div>
+                ))}
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground bg-muted/20 rounded-2xl border border-dashed border-border">
@@ -393,15 +392,15 @@ export default function ClientProfilePage({ params }: { params: Promise<{ id: st
             </h3>
             {client.compliances && client.compliances.length > 0 ? (
               <div className="grid grid-cols-1 gap-4">
-                 {client.compliances.map((c) => (
-                    <div key={c.id} className="flex items-center justify-between p-5 rounded-2xl bg-background border border-border hover:border-primary/20 transition-all shadow-sm group">
-                      <div className="space-y-1">
-                        <p className="font-bold text-foreground text-lg group-hover:text-primary transition-colors">{c.compliance_type}</p>
-                        <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest mt-1">Expiry: {new Date(c.expiry_date).toLocaleDateString([], { day: '2-digit', month: 'short', year: 'numeric' })}</p>
-                      </div>
-                      <span className="px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-tighter bg-primary/10 text-primary ring-1 ring-primary/20 shadow-sm">{c.status}</span>
+                {client.compliances.map((c) => (
+                  <div key={c.id} className="flex items-center justify-between p-5 rounded-2xl bg-background border border-border hover:border-primary/20 transition-all shadow-sm group">
+                    <div className="space-y-1">
+                      <p className="font-bold text-foreground text-lg group-hover:text-primary transition-colors">{c.compliance_type}</p>
+                      <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest mt-1">Expiry: {new Date(c.expiry_date).toLocaleDateString([], { day: '2-digit', month: 'short', year: 'numeric' })}</p>
                     </div>
-                 ))}
+                    <span className="px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-tighter bg-primary/10 text-primary ring-1 ring-primary/20 shadow-sm">{c.status}</span>
+                  </div>
+                ))}
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground bg-muted/20 rounded-2xl border border-dashed border-border">
@@ -440,9 +439,9 @@ export default function ClientProfilePage({ params }: { params: Promise<{ id: st
                 </div>
                 Assigned Account Manager
               </h3>
-              
-              <Button 
-                variant="ghost" 
+
+              <Button
+                variant="ghost"
                 size="sm"
                 onClick={() => {
                   setIsTransferring(!isTransferring);
@@ -471,13 +470,13 @@ export default function ClientProfilePage({ params }: { params: Promise<{ id: st
                     Select a safety officer to assign/transfer this client portfolio. Caseload ratings and portfolio meters will update dynamically.
                   </p>
                 </div>
-                
+
                 <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
                   {usersList.map((user) => {
                     const isCurrentAssigned = client.assigned_staff?.id === user.id;
                     const isSelected = selectedStaffId === user.id;
                     return (
-                      <div 
+                      <div
                         key={user.id}
                         onClick={() => !isCurrentAssigned && setSelectedStaffId(user.id)}
                         className={cn(
@@ -504,7 +503,7 @@ export default function ClientProfilePage({ params }: { params: Promise<{ id: st
                             <span>{user.department || "Operations"}</span>
                           </div>
                         </div>
-                        
+
                         {!isCurrentAssigned && (
                           <div className={cn(
                             "w-4 h-4 rounded-full border flex items-center justify-center shrink-0",
@@ -544,7 +543,7 @@ export default function ClientProfilePage({ params }: { params: Promise<{ id: st
                 </div>
               </div>
             )}
-            
+
             {client.assigned_staff ? (
               <div className="space-y-4">
                 <div className="flex items-center gap-4 p-4 bg-background border border-border rounded-2xl shadow-sm">
@@ -557,15 +556,15 @@ export default function ClientProfilePage({ params }: { params: Promise<{ id: st
                     {client.assigned_staff.email && (
                       <p className="text-[10px] text-muted-foreground/80 font-mono tracking-tight mt-1 truncate">{client.assigned_staff.email}</p>
                     )}
-                    
+
                     {client.assigned_staff.assigned_clients && (
                       <div className="mt-3 flex flex-wrap gap-2">
                         <button
                           onClick={() => setIsWorkloadAnalyzed(!isWorkloadAnalyzed)}
-                          className={cn("flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[9px] font-black uppercase tracking-wider border transition-all hover:scale-[1.02] active:scale-95 duration-200", 
-                          isWorkloadAnalyzed 
-                            ? "bg-emerald-500 text-white border-emerald-600 shadow-sm shadow-emerald-500/20" 
-                            : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20"
+                          className={cn("flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[9px] font-black uppercase tracking-wider border transition-all hover:scale-[1.02] active:scale-95 duration-200",
+                            isWorkloadAnalyzed
+                              ? "bg-emerald-500 text-white border-emerald-600 shadow-sm shadow-emerald-500/20"
+                              : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20"
                           )}
                         >
                           <BarChart2 className="w-3 h-3" />
@@ -596,20 +595,20 @@ export default function ClientProfilePage({ params }: { params: Promise<{ id: st
                           }
                         })()}
                       </div>
-                      
+
                       {/* Dynamic capacity horizontal indicator */}
                       <div className="pt-2">
                         <div className="w-full h-2 bg-muted rounded-full overflow-hidden flex">
                           {(() => {
                             const count = client.assigned_staff?.assigned_clients?.length || 0;
                             const fillPercentage = Math.min((count / 8) * 100, 100);
-                            const barColorClass = count <= 2 
-                              ? "bg-emerald-500" 
-                              : count <= 5 
-                                ? "bg-blue-500" 
+                            const barColorClass = count <= 2
+                              ? "bg-emerald-500"
+                              : count <= 5
+                                ? "bg-blue-500"
                                 : "bg-amber-500";
                             return (
-                              <div 
+                              <div
                                 className={cn("h-full rounded-full transition-all duration-500", barColorClass)}
                                 style={{ width: `${fillPercentage}%` }}
                               />
@@ -637,17 +636,17 @@ export default function ClientProfilePage({ params }: { params: Promise<{ id: st
                         <Users className="w-3.5 h-3.5 text-emerald-500" />
                         Live Account Portfolio
                       </span>
-                      
+
                       <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
                         {client.assigned_staff.assigned_clients.map((c) => {
                           const isCurrent = c.id === client.id;
                           return (
-                            <div 
-                              key={c.id} 
+                            <div
+                              key={c.id}
                               className={cn(
                                 "p-3 rounded-xl border flex items-center justify-between gap-3 transition-all",
-                                isCurrent 
-                                  ? "bg-emerald-500/5 border-emerald-500/20 shadow-sm" 
+                                isCurrent
+                                  ? "bg-emerald-500/5 border-emerald-500/20 shadow-sm"
                                   : "bg-background border-border hover:border-primary/20"
                               )}
                             >
@@ -666,7 +665,7 @@ export default function ClientProfilePage({ params }: { params: Promise<{ id: st
                                   <span>{c.city || "Global"}</span>
                                 </div>
                               </div>
-                              
+
                               {!isCurrent && (
                                 <button
                                   onClick={() => router.push(`/dashboard/clients/${c.id}`)}
@@ -693,17 +692,17 @@ export default function ClientProfilePage({ params }: { params: Promise<{ id: st
           </div>
 
           <div className="bg-card/40 backdrop-blur-md rounded-3xl border border-border p-8 flex flex-col items-center justify-center text-center space-y-4 shadow-sm">
-             <div className={cn("w-16 h-16 rounded-3xl flex items-center justify-center border-2 border-dashed transition-all", 
-               client.is_active ? "border-emerald-500/20 bg-emerald-500/5" : "border-rose-500/20 bg-rose-500/5"
-             )}>
-               <ShieldAlert className={cn("w-8 h-8", client.is_active ? "text-emerald-500" : "text-rose-500")} />
-             </div>
-             <div className="space-y-1">
-               <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Account State</p>
-               <p className={cn("font-black text-lg tracking-tight", client.is_active ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400')}>
-                 {client.is_active ? 'ACTIVE & MONITORED' : 'RESTRICTED ACCESS'}
-               </p>
-             </div>
+            <div className={cn("w-16 h-16 rounded-3xl flex items-center justify-center border-2 border-dashed transition-all",
+              client.is_active ? "border-emerald-500/20 bg-emerald-500/5" : "border-rose-500/20 bg-rose-500/5"
+            )}>
+              <ShieldAlert className={cn("w-8 h-8", client.is_active ? "text-emerald-500" : "text-rose-500")} />
+            </div>
+            <div className="space-y-1">
+              <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Account State</p>
+              <p className={cn("font-black text-lg tracking-tight", client.is_active ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400')}>
+                {client.is_active ? 'ACTIVE & MONITORED' : 'RESTRICTED ACCESS'}
+              </p>
+            </div>
           </div>
         </div>
       </div>
@@ -755,7 +754,7 @@ export default function ClientProfilePage({ params }: { params: Promise<{ id: st
                   Track full compliance activities, service delivery projects, and task progression.
                 </p>
               </div>
-              
+
               <div className="flex items-center gap-3 bg-card/30 backdrop-blur-md px-4 py-2 rounded-2xl border border-border">
                 <span className="text-xs font-black uppercase text-muted-foreground tracking-widest">Done VS Pending:</span>
                 <span className="text-sm font-bold text-foreground bg-primary/10 px-2 py-0.5 rounded-lg text-primary">{doneOps} Done</span>
@@ -769,27 +768,27 @@ export default function ClientProfilePage({ params }: { params: Promise<{ id: st
               <div className="lg:col-span-2 bg-card/40 backdrop-blur-md rounded-3xl border border-border p-6 flex flex-col items-center justify-center text-center relative overflow-hidden shadow-sm">
                 <div className="absolute top-0 right-0 w-24 h-24 bg-primary/5 rounded-full blur-2xl"></div>
                 <div className="absolute bottom-0 left-0 w-24 h-24 bg-emerald-500/5 rounded-full blur-2xl"></div>
-                
+
                 <h4 className="text-sm font-black text-muted-foreground uppercase tracking-widest mb-4">Overall Completion</h4>
-                
+
                 {/* Circular Gauge */}
                 <div className="relative w-36 h-36 flex items-center justify-center">
                   <svg className="w-full h-full transform -rotate-90">
-                    <circle 
-                      cx="72" 
-                      cy="72" 
-                      r="60" 
-                      className="stroke-muted/40" 
-                      strokeWidth="10" 
-                      fill="transparent" 
+                    <circle
+                      cx="72"
+                      cy="72"
+                      r="60"
+                      className="stroke-muted/40"
+                      strokeWidth="10"
+                      fill="transparent"
                     />
-                    <circle 
-                      cx="72" 
-                      cy="72" 
-                      r="60" 
-                      className="stroke-primary transition-all duration-1000 ease-out" 
-                      strokeWidth="10" 
-                      fill="transparent" 
+                    <circle
+                      cx="72"
+                      cy="72"
+                      r="60"
+                      className="stroke-primary transition-all duration-1000 ease-out"
+                      strokeWidth="10"
+                      fill="transparent"
                       strokeDasharray={2 * Math.PI * 60}
                       strokeDashoffset={2 * Math.PI * 60 * (1 - overallPercentage / 100)}
                       strokeLinecap="round"
@@ -821,7 +820,7 @@ export default function ClientProfilePage({ params }: { params: Promise<{ id: st
                   <div className="mt-4 space-y-2">
                     <h5 className="font-bold text-foreground text-base">Projects Portfolio</h5>
                     <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
-                      <div 
+                      <div
                         className="h-full bg-blue-500 rounded-full transition-all duration-500"
                         style={{ width: `${totalProjects > 0 ? (completedProjects / totalProjects) * 100 : 0}%` }}
                       />
@@ -845,7 +844,7 @@ export default function ClientProfilePage({ params }: { params: Promise<{ id: st
                   <div className="mt-4 space-y-2">
                     <h5 className="font-bold text-foreground text-base">Milestone Tasks</h5>
                     <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
-                      <div 
+                      <div
                         className="h-full bg-purple-500 rounded-full transition-all duration-500"
                         style={{ width: `${totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0}%` }}
                       />
@@ -869,7 +868,7 @@ export default function ClientProfilePage({ params }: { params: Promise<{ id: st
                   <div className="mt-4 space-y-2">
                     <h5 className="font-bold text-foreground text-base">Work Orders</h5>
                     <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
-                      <div 
+                      <div
                         className="h-full bg-emerald-500 rounded-full transition-all duration-500"
                         style={{ width: `${totalWorkOrders > 0 ? (completedWorkOrders / totalWorkOrders) * 100 : 0}%` }}
                       />
@@ -893,7 +892,7 @@ export default function ClientProfilePage({ params }: { params: Promise<{ id: st
                   <div className="mt-4 space-y-2">
                     <h5 className="font-bold text-foreground text-base">Safety Inspections</h5>
                     <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
-                      <div 
+                      <div
                         className="h-full bg-amber-500 rounded-full transition-all duration-500"
                         style={{ width: `${totalInspections > 0 ? (completedInspections / totalInspections) * 100 : 0}%` }}
                       />
@@ -924,21 +923,21 @@ export default function ClientProfilePage({ params }: { params: Promise<{ id: st
                       const taskPercentage = totalTasksCount > 0 ? Math.round((completedTasksCount / totalTasksCount) * 100) : 0;
 
                       return (
-                        <div 
-                          key={p.id} 
+                        <div
+                          key={p.id}
                           className="bg-card/30 rounded-2xl border border-border overflow-hidden transition-all hover:border-primary/20"
                         >
                           {/* Project Header */}
-                          <div 
+                          <div
                             className="p-5 flex items-center justify-between cursor-pointer select-none"
                             onClick={() => setExpandedProject(isExpanded ? null : p.id)}
                           >
                             <div className="space-y-1.5 flex-1 pr-4">
                               <div className="flex items-center gap-2">
                                 <h5 className="font-bold text-foreground text-base hover:text-primary transition-colors">{p.name}</h5>
-                                <span className={cn("px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider border", 
-                                  p.status === 'COMPLETED' 
-                                    ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20" 
+                                <span className={cn("px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider border",
+                                  p.status === 'COMPLETED'
+                                    ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
                                     : "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20"
                                 )}>
                                   {p.status}
@@ -947,11 +946,11 @@ export default function ClientProfilePage({ params }: { params: Promise<{ id: st
                               {p.description && (
                                 <p className="text-muted-foreground text-xs line-clamp-1">{p.description}</p>
                               )}
-                              
+
                               {/* Horizontal mini progress bar for tasks */}
                               <div className="flex items-center gap-2.5 max-w-[280px] pt-1">
                                 <div className="w-full h-1 bg-muted rounded-full overflow-hidden">
-                                  <div 
+                                  <div
                                     className="h-full bg-primary rounded-full transition-all duration-300"
                                     style={{ width: `${taskPercentage}%` }}
                                   />
@@ -980,15 +979,15 @@ export default function ClientProfilePage({ params }: { params: Promise<{ id: st
                                     <div key={t.id} className="py-3 flex items-start justify-between gap-4 group">
                                       <div className="flex items-start gap-3">
                                         <div className="pt-0.5">
-                                          <input 
-                                            type="checkbox" 
+                                          <input
+                                            type="checkbox"
                                             checked={t.status === 'DONE'}
                                             readOnly
                                             className="w-4 h-4 rounded border-muted-foreground text-primary focus:ring-primary pointer-events-none"
                                           />
                                         </div>
                                         <div>
-                                          <p className={cn("font-semibold text-sm", 
+                                          <p className={cn("font-semibold text-sm",
                                             t.status === 'DONE' ? "text-muted-foreground/80 line-through font-normal" : "text-foreground"
                                           )}>
                                             {t.title}
@@ -996,7 +995,7 @@ export default function ClientProfilePage({ params }: { params: Promise<{ id: st
                                           {t.description && (
                                             <p className="text-muted-foreground text-[11px] mt-0.5 line-clamp-1">{t.description}</p>
                                           )}
-                                          
+
                                           {/* Task Meta details */}
                                           <div className="flex items-center gap-2 mt-1">
                                             {t.due_date && (
@@ -1005,9 +1004,9 @@ export default function ClientProfilePage({ params }: { params: Promise<{ id: st
                                               </span>
                                             )}
                                             {t.priority && (
-                                              <span className={cn("text-[9px] font-bold px-1 py-0.2 rounded border", 
-                                                t.priority === 'HIGH' 
-                                                  ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/15" 
+                                              <span className={cn("text-[9px] font-bold px-1 py-0.2 rounded border",
+                                                t.priority === 'HIGH'
+                                                  ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/15"
                                                   : t.priority === 'MEDIUM'
                                                     ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/15"
                                                     : "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/15"
@@ -1018,7 +1017,7 @@ export default function ClientProfilePage({ params }: { params: Promise<{ id: st
                                           </div>
                                         </div>
                                       </div>
-                                      
+
                                       {t.assignee && (
                                         <div className="flex items-center gap-1.5 text-right whitespace-nowrap">
                                           <span className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold font-mono">
@@ -1065,9 +1064,9 @@ export default function ClientProfilePage({ params }: { params: Promise<{ id: st
                           <div className="space-y-1">
                             <div className="flex items-center gap-2">
                               <span className="font-bold text-foreground text-sm tracking-tight">{w.work_order_no}</span>
-                              <span className={cn("px-1.5 py-0.2 rounded text-[9px] font-black uppercase tracking-wider", 
-                                w.status === 'COMPLETED' 
-                                  ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20" 
+                              <span className={cn("px-1.5 py-0.2 rounded text-[9px] font-black uppercase tracking-wider",
+                                w.status === 'COMPLETED'
+                                  ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
                                   : "bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20"
                               )}>
                                 {w.status}
@@ -1105,9 +1104,9 @@ export default function ClientProfilePage({ params }: { params: Promise<{ id: st
                           <div className="space-y-1">
                             <div className="flex items-center gap-2">
                               <span className="font-bold text-foreground text-xs font-mono uppercase">ID: {i.id.split('-')[0]}</span>
-                              <span className={cn("px-1.5 py-0.2 rounded text-[9px] font-black uppercase tracking-wider", 
-                                i.status === 'COMPLETED' 
-                                  ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20" 
+                              <span className={cn("px-1.5 py-0.2 rounded text-[9px] font-black uppercase tracking-wider",
+                                i.status === 'COMPLETED'
+                                  ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
                                   : i.status === 'SCHEDULED'
                                     ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
                                     : "bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20"
@@ -1153,7 +1152,7 @@ export default function ClientProfilePage({ params }: { params: Promise<{ id: st
                       A clear timeline showing who managed this client, when they worked, and exactly what they accomplished.
                     </p>
                   </div>
-                  
+
                   <div className="flex items-center gap-2 bg-primary/10 px-3 py-1.5 rounded-xl border border-primary/20 shrink-0">
                     <Activity className="w-3.5 h-3.5 text-primary animate-pulse" />
                     <span className="text-[10px] font-black uppercase text-primary tracking-wider">
@@ -1206,7 +1205,7 @@ export default function ClientProfilePage({ params }: { params: Promise<{ id: st
                       const nextLog = logs[i + 1];
                       const curOldData = (currentLog.old_data as any) || {};
                       const nextOldData = (nextLog.old_data as any) || {};
-                      
+
                       tenures.push({
                         staffName: currentLog.new_data?.assigned_staff_name || "Unassigned",
                         staffId: currentLog.new_data?.assigned_staff_id || null,
@@ -1225,7 +1224,7 @@ export default function ClientProfilePage({ params }: { params: Promise<{ id: st
                     // 3. Current tenure (since the last log)
                     const lastLog = logs[logs.length - 1];
                     const lastOldData = (lastLog.old_data as any) || {};
-                    
+
                     if (client.assigned_staff) {
                       tenures.push({
                         staffName: client.assigned_staff.name,
@@ -1250,7 +1249,7 @@ export default function ClientProfilePage({ params }: { params: Promise<{ id: st
                     const end = t.rawEndDate || new Date();
                     const diffTime = Math.abs(end.getTime() - start.getTime());
                     const days = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) || 1;
-                    
+
                     const accomplishments: string[] = [];
                     if (t.completedProjects > 0) {
                       accomplishments.push(`${t.completedProjects} project${t.completedProjects > 1 ? 's' : ''}`);
@@ -1264,14 +1263,14 @@ export default function ClientProfilePage({ params }: { params: Promise<{ id: st
                     if (t.completedInspections > 0) {
                       accomplishments.push(`${t.completedInspections} safety audit${t.completedInspections > 1 ? 's' : ''}`);
                     }
-                    
+
                     const activeWord = t.isActive ? "has been managing" : "managed";
                     const durationWord = t.isActive ? `for the past ${days} days` : `during their ${days}-day assignment`;
-                    
+
                     if (accomplishments.length === 0) {
                       return `${t.staffName} ${activeWord} this client ${durationWord}, and is currently setting up the safety plan.`;
                     }
-                    
+
                     let listStr = "";
                     if (accomplishments.length === 1) {
                       listStr = accomplishments[0];
@@ -1280,7 +1279,7 @@ export default function ClientProfilePage({ params }: { params: Promise<{ id: st
                     } else {
                       listStr = `${accomplishments.slice(0, -1).join(", ")}, and ${accomplishments[accomplishments.length - 1]}`;
                     }
-                    
+
                     return `${t.staffName} successfully completed ${listStr} ${durationWord}.`;
                   };
 
@@ -1298,14 +1297,14 @@ export default function ClientProfilePage({ params }: { params: Promise<{ id: st
                     <div className="relative border-l border-border pl-6 ml-4 space-y-8 my-4">
                       {displayTenures.map((t, idx) => {
                         const totalWorkResolved = t.completedProjects + t.completedTasks + t.completedWorkOrders + t.completedInspections;
-                        
+
                         return (
                           <div key={idx} className="relative group">
                             {/* Circle Dot for Timeline */}
                             <div className={cn(
                               "absolute -left-[30px] top-2 w-3 h-3 rounded-full border-2 flex items-center justify-center transition-all duration-300 bg-background border-border",
-                              t.isActive 
-                                ? "bg-emerald-500 border-emerald-500/30 scale-110 shadow-[0_0_8px_rgba(16,185,129,0.5)]" 
+                              t.isActive
+                                ? "bg-emerald-500 border-emerald-500/30 scale-110 shadow-[0_0_8px_rgba(16,185,129,0.5)]"
                                 : "group-hover:border-primary/50"
                             )} />
 
@@ -1316,7 +1315,7 @@ export default function ClientProfilePage({ params }: { params: Promise<{ id: st
                                 ? "bg-emerald-500/5 border-emerald-500/30 shadow-md shadow-emerald-500/5"
                                 : "bg-card/25 border-border hover:border-border/80 hover:bg-card/30"
                             )}>
-                              
+
                               {/* Card Header */}
                               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/40 pb-4 mb-4">
                                 <div className="flex items-center gap-3">
@@ -1359,7 +1358,7 @@ export default function ClientProfilePage({ params }: { params: Promise<{ id: st
                                 <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Progress Log Details:</p>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                   <div className="flex items-center gap-3 text-xs bg-background/20 p-2.5 rounded-xl border border-border/50">
-                                    <div className={cn("w-7 h-7 rounded-lg flex items-center justify-center shrink-0 border", 
+                                    <div className={cn("w-7 h-7 rounded-lg flex items-center justify-center shrink-0 border",
                                       t.completedProjects > 0 ? "bg-blue-500/10 text-blue-500 border-blue-500/20" : "bg-muted text-muted-foreground/40 border-border"
                                     )}>
                                       <Briefcase className="w-3.5 h-3.5" />
@@ -1371,7 +1370,7 @@ export default function ClientProfilePage({ params }: { params: Promise<{ id: st
                                   </div>
 
                                   <div className="flex items-center gap-3 text-xs bg-background/20 p-2.5 rounded-xl border border-border/50">
-                                    <div className={cn("w-7 h-7 rounded-lg flex items-center justify-center shrink-0 border", 
+                                    <div className={cn("w-7 h-7 rounded-lg flex items-center justify-center shrink-0 border",
                                       t.completedTasks > 0 ? "bg-purple-500/10 text-purple-500 border-purple-500/20" : "bg-muted text-muted-foreground/40 border-border"
                                     )}>
                                       <CheckSquare className="w-3.5 h-3.5" />
@@ -1383,7 +1382,7 @@ export default function ClientProfilePage({ params }: { params: Promise<{ id: st
                                   </div>
 
                                   <div className="flex items-center gap-3 text-xs bg-background/20 p-2.5 rounded-xl border border-border/50">
-                                    <div className={cn("w-7 h-7 rounded-lg flex items-center justify-center shrink-0 border", 
+                                    <div className={cn("w-7 h-7 rounded-lg flex items-center justify-center shrink-0 border",
                                       t.completedWorkOrders > 0 ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" : "bg-muted text-muted-foreground/40 border-border"
                                     )}>
                                       <FileText className="w-3.5 h-3.5" />
@@ -1395,7 +1394,7 @@ export default function ClientProfilePage({ params }: { params: Promise<{ id: st
                                   </div>
 
                                   <div className="flex items-center gap-3 text-xs bg-background/20 p-2.5 rounded-xl border border-border/50">
-                                    <div className={cn("w-7 h-7 rounded-lg flex items-center justify-center shrink-0 border", 
+                                    <div className={cn("w-7 h-7 rounded-lg flex items-center justify-center shrink-0 border",
                                       t.completedInspections > 0 ? "bg-amber-500/10 text-amber-500 border-amber-500/20" : "bg-muted text-muted-foreground/40 border-border"
                                     )}>
                                       <Calendar className="w-3.5 h-3.5" />
