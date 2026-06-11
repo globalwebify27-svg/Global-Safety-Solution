@@ -22,6 +22,32 @@ async function bootstrap() {
   console.log(`${result.rolesCount} roles seeded.`);
   console.log(`Admin assigned to SUPER_ADMIN: ${result.adminAssigned}`);
 
+  // 3. Seed Chart of Accounts
+  console.log('Seeding Chart of Accounts...');
+  const defaultAccounts = [
+    { code: '1010', name: 'Bank Current Account', type: 'ASSET' },
+    { code: '1020', name: 'Cash Account', type: 'ASSET' },
+    { code: '1200', name: 'Accounts Receivable', type: 'ASSET' },
+    { code: '2000', name: 'Accounts Payable', type: 'LIABILITY' },
+    { code: '3000', name: 'Owner Equity', type: 'EQUITY' },
+    { code: '4000', name: 'Sales Revenue', type: 'REVENUE' },
+    { code: '5000', name: 'Cost of Goods Sold', type: 'EXPENSE' },
+  ];
+
+  for (const acc of defaultAccounts) {
+    await prisma.account.upsert({
+      where: { code: acc.code },
+      update: {},
+      create: {
+        code: acc.code,
+        name: acc.name,
+        type: acc.type,
+        balance: 0.00,
+      },
+    });
+  }
+  console.log('Chart of Accounts seeded.');
+
   await app.close();
 }
 bootstrap();
