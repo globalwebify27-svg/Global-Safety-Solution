@@ -575,7 +575,7 @@ export class QuotationsService {
 
           return { project, invoice, quotationId: quotation.id };
         },
-        { timeout: 15000 },
+        { timeout: 60000 },
       );
     } catch (error: any) {
       if (
