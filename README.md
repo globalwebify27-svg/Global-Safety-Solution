@@ -130,7 +130,7 @@ global-safety-solution-erp/
 | `npm run build` | Compile and build the entire codebase for production | Global |
 | `npm run start` | Run production servers | Global |
 | `npm run db:push` | Push schema changes to the MySQL database | `@repo/database` |
-| `npm run seed` | Seed initial roles, permissions, and default admin | `backend` |
+| `npm run seed` | Seed initial roles, permissions, and default admin.
 
 ## 📝 License
 
