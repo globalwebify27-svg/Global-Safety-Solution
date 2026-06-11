@@ -131,17 +131,6 @@ global-safety-solution-erp/
 | `npm run start` | Run production servers | Global |
 | `npm run db:push` | Push schema changes to the MySQL database | `@repo/database` |
 | `npm run seed` | Seed initial roles, permissions, and default admin | `backend` |
-| `npm run reset:passwords` | Reset all user passwords to `Staff@123` | `backend` |
-
----
-
-## 🔑 Default Credentials
-
-Once the database is seeded and passwords are reset:
-- **Email**: `admin@globalsafety.com`
-- **Password**: `Staff@123`
-
----
 
 ## 📝 License
 
