@@ -193,6 +193,22 @@ export class RBACService {
         module: 'FIELD_TASKS',
         description: 'View field task board',
       },
+      // Documents (Vault)
+      {
+        name: 'READ_DOCUMENT',
+        module: 'VAULT',
+        description: 'Read and download vault documents',
+      },
+      {
+        name: 'CREATE_DOCUMENT',
+        module: 'VAULT',
+        description: 'Upload and encrypt documents to vault',
+      },
+      {
+        name: 'DELETE_DOCUMENT',
+        module: 'VAULT',
+        description: 'Revoke and delete vault documents',
+      },
     ];
 
     for (const p of permissions) {

@@ -26,6 +26,9 @@ async function main() {
       { name: 'MANAGE_COMPLIANCE', module: 'COMPLIANCE', description: 'Manage compliance certificates and renewals' },
       { name: 'MANAGE_SYSTEM_SETTINGS', module: 'SYSTEM', description: 'Change organization and system settings' },
       { name: 'MANAGE_ROLES', module: 'SYSTEM', description: 'Manage roles and permissions' },
+      { name: 'READ_DOCUMENT', module: 'VAULT', description: 'Read and download vault documents' },
+      { name: 'CREATE_DOCUMENT', module: 'VAULT', description: 'Upload and encrypt documents to vault' },
+      { name: 'DELETE_DOCUMENT', module: 'VAULT', description: 'Revoke and delete vault documents' },
   ];
 
   for (const p of permissions) {
