@@ -78,23 +78,92 @@ export default function DashboardLayout({
     }
     
     // 3. Admin override
-    const isLegacyAdmin = user?.email === "admin@globalsafety.com";
+    const isLegacyAdmin = user?.email === "admin@globalsafety.com" || user?.email === "amrvbloggers@gmail.com";
     const effectiveRole = isLegacyAdmin ? "SUPER_ADMIN" : roleName;
+
+    // Extract database permissions
+    const userPermissions = new Set<string>();
+    if (user?.roles) {
+      user.roles.forEach((ur: any) => {
+        if (ur.role && ur.role.permissions) {
+          ur.role.permissions.forEach((rp: any) => {
+            if (rp.permission && rp.permission.name) {
+              userPermissions.add(rp.permission.name);
+            }
+          });
+        }
+      });
+    }
+
+    const hasPermissionForItem = (item: any) => {
+      if (effectiveRole === "SUPER_ADMIN") {
+        return item.module !== "FIELD_TASKS";
+      }
+
+      switch (item.name) {
+        case "Overview":
+          return effectiveRole === "CLIENT" || userPermissions.has("VIEW_DASHBOARD");
+        case "Quotation Hub":
+          return effectiveRole === "CLIENT" || userPermissions.has("VIEW_QUOTATIONS") || userPermissions.has("MANAGE_QUOTATIONS");
+        case "Sales Pipeline":
+          return userPermissions.has("VIEW_LEADS") || userPermissions.has("MANAGE_LEADS");
+        case "Client Management":
+          return userPermissions.has("VIEW_CLIENTS") || userPermissions.has("MANAGE_CLIENTS");
+        case "Finance & Invoices":
+        case "Accounting Hub":
+          return userPermissions.has("VIEW_INVOICES") || userPermissions.has("MANAGE_INVOICES");
+        case "Staff Directory":
+          return userPermissions.has("VIEW_STAFF") || userPermissions.has("MANAGE_STAFF");
+        case "Payroll Hub":
+          return userPermissions.has("VIEW_PAYROLL") || userPermissions.has("MANAGE_PAYROLL");
+        case "Attendance Hub":
+          return effectiveRole !== "CLIENT";
+        case "Site Inspections":
+          return effectiveRole === "CLIENT" || userPermissions.has("VIEW_INSPECTIONS") || userPermissions.has("MANAGE_INSPECTIONS");
+        case "Operations":
+          return userPermissions.has("VIEW_PROJECTS") || userPermissions.has("MANAGE_PROJECTS");
+        case "Compliance":
+          return userPermissions.has("VIEW_COMPLIANCE") || userPermissions.has("MANAGE_COMPLIANCE");
+        case "Digital Vault":
+          return (
+            userPermissions.has("VIEW_STAFF") ||
+            userPermissions.has("VIEW_CLIENTS") ||
+            userPermissions.has("VIEW_PROJECTS") ||
+            userPermissions.has("VIEW_COMPLIANCE") ||
+            effectiveRole === "CLIENT"
+          );
+        case "Inventory Ledger":
+          return userPermissions.has("MANAGE_SYSTEM_SETTINGS") || userPermissions.has("VIEW_INSPECTIONS");
+        case "Asset Registry":
+          return userPermissions.has("MANAGE_SYSTEM_SETTINGS");
+        case "Settings":
+          return userPermissions.has("MANAGE_SYSTEM_SETTINGS") || userPermissions.has("MANAGE_ROLES");
+        case "Field Task Board":
+          return userPermissions.has("VIEW_FIELD_TASKS");
+        default:
+          return false;
+      }
+    };
 
     const allowed = allowedModulesForRole[effectiveRole] || [];
 
     return navigation.filter(item => {
-      // 1. Modules everyone needs (if any exist)
       if (item.module === "ALL") return true;
 
-      // 2. Super Admin Access
-      if (effectiveRole === "SUPER_ADMIN") {
-        if (item.module === "FIELD_TASKS") return false; // Hide field tasks from admin view
+      // 1. Always show the default sections for this role
+      if (allowed.includes(item.module)) {
+        if (effectiveRole === "SUPER_ADMIN" && item.module === "FIELD_TASKS") {
+          return false; // Hide field tasks from admin view
+        }
         return true; 
       }
 
-      // 3. Check role mapping
-      return allowed.includes(item.module);
+      // 2. Append any extra sections allowed by dynamic DB permissions
+      if (userPermissions.size > 0) {
+        return hasPermissionForItem(item);
+      }
+
+      return false;
     });
   }, [user]);
 

@@ -116,7 +116,22 @@ export default function ClientsPage() {
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const token = useAuthStore((state) => state.token);
+  const { user, token } = useAuthStore();
+
+  const userPermissions = new Set<string>();
+  if (user?.roles) {
+    user.roles.forEach((ur: any) => {
+      if (ur.role && ur.role.permissions) {
+        ur.role.permissions.forEach((rp: any) => {
+          if (rp.permission && rp.permission.name) {
+            userPermissions.add(rp.permission.name);
+          }
+        });
+      }
+    });
+  }
+  const isSuperAdmin = user?.email === "admin@globalsafety.com" || user?.email === "amrvbloggers@gmail.com" || user?.role === "SUPER_ADMIN";
+  const canManageClients = isSuperAdmin || userPermissions.has("MANAGE_CLIENTS");
 
   const [formData, setFormData] = useState({ 
     name: '', 
@@ -284,11 +299,12 @@ export default function ClientsPage() {
             />
           </div>
           
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger render={<Button className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20 h-10 px-6 py-2 rounded-md font-semibold inline-flex items-center justify-center text-sm transition-colors" />}>
-              <Plus className="w-4 h-4 mr-2" /> Add Client
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[700px] bg-card border-border text-foreground shadow-2xl">
+          {canManageClients && (
+            <Dialog open={open} onOpenChange={setOpen}>
+              <DialogTrigger render={<Button className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20 h-10 px-6 py-2 rounded-md font-semibold inline-flex items-center justify-center text-sm transition-colors" />}>
+                <Plus className="w-4 h-4 mr-2" /> Add Client
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[700px] bg-card border-border text-foreground shadow-2xl">
             <DialogHeader>
               <DialogTitle className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-teal-500">
                 Onboard Enterprise Client
@@ -574,6 +590,7 @@ export default function ClientsPage() {
             </form>
           </DialogContent>
         </Dialog>
+        )}
         </div>
       </div>
 

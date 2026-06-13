@@ -54,6 +54,14 @@ export default function RolesPage() {
     }
   };
 
+  const isSuperAdmin = user?.email === "admin@globalsafety.com" || user?.email === "amrvbloggers@gmail.com" || user?.role === "SUPER_ADMIN";
+
+  useEffect(() => {
+    if (user && !isSuperAdmin) {
+      window.location.href = "/dashboard";
+    }
+  }, [user, isSuperAdmin]);
+
   useEffect(() => {
     fetchRoles();
   }, [token]);

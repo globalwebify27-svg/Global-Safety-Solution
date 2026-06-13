@@ -149,12 +149,20 @@ export default function SettingsPage() {
     }
   };
 
+  const isSuperAdmin = user?.email === "admin@globalsafety.com" || user?.email === "amrvbloggers@gmail.com" || user?.role === "SUPER_ADMIN";
+
+  useEffect(() => {
+    if (activeTab === "roles" && !isSuperAdmin) {
+      setActiveTab("profile");
+    }
+  }, [activeTab, isSuperAdmin]);
+
   const tabs = [
     { id: "profile", label: "My Profile", icon: User },
     { id: "security", label: "Security", icon: Lock },
     { id: "organization", label: "Organization", icon: Building2 },
     { id: "notifications", label: "Notifications", icon: Bell },
-    { id: "roles", label: "Roles & Permissions", icon: ShieldCheck },
+    ...(isSuperAdmin ? [{ id: "roles", label: "Roles & Permissions", icon: ShieldCheck }] : []),
   ];
 
   const handleUpdatePassword = async (e: React.FormEvent) => {

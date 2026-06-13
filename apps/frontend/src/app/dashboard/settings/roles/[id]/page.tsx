@@ -30,7 +30,14 @@ export default function RoleDetail({ params }: { params: Promise<{ id: string }>
   const [activePermissionIds, setActivePermissionIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const token = useAuthStore((state) => state.token);
+  const { token, user } = useAuthStore();
+  const isSuperAdmin = user?.email === "admin@globalsafety.com" || user?.email === "amrvbloggers@gmail.com" || user?.role === "SUPER_ADMIN";
+
+  useEffect(() => {
+    if (user && !isSuperAdmin) {
+      window.location.href = "/dashboard";
+    }
+  }, [user, isSuperAdmin]);
 
   useEffect(() => {
     if (!token) return;

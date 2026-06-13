@@ -3,6 +3,8 @@ import { RBACService } from './rbac.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { PermissionsGuard } from '../auth/guards/permissions.guard';
+import { Permissions } from '../auth/decorators/permissions.decorator';
 
 @Controller('rbac')
 export class RBACController {
@@ -14,8 +16,8 @@ export class RBACController {
   }
 
   @Get('roles')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('SUPER_ADMIN', 'HR_MANAGER', 'OFFICE_ADMIN')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions('VIEW_STAFF', 'MANAGE_ROLES', 'READ_USER')
   getRoles() {
     console.log('RBACController: getRoles called');
     return this.rbacService.getAllRoles();
