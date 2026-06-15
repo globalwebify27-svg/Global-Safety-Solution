@@ -2,7 +2,7 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
-@custom-variant dark (&:is(.dark *));
+@variant dark (&:is(.dark *));
 
 @theme inline {
   --color-background: var(--background);
@@ -117,25 +117,23 @@
   --sidebar-ring: oklch(0.442 0.129 251.428);
 }
 
-@layer base {
-  * {
-    @apply border-border outline-ring/50;
-  }
-  body {
-    @apply bg-background text-foreground;
-  }
-  html {
-    @apply font-sans;
-  }
-  
-  /* Prevent native body double scrollbar and set screen size */
-  html, body {
-    height: 100vh;
-    overflow: hidden;
-  }
+* {
+  @apply border-border outline-ring/50;
+}
+body {
+  @apply bg-background text-foreground;
+}
+html {
+  @apply font-sans;
 }
 
-/* Custom scrollbar styling (Glass Style & Page Color Matching) */
+/* Prevent native body double scrollbar and set screen size */
+html, body {
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* Premium Glassmorphism Scrollbar (Page Color Matching) */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -146,33 +144,43 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(100, 116, 139, 0.2); /* slate-500 with opacity */
+  background: rgba(100, 116, 139, 0.15); /* slate-500 with opacity */
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   border-radius: 9999px;
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  border: 2px solid transparent;
+  background-clip: padding-box;
   transition: all 0.2s ease;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(100, 116, 139, 0.35);
+  background: rgba(100, 116, 139, 0.3);
 }
 
 .dark ::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.16); /* slate-400 with opacity */
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(148, 163, 184, 0.12); /* slate-400 with opacity */
+  border: 2px solid transparent;
+  background-clip: padding-box;
 }
 
 .dark ::-webkit-scrollbar-thumb:hover {
-  background: rgba(148, 163, 184, 0.3);
+  background: rgba(148, 163, 184, 0.25);
+}
+
+::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 /* Firefox scrollbar support */
 * {
   scrollbar-width: thin;
-  scrollbar-color: rgba(100, 116, 139, 0.2) transparent;
+  scrollbar-color: rgba(100, 116, 139, 0.15) transparent;
 }
 
 .dark * {
-  scrollbar-color: rgba(148, 163, 184, 0.16) transparent;
+  scrollbar-color: rgba(148, 163, 184, 0.12) transparent;
 }
 
 /* Hide native number input spin buttons globally */
@@ -193,41 +201,4 @@ input[type="number"] {
   &::-webkit-scrollbar {
     display: none; /* Chrome, Safari and Opera */
   }
-}
-
-/* Global Premium Glassmorphism Scrollbar */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.12);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border-radius: 9999px;
-  border: 2px solid transparent;
-  background-clip: padding-box;
-  transition: background 0.2s ease;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(148, 163, 184, 0.25);
-  background-clip: padding-box;
-}
-
-::-webkit-scrollbar-button {
-  display: none;
-  width: 0;
-  height: 0;
-}
-
-/* For Firefox */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(148, 163, 184, 0.15) transparent;
 }
