@@ -51,6 +51,7 @@ export default function AccountingPage() {
   const [activeTab, setActiveTab] = useState<"ledgers" | "accounts" | "reports">("ledgers");
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [vouchers, setVouchers] = useState<Voucher[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [openVoucherDialog, setOpenVoucherDialog] = useState(false);
   const [openAccountDialog, setOpenAccountDialog] = useState(false);
@@ -81,6 +82,16 @@ export default function AccountingPage() {
   const [loadingReport, setLoadingReport] = useState(false);
 
   const token = useAuthStore((state) => state.token);
+
+  const filteredVouchers = vouchers.filter(v => 
+    v.voucher_no.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    v.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    v.debit_account.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    v.debit_account.code.includes(searchQuery) ||
+    v.credit_account.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    v.credit_account.code.includes(searchQuery) ||
+    v.created_by.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   const fetchAccountsAndVouchers = async () => {
     if (!token) return;
@@ -465,7 +476,12 @@ export default function AccountingPage() {
                 <div className="flex items-center gap-3">
                   <div className="relative">
                     <Search className="w-4 h-4 absolute left-3 top-3.5 text-muted-foreground" />
-                    <Input placeholder="Search vouchers..." className="pl-9 h-10 w-64 bg-background border-border rounded-xl" />
+                    <Input 
+                      placeholder="Search vouchers..." 
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-9 h-10 w-64 bg-background border-border rounded-xl" 
+                    />
                   </div>
                 </div>
               </div>
@@ -483,12 +499,12 @@ export default function AccountingPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/60 text-sm">
-                    {vouchers.length === 0 ? (
+                    {filteredVouchers.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="py-10 text-center text-muted-foreground italic">No vouchers posted yet.</td>
+                        <td colSpan={7} className="py-10 text-center text-muted-foreground italic">No vouchers found.</td>
                       </tr>
                     ) : (
-                      vouchers.map(v => (
+                      filteredVouchers.map(v => (
                         <tr key={v.id} className="hover:bg-accent/5 transition-colors">
                           <td className="py-4 px-6 font-bold text-indigo-500">{v.voucher_no}</td>
                           <td className="py-4 px-6 text-muted-foreground">
