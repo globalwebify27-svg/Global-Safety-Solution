@@ -1085,7 +1085,11 @@ export default function InspectionsPage() {
                         <input
                           type="number"
                           placeholder="0.00"
-                          value={selectedInspection.expenditure !== undefined && selectedInspection.expenditure !== null ? selectedInspection.expenditure : ""}
+                          value={
+                            selectedInspection.expenditure !== undefined && selectedInspection.expenditure !== null && Number(selectedInspection.expenditure) > 0
+                              ? selectedInspection.expenditure
+                              : ((selectedInspection.items || []).reduce((acc: number, curr: any) => acc + (Number(curr.expenditure) || 0), 0) || "")
+                          }
                           onChange={(e) => {
                             const val = e.target.value;
                             setSelectedInspection(prev => prev ? { ...prev, expenditure: val } : null);
