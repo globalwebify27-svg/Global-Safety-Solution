@@ -14,14 +14,16 @@ export class CertificatesService {
     const issueDate = new Date(issue_date);
     const expiryDate = new Date(issue_date);
 
-    if (validity_period === '1y') {
+    if (validity_period === '1y' || validity_period === '1 year') {
       expiryDate.setFullYear(expiryDate.getFullYear() + 1);
-    } else if (validity_period === '3y') {
+    } else if (validity_period === '2y' || validity_period === '2 year') {
+      expiryDate.setFullYear(expiryDate.getFullYear() + 2);
+    } else if (validity_period === '3y' || validity_period === '3 year') {
       expiryDate.setFullYear(expiryDate.getFullYear() + 3);
+    } else if (validity_period === '1/2y' || validity_period === '1/2 year') {
+      expiryDate.setMonth(expiryDate.getMonth() + 6);
     } else {
-      // 1-time or other: maybe set a very distant date or same date?
-      // User said "as required", so let's assume 1-time has no expiry or 1 day expiry.
-      // Usually, 1-time safety checks are valid for the day.
+      // One-time or other: valid for 1 day
       expiryDate.setDate(expiryDate.getDate() + 1);
     }
 

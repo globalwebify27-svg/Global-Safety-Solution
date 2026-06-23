@@ -4,6 +4,7 @@ import {
   CreateInspectionDto,
   UpdateInspectionDto,
   UpdateInspectionItemDto,
+  AddInspectionItemDto,
 } from './dto/create-inspection.dto';
 import { MailService } from '../common/mail/mail.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -202,10 +203,16 @@ export class InspectionsService {
                 : parsedRemarks.draft_cert_data;
               if (dataObj.validity_period) {
                 validityPeriod = dataObj.validity_period;
-                if (validityPeriod === '3y') {
+                if (validityPeriod === '2y' || validityPeriod === '2 year') {
+                  cycleDays = 730;
+                } else if (validityPeriod === '3y' || validityPeriod === '3 year') {
                   cycleDays = 1095;
-                } else if (validityPeriod === 'One-Time') {
+                } else if (validityPeriod === '1/2y' || validityPeriod === '1/2 year') {
+                  cycleDays = 180;
+                } else if (validityPeriod === 'One-Time' || validityPeriod === '1 time') {
                   cycleDays = 9999;
+                } else {
+                  cycleDays = 365;
                 }
               }
               if (dataObj.expiry_date) {
@@ -350,6 +357,24 @@ export class InspectionsService {
     await this.autoUpdateInspectionStatus(updatedItem.inspection_id);
 
     return updatedItem;
+  }
+
+  async addItem(data: AddInspectionItemDto) {
+    const item = await this.prisma.inspectionItem.create({
+      data: {
+        inspection_id: data.inspection_id,
+        description: data.description,
+        status: data.status || 'PENDING',
+        notes: data.notes || '',
+        expenditure: data.expenditure || 0,
+        photo_url: data.photo_url || null,
+      },
+    });
+
+    // Automatically recalculate and update parent inspection status in real-time
+    await this.autoUpdateInspectionStatus(data.inspection_id);
+
+    return item;
   }
 
   async findByEngineer(engineerId: string) {
@@ -964,7 +989,17 @@ export class InspectionsService {
 
         doc.moveTo(28, stdGridY + 18).lineTo(567, stdGridY + 18).lineWidth(0.3).stroke('#e2e8f0');
         doc.font('Helvetica-Bold').text('Inspection Date:', 38, stdGridY + 22); doc.font('Helvetica').text(stdIssueDate, 145, stdGridY + 22);
-        doc.font('Helvetica-Bold').text('Validity:', 350, stdGridY + 22); doc.font('Helvetica').text(inspection.certificate?.validity_period === '3y' ? '3 Years' : '1 Year', 395, stdGridY + 22);
+        
+        const getValPeriodText = (v?: string) => {
+          if (!v) return '1 Year';
+          if (v === '1y' || v === '1 year') return '1 Year';
+          if (v === '2y' || v === '2 year') return '2 Years';
+          if (v === '3y' || v === '3 year') return '3 Years';
+          if (v === '1/2y' || v === '1/2 year') return '1/2 Year';
+          if (v === 'One-Time' || v === '1 time') return '1 Time';
+          return v;
+        };
+        doc.font('Helvetica-Bold').text('Validity:', 350, stdGridY + 22); doc.font('Helvetica').text(getValPeriodText(inspection.certificate?.validity_period), 395, stdGridY + 22);
 
         doc.moveTo(28, stdGridY + 40).lineTo(567, stdGridY + 40).lineWidth(0.3).stroke('#e2e8f0');
         doc.font('Helvetica-Bold').text('Expiry Date:', 38, stdGridY + 44); doc.font('Helvetica').fillColor(goldColor).text(stdExpiryDate, 145, stdGridY + 44);

@@ -655,6 +655,7 @@ model Inspection {
   lat            Decimal?          @db.Decimal(10, 8)
   lng            Decimal?          @db.Decimal(11, 8)
   remarks        String?           @db.Text
+  expenditure    Decimal?          @default(0.00) @db.Decimal(15, 2)
   created_at     DateTime          @default(now()) @db.DateTime(6)
   updated_at     DateTime          @updatedAt @db.DateTime(6)
   work_order_id  String?           @db.VarChar(36)

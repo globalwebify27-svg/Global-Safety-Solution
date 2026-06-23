@@ -26,6 +26,8 @@ interface Task {
   status: string;
   scheduled_date: string;
   client: { name: string; city?: string };
+  client_id?: string;
+  project_id?: string;
   work_order?: {
     work_order_no: string;
     service_product?: {
@@ -286,24 +288,71 @@ export default function FieldTasksPage() {
     }
   };
 
-  const handleUpdateItem = async (itemId: string, status: string, notes?: string) => {
+  const parseItemPhotos = (photoUrl?: string | null): string[] => {
+    if (!photoUrl) return [];
+    if (photoUrl.startsWith('[') && photoUrl.endsWith(']')) {
+      try {
+        return JSON.parse(photoUrl);
+      } catch (e) {
+        return [photoUrl];
+      }
+    }
+    return photoUrl.split(',').filter(Boolean);
+  };
+
+  const handleUpdateItem = async (itemId: string, status: string, notes?: string, photo_url?: string) => {
     if (!token) return;
     try {
       const res = await fetch(`${API_BASE_URL}/inspections/item/${itemId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ status, notes })
+        body: JSON.stringify({ status, notes, photo_url })
       });
       if (res.ok) {
         if (selectedTask) {
           const updatedItems = selectedTask.items.map(item => 
-            item.id === itemId ? { ...item, status, notes } : item
+            item.id === itemId ? { ...item, status, notes, photo_url } : item
           );
           setSelectedTask({ ...selectedTask, items: updatedItems });
         }
       }
     } catch (e) {
       toast.error("Failed to update item");
+    }
+  };
+
+  const handleItemPhotoUpload = async (itemId: string, files: FileList) => {
+    if (files.length === 0 || !token || !selectedTask) return;
+    try {
+      const uploadedUrls: string[] = [];
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('name', `Item Photo - ${selectedTask.client?.name || 'Inspection'} - Item ${itemId}`);
+        formData.append('category', 'OTHER');
+        if (selectedTask.client_id) {
+          formData.append('client_id', selectedTask.client_id);
+        }
+        const res = await fetch(`${API_BASE_URL}/documents`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+          body: formData
+        });
+        if (res.ok) {
+          const data = await res.json();
+          uploadedUrls.push(data.file_url);
+        }
+      }
+      if (uploadedUrls.length > 0) {
+        const currentItem = selectedTask.items.find(it => it.id === itemId);
+        const existingUrls = currentItem?.photo_url ? parseItemPhotos(currentItem.photo_url) : [];
+        const newUrls = [...existingUrls, ...uploadedUrls];
+        await handleUpdateItem(itemId, currentItem?.status || 'PENDING', currentItem?.notes || '', JSON.stringify(newUrls));
+        toast.success("Photo uploaded successfully!");
+      }
+    } catch (err) {
+      toast.error("Failed to upload photo");
     }
   };
 
@@ -484,7 +533,7 @@ export default function FieldTasksPage() {
                       size="sm" 
                       variant={item.status === 'PASS' ? 'default' : 'outline'} 
                       className={cn("w-10 h-10 rounded-xl", item.status === 'PASS' && "bg-emerald-600 hover:bg-emerald-500 shadow-lg shadow-emerald-500/20")}
-                      onClick={() => handleUpdateItem(item.id, 'PASS')}
+                      onClick={() => handleUpdateItem(item.id, 'PASS', item.notes)}
                     >
                       <Check className="w-5 h-5" />
                     </Button>
@@ -492,20 +541,114 @@ export default function FieldTasksPage() {
                       size="sm" 
                       variant={item.status === 'FAIL' ? 'destructive' : 'outline'} 
                       className={cn("w-10 h-10 rounded-xl", item.status === 'FAIL' && "shadow-lg shadow-destructive/20")}
-                      onClick={() => handleUpdateItem(item.id, 'FAIL')}
+                      onClick={() => handleUpdateItem(item.id, 'FAIL', item.notes)}
                     >
                       <X className="w-5 h-5" />
                     </Button>
                   </div>
                 </div>
-                <Input 
-                  placeholder="Observations / Notes..." 
-                  className="bg-muted/30 border-none rounded-xl h-12"
-                  value={item.notes || ""}
-                  onChange={(e) => handleUpdateItem(item.id, item.status, e.target.value)}
-                />
+                
+                <div className="flex flex-col gap-3">
+                  <Input 
+                    placeholder="Observations / Notes..." 
+                    className="bg-muted/30 border-none rounded-xl h-12"
+                    value={item.notes || ""}
+                    onChange={(e) => handleUpdateItem(item.id, item.status, e.target.value)}
+                  />
+
+                  {/* Per-item Photo Upload & Preview */}
+                  <div className="space-y-2">
+                    {item.photo_url && parseItemPhotos(item.photo_url).length > 0 && (
+                      <div className="grid grid-cols-4 sm:grid-cols-6 gap-3 p-3 bg-muted/30 border border-border/50 rounded-xl">
+                        {parseItemPhotos(item.photo_url).map((url, index) => (
+                          <div key={index} className="relative aspect-square rounded-xl overflow-hidden border border-border group shadow-sm bg-background">
+                            <img 
+                              src={url} 
+                              alt={`Item photo ${index + 1}`} 
+                              className="w-full h-full object-cover transition-all duration-300 group-hover:scale-110 cursor-pointer" 
+                              onClick={() => window.open(url, '_blank')}
+                            />
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                const remaining = parseItemPhotos(item.photo_url).filter((_, idx) => idx !== index);
+                                await handleUpdateItem(item.id, item.status, item.notes, remaining.length > 0 ? JSON.stringify(remaining) : "");
+                              }}
+                              className="absolute top-1.5 right-1.5 bg-rose-500 hover:bg-rose-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow duration-200 cursor-pointer"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    
+                    <div className="flex items-center gap-2">
+                      <input 
+                        type="file" 
+                        id={`item-file-${item.id}`}
+                        onChange={(e) => {
+                          if (e.target.files) {
+                            handleItemPhotoUpload(item.id, e.target.files);
+                          }
+                        }}
+                        accept="image/*" 
+                        className="hidden" 
+                        multiple
+                      />
+                      <Button 
+                        type="button"
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => document.getElementById(`item-file-${item.id}`)?.click()}
+                        className="rounded-xl h-9 border-blue-500/20 text-blue-600 hover:bg-blue-500/10 font-bold text-xs"
+                      >
+                        <Camera className="w-3.5 h-3.5 mr-1" /> Upload Item Photo
+                      </Button>
+                    </div>
+                  </div>
+                </div>
               </div>
             ))}
+
+            {/* Manual Button to Add Observation */}
+            <div className="pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={async () => {
+                  if (!token || !selectedTask) return;
+                  try {
+                    const res = await fetch(`${API_BASE_URL}/inspections/item`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                      body: JSON.stringify({
+                        inspection_id: selectedTask.id,
+                        description: "General Safety Check",
+                        status: 'PENDING',
+                        notes: ''
+                      })
+                    });
+                    if (res.ok) {
+                      toast.success("New observation section added!");
+                      // Refresh selected task details
+                      const refRes = await fetch(`${API_BASE_URL}/inspections/${selectedTask.id}`, {
+                        headers: { Authorization: `Bearer ${token}` }
+                      });
+                      if (refRes.ok) {
+                        const updatedData = await refRes.json();
+                        setSelectedTask(updatedData);
+                      }
+                    }
+                  } catch (err) {
+                    toast.error("Failed to add observation section");
+                  }
+                }}
+                className="w-full rounded-2xl h-11 border-dashed border-blue-500/30 text-blue-600 hover:bg-blue-500/5 font-bold transition-all"
+              >
+                + Add Observation Section
+              </Button>
+            </div>
           </div>
 
           <div className="bg-blue-600/5 border border-blue-600/10 rounded-2xl p-4 flex items-center gap-4">
@@ -568,18 +711,26 @@ export default function FieldTasksPage() {
                     value={draftCertValidity}
                     onChange={(e) => {
                       setDraftCertValidity(e.target.value);
-                      const oneYearLater = new Date();
-                      if (e.target.value === '3y') {
-                        oneYearLater.setFullYear(oneYearLater.getFullYear() + 3);
+                      const futureDate = new Date();
+                      if (e.target.value === '2y') {
+                        futureDate.setFullYear(futureDate.getFullYear() + 2);
+                      } else if (e.target.value === '3y') {
+                        futureDate.setFullYear(futureDate.getFullYear() + 3);
+                      } else if (e.target.value === '1/2y') {
+                        futureDate.setMonth(futureDate.getMonth() + 6);
+                      } else if (e.target.value === 'One-Time') {
+                        futureDate.setDate(futureDate.getDate() + 1);
                       } else {
-                        oneYearLater.setFullYear(oneYearLater.getFullYear() + 1);
+                        futureDate.setFullYear(futureDate.getFullYear() + 1);
                       }
-                      setDraftCertExpiry(oneYearLater.toISOString().split("T")[0]);
+                      setDraftCertExpiry(futureDate.toISOString().split("T")[0]);
                     }}
                     className="w-full h-11 px-4 bg-muted/30 border border-border rounded-xl text-sm font-medium focus:ring-2 focus:ring-blue-500/20"
                   >
                     <option value="1y">1 Year (Standard)</option>
+                    <option value="2y">2 Years</option>
                     <option value="3y">3 Years (Stability Standard)</option>
+                    <option value="1/2y">1/2 Year</option>
                     <option value="One-Time">One-Time Certificate</option>
                   </select>
                 </div>

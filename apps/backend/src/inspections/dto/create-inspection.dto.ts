@@ -24,6 +24,10 @@ export class CreateInspectionItemDto {
   description: string;
 
   @IsOptional()
+  @IsString()
+  notes?: string;
+
+  @IsOptional()
   @IsNumber()
   expenditure?: number;
 }
@@ -46,6 +50,10 @@ export class CreateInspectionDto {
 
   @IsDateString()
   scheduled_date: string;
+
+  @IsOptional()
+  @IsNumber()
+  expenditure?: number;
 
   @IsArray()
   @ValidateNested({ each: true })
@@ -91,6 +99,10 @@ export class UpdateInspectionDto {
   draft_cert_data?: any;
 
   @IsOptional()
+  @IsNumber()
+  expenditure?: number;
+
+  @IsOptional()
   @IsDateString()
   completed_date?: string;
 }
@@ -111,4 +123,28 @@ export class UpdateInspectionItemDto {
   @IsOptional()
   @IsNumber()
   expenditure?: number;
+}
+
+export class AddInspectionItemDto {
+  @IsUUID()
+  inspection_id: string;
+
+  @IsString()
+  description: string;
+
+  @IsOptional()
+  @IsString()
+  status?: string;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
+
+  @IsOptional()
+  @IsNumber()
+  expenditure?: number;
+
+  @IsOptional()
+  @IsString()
+  photo_url?: string;
 }

@@ -16,12 +16,18 @@ import {
   CreateInspectionDto,
   UpdateInspectionDto,
   UpdateInspectionItemDto,
+  AddInspectionItemDto,
 } from './dto/create-inspection.dto';
 
 @Controller('inspections')
 @UseGuards(JwtAuthGuard)
 export class InspectionsController {
   constructor(private readonly inspectionsService: InspectionsService) {}
+
+  @Post('item')
+  addItem(@Body() data: AddInspectionItemDto) {
+    return this.inspectionsService.addItem(data);
+  }
 
   @Post()
   create(@Body() data: CreateInspectionDto) {
