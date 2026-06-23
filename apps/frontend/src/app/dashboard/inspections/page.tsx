@@ -119,6 +119,16 @@ export default function InspectionsPage() {
   const roleName = user?.roles?.[0]?.role?.name || "";
   const designation = (user?.designation || "").toUpperCase();
   const isClient = roleName === "CLIENT" || designation.includes("CLIENT");
+  
+  const isOfficeUser = user?.role === 'ADMIN' || 
+    user?.designation?.toLowerCase().includes('admin') || 
+    user?.designation?.toLowerCase().includes('executive') ||
+    user?.designation?.toLowerCase().includes('staff') ||
+    user?.email?.toLowerCase().includes('admin') ||
+    roleName === 'ADMIN' ||
+    designation.includes('ADMIN') ||
+    designation.includes('STAFF') ||
+    designation.includes('EXECUTIVE');
 
   useEffect(() => {
     if (selectedInspection) {
@@ -1348,6 +1358,38 @@ export default function InspectionsPage() {
                               className="bg-background text-xs h-10"
                             />
                           </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Direct Office Review Actions for Administrators */}
+                    {isOfficeUser && selectedInspection.status === 'IN_PROGRESS' && (
+                      <div className="p-6 bg-amber-500/5 border border-amber-500/10 rounded-2xl space-y-4 shadow-sm mt-6">
+                        <h4 className="font-black text-amber-600 uppercase text-xs tracking-wider">Office Review Actions</h4>
+                        <div className="space-y-2">
+                          <Label className="text-xs font-semibold">Rejection Feedback (Required only if requesting changes)</Label>
+                          <Input
+                            placeholder="e.g., Please re-check the sprinkler systems on the 3rd floor..."
+                            value={feedbackInput}
+                            onChange={(e) => setFeedbackInput(e.target.value)}
+                            className="bg-background text-sm h-11"
+                          />
+                        </div>
+                        <div className="flex gap-3 pt-2">
+                          <Button 
+                            onClick={() => handleRejectInspection(selectedInspection.id)}
+                            disabled={submittingReview || !feedbackInput.trim()}
+                            className="flex-1 rounded-xl font-bold bg-rose-600 hover:bg-rose-500 text-white h-11 transition-all"
+                          >
+                            Reject & Request Changes
+                          </Button>
+                          <Button 
+                            onClick={() => handleApproveInspection(selectedInspection.id)}
+                            disabled={submittingReview}
+                            className="flex-1 rounded-xl font-bold bg-emerald-600 hover:bg-emerald-500 text-white h-11 transition-all"
+                          >
+                            Approve & Issue Certificate
+                          </Button>
                         </div>
                       </div>
                     )}

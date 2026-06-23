@@ -330,7 +330,7 @@ export class InspectionsService {
       if (failItems.length > 0) {
         newStatus = 'REJECTED';
       } else {
-        newStatus = 'COMPLETED';
+        newStatus = 'PENDING_REVIEW';
       }
     }
     // else: mixed edge-case — leave status as-is
