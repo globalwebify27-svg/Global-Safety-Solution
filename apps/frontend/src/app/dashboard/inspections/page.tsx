@@ -244,7 +244,7 @@ export default function InspectionsPage() {
         client_id: scheduleForm.client_id,
         engineer_id: scheduleForm.engineer_id,
         scheduled_date: scheduleForm.scheduled_date,
-        items: [{ description: "General Safety Check", status: "PENDING", notes: "" }]
+        items: [{ description: "General Safety Check" }]
       };
       const res = await fetch(`${API_BASE_URL}/inspections`, {
         method: 'POST',
