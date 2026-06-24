@@ -359,6 +359,17 @@ export class InspectionsService {
     return updatedItem;
   }
 
+  async deleteItem(itemId: string) {
+    const deletedItem = await this.prisma.inspectionItem.delete({
+      where: { id: itemId },
+    });
+
+    // Automatically recalculate and update parent inspection status in real-time
+    await this.autoUpdateInspectionStatus(deletedItem.inspection_id);
+
+    return deletedItem;
+  }
+
   async addItem(data: AddInspectionItemDto) {
     const item = await this.prisma.inspectionItem.create({
       data: {

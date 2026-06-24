@@ -289,6 +289,24 @@ export default function InspectionsPage() {
     }
   };
 
+  const handleDeleteItem = async (itemId: string) => {
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/inspections/item/${itemId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        toast.success("Observation section removed!");
+        if (selectedInspection) {
+          await fetchSingleInspection(selectedInspection.id);
+        }
+      }
+    } catch (err) {
+      toast.error("Failed to remove observation section");
+    }
+  };
+
   const handleItemPhotoUpload = async (itemId: string, files: FileList) => {
     if (files.length === 0 || !token) return;
     try {
@@ -1155,14 +1173,32 @@ export default function InspectionsPage() {
                       <h4 className="font-black text-xs uppercase tracking-widest text-muted-foreground">Checklist Results</h4>
                       <div className="max-h-48 overflow-y-auto space-y-2 border border-border/50 rounded-xl p-3 bg-muted/10">
                         {(selectedInspection.items || []).map((item) => (
-                          <div key={item.id} className="flex items-center justify-between text-xs p-2.5 bg-background rounded-lg border border-border/50">
-                            <span className="font-medium text-foreground">{item.description}</span>
-                            <span className={cn("px-2 py-0.5 rounded text-[10px] font-black uppercase",
-                              item.status === 'PASS' ? 'bg-emerald-500/10 text-emerald-600' :
-                              item.status === 'FAIL' ? 'bg-rose-500/10 text-rose-600' : 'bg-muted text-muted-foreground'
-                            )}>
-                              {item.status}
-                            </span>
+                          <div key={item.id} className="text-xs p-2.5 bg-background rounded-lg border border-border/50 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="font-medium text-foreground">{item.description}</span>
+                              <span className={cn("px-2 py-0.5 rounded text-[10px] font-black uppercase",
+                                item.status === 'PASS' ? 'bg-emerald-500/10 text-emerald-600' :
+                                item.status === 'FAIL' ? 'bg-rose-500/10 text-rose-600' : 'bg-muted text-muted-foreground'
+                              )}>
+                                {item.status}
+                              </span>
+                            </div>
+                            {item.notes && (
+                              <p className="text-[11px] text-muted-foreground italic">Note: {item.notes}</p>
+                            )}
+                            {item.photo_url && parseItemPhotos(item.photo_url).length > 0 && (
+                              <div className="flex gap-2 flex-wrap pt-1">
+                                {parseItemPhotos(item.photo_url).map((url, idx) => (
+                                  <img 
+                                    key={idx}
+                                    src={url}
+                                    alt="Evidence"
+                                    className="w-10 h-10 object-cover rounded-lg border border-border cursor-pointer hover:opacity-85 transition-opacity"
+                                    onClick={() => window.open(url, '_blank')}
+                                  />
+                                ))}
+                              </div>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -1256,9 +1292,9 @@ export default function InspectionsPage() {
                               </Button>
                               <Button 
                                 size="sm" 
-                                variant={item.status === 'FAIL' ? 'destructive' : 'outline'} 
-                                className="h-8 rounded-lg"
-                                onClick={() => handleUpdateItem(item.id, 'FAIL', item.notes)}
+                                variant="outline" 
+                                className="h-8 rounded-lg hover:bg-rose-500/10 hover:text-rose-600 hover:border-rose-500/20"
+                                onClick={() => handleDeleteItem(item.id)}
                               >
                                 <X className="w-4 h-4" />
                               </Button>

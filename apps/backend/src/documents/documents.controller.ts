@@ -78,7 +78,7 @@ export class DocumentsController {
         file_url: fileUrl,
         file_size: file?.size || data.file_size,
       },
-      req.user.id,
+      req.user.userId,
     );
   }
 

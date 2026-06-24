@@ -321,6 +321,30 @@ export default function FieldTasksPage() {
     }
   };
 
+  const handleDeleteItem = async (itemId: string) => {
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/inspections/item/${itemId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        toast.success("Observation section removed!");
+        if (selectedTask) {
+          const refRes = await fetch(`${API_BASE_URL}/inspections/${selectedTask.id}`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          if (refRes.ok) {
+            const updatedData = await refRes.json();
+            setSelectedTask(updatedData);
+          }
+        }
+      }
+    } catch (err) {
+      toast.error("Failed to remove observation section");
+    }
+  };
+
   const handleItemPhotoUpload = async (itemId: string, files: FileList) => {
     if (files.length === 0 || !token || !selectedTask) return;
     try {
@@ -539,9 +563,9 @@ export default function FieldTasksPage() {
                     </Button>
                     <Button 
                       size="sm" 
-                      variant={item.status === 'FAIL' ? 'destructive' : 'outline'} 
-                      className={cn("w-10 h-10 rounded-xl", item.status === 'FAIL' && "shadow-lg shadow-destructive/20")}
-                      onClick={() => handleUpdateItem(item.id, 'FAIL', item.notes)}
+                      variant="outline"
+                      className="w-10 h-10 rounded-xl hover:bg-rose-500/10 hover:text-rose-600 hover:border-rose-500/20"
+                      onClick={() => handleDeleteItem(item.id)}
                     >
                       <X className="w-5 h-5" />
                     </Button>

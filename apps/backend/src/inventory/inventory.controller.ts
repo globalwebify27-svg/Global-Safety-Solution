@@ -50,7 +50,7 @@ export class InventoryController {
   createTransaction(@Body() data: CreateTransactionDto, @Req() req: any) {
     return this.inventoryService.createTransaction({
       ...data,
-      performed_by: req.user.id,
+      performed_by: req.user.userId,
     });
   }
 }

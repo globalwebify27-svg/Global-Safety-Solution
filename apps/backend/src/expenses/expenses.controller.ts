@@ -21,7 +21,7 @@ export class ExpensesController {
 
   @Post()
   create(@Body() data: any, @Request() req: any) {
-    return this.expensesService.create(data, req.user.id);
+    return this.expensesService.create(data, req.user.userId);
   }
 
   @Get()
@@ -42,7 +42,7 @@ export class ExpensesController {
     @Body() data: { status: string },
     @Request() req: any,
   ) {
-    return this.expensesService.updateStatus(id, data.status, req.user.id);
+    return this.expensesService.updateStatus(id, data.status, req.user.userId);
   }
 
   @Delete(':id')

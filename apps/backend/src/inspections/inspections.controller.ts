@@ -79,6 +79,11 @@ export class InspectionsController {
     return this.inspectionsService.updateItem(itemId, data);
   }
 
+  @Delete('item/:itemId')
+  deleteItem(@Param('itemId') itemId: string) {
+    return this.inspectionsService.deleteItem(itemId);
+  }
+
   @Get(':id/certificate')
   async downloadCertificate(
     @Param('id') id: string,
