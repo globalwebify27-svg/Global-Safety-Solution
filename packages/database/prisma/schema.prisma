@@ -680,7 +680,7 @@ model InspectionItem {
   description     String
   status          String     @default("PENDING") @db.VarChar(50)
   notes           String?
-  photo_url       String?
+  photo_url       String?    @db.Text
   scope           String?    @db.Text
   recommendations String?    @db.Text
   expenditure     Decimal?   @default(0.00) @db.Decimal(15, 2)

@@ -292,14 +292,30 @@ export default function FieldTasksPage() {
 
   const parseItemPhotos = (photoUrl?: string | null): string[] => {
     if (!photoUrl) return [];
-    if (photoUrl.startsWith('[') && photoUrl.endsWith(']')) {
+    
+    // Trim spaces and quotes
+    let clean = photoUrl.trim();
+    if ((clean.startsWith('"') && clean.endsWith('"')) || (clean.startsWith("'") && clean.endsWith("'"))) {
+      clean = clean.substring(1, clean.length - 1).trim();
+    }
+    if (clean.startsWith('\\"') && clean.endsWith('\\"')) {
+      clean = clean.substring(2, clean.length - 2).trim();
+    }
+
+    if (clean.startsWith('[') && clean.endsWith(']')) {
       try {
-        return JSON.parse(photoUrl);
+        const parsed = JSON.parse(clean);
+        if (Array.isArray(parsed)) {
+          return parsed.map(url => typeof url === 'string' ? url.replace(/[\[\]"']/g, '').trim() : url);
+        }
       } catch (e) {
-        return [photoUrl];
+        // Fallback
       }
     }
-    return photoUrl.split(',').filter(Boolean);
+    
+    return clean.split(',')
+      .map(url => url.trim().replace(/[\[\]"']/g, '').trim())
+      .filter(Boolean);
   };
 
   const handleUpdateItem = async (itemId: string, status: string, notes?: string, photo_url?: string, scope?: string, recommendations?: string) => {
