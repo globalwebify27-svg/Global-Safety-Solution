@@ -69,8 +69,10 @@ export class DocumentsController {
   )
   create(@UploadedFile() file: any, @Body() data: any, @Req() req: any) {
     console.log('CREATE DOCUMENT BODY:', data);
+    const host = req.get('host');
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol;
     const fileUrl = file
-      ? `http://127.0.0.1:3001/public/${data.category || 'OTHER'}/${file.filename}`
+      ? `${protocol}://${host}/public/${data.category || 'OTHER'}/${file.filename}`
       : data.file_url;
     return this.documentsService.create(
       {
