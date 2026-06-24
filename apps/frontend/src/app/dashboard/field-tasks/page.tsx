@@ -14,7 +14,8 @@ import {
   AlertCircle,
   Clock,
   CheckCircle2,
-  ArrowLeft
+  ArrowLeft,
+  Upload
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,6 +38,7 @@ interface Task {
   };
   items: any[];
   remarks?: string | null;
+  expenditure?: number | string;
 }
 
 export default function FieldTasksPage() {
@@ -303,16 +305,30 @@ export default function FieldTasksPage() {
   const handleUpdateItem = async (itemId: string, status: string, notes?: string, photo_url?: string, scope?: string, recommendations?: string) => {
     if (!token) return;
     try {
+      const body: any = { status };
+      if (notes !== undefined) body.notes = notes;
+      if (photo_url !== undefined) body.photo_url = photo_url;
+      if (scope !== undefined) body.scope = scope;
+      if (recommendations !== undefined) body.recommendations = recommendations;
+
       const res = await fetch(`${API_BASE_URL}/inspections/item/${itemId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ status, notes, photo_url, scope, recommendations })
+        body: JSON.stringify(body)
       });
       if (res.ok) {
         if (selectedTask) {
-          const updatedItems = selectedTask.items.map(item => 
-            item.id === itemId ? { ...item, status, notes, photo_url, scope, recommendations } : item
-          );
+          const updatedItems = selectedTask.items.map(item => {
+            if (item.id === itemId) {
+              const updatedItem = { ...item, status: status as any };
+              if (notes !== undefined) updatedItem.notes = notes;
+              if (photo_url !== undefined) updatedItem.photo_url = photo_url;
+              if (scope !== undefined) updatedItem.scope = scope;
+              if (recommendations !== undefined) updatedItem.recommendations = recommendations;
+              return updatedItem;
+            }
+            return item;
+          });
           setSelectedTask({ ...selectedTask, items: updatedItems });
         }
       }
@@ -546,6 +562,44 @@ export default function FieldTasksPage() {
             </div>
           </div>
 
+          <div className="bg-card border border-border rounded-3xl p-6 space-y-4 shadow-sm">
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase">Total Expenditure (₹)</label>
+              <Input
+                type="number"
+                placeholder="0.00"
+                className="bg-muted/30 border-none rounded-xl h-12"
+                value={
+                  selectedTask.expenditure !== undefined && selectedTask.expenditure !== null && Number(selectedTask.expenditure) > 0
+                    ? selectedTask.expenditure
+                    : ((selectedTask.items || []).reduce((acc: number, curr: any) => acc + (Number(curr.expenditure) || 0), 0) || "")
+                }
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setSelectedTask(prev => prev ? { ...prev, expenditure: val } : null);
+                }}
+                onBlur={async (e) => {
+                  const val = e.target.value;
+                  if (!token) return;
+                  try {
+                    const res = await fetch(`${API_BASE_URL}/inspections/${selectedTask.id}`, {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                      body: JSON.stringify({ expenditure: val ? Number(val) : 0 })
+                    });
+                    if (res.ok) {
+                      toast.success("Total expenditure updated!");
+                    } else {
+                      toast.error("Failed to update expenditure");
+                    }
+                  } catch (err) {
+                    toast.error("Failed to update expenditure");
+                  }
+                }}
+              />
+            </div>
+          </div>
+
           <div className="space-y-4">
             <h3 className="text-sm font-black uppercase tracking-widest text-muted-foreground px-2">Checklist Items</h3>
             {selectedTask.items.map((item, idx) => (
@@ -641,6 +695,27 @@ export default function FieldTasksPage() {
                         className="hidden" 
                         multiple
                       />
+                      <input 
+                        type="file" 
+                        id={`item-camera-${item.id}`}
+                        onChange={(e) => {
+                          if (e.target.files) {
+                            handleItemPhotoUpload(item.id, e.target.files);
+                          }
+                        }}
+                        accept="image/*" 
+                        capture="environment"
+                        className="hidden" 
+                      />
+                      <Button 
+                        type="button"
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => document.getElementById(`item-camera-${item.id}`)?.click()}
+                        className="rounded-xl h-9 border-emerald-500/20 text-emerald-600 hover:bg-emerald-500/10 font-bold text-xs"
+                      >
+                        <Camera className="w-3.5 h-3.5 mr-1" /> Take Photo
+                      </Button>
                       <Button 
                         type="button"
                         variant="outline" 
@@ -648,7 +723,7 @@ export default function FieldTasksPage() {
                         onClick={() => document.getElementById(`item-file-${item.id}`)?.click()}
                         className="rounded-xl h-9 border-blue-500/20 text-blue-600 hover:bg-blue-500/10 font-bold text-xs"
                       >
-                        <Camera className="w-3.5 h-3.5 mr-1" /> Upload Item Photo
+                        <Upload className="w-3.5 h-3.5 mr-1" /> Upload Photo
                       </Button>
                     </div>
                   </div>

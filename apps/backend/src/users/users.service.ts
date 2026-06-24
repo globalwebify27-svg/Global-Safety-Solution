@@ -53,6 +53,11 @@ export class UsersService {
         join_date: true,
         base_salary: true,
         leave_balance: true,
+        roles: {
+          include: {
+            role: true,
+          },
+        },
       },
       orderBy: { name: 'asc' },
     });

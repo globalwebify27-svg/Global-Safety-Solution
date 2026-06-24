@@ -213,7 +213,10 @@ export default function InspectionsPage() {
       if (Array.isArray(iData)) setInspections(iData);
       if (Array.isArray(cData)) setClients(cData);
       if (Array.isArray(eData)) {
-        setEngineers(eData.filter((u: any) => u.is_active));
+        setEngineers(eData.filter((u: any) => 
+          u.is_active && 
+          u.roles?.some((ur: any) => ur.role?.name === 'FIELD_ENGINEER')
+        ));
       }
     } catch (e) {
       console.error(e);
@@ -272,16 +275,32 @@ export default function InspectionsPage() {
   const handleUpdateItem = async (itemId: string, status: string, notes?: string, expenditure?: number | string, photo_url?: string, scope?: string, recommendations?: string) => {
     if (!token) return;
     try {
+      const body: any = { status };
+      if (notes !== undefined) body.notes = notes;
+      if (expenditure !== undefined) body.expenditure = expenditure ? Number(expenditure) : 0;
+      if (photo_url !== undefined) body.photo_url = photo_url;
+      if (scope !== undefined) body.scope = scope;
+      if (recommendations !== undefined) body.recommendations = recommendations;
+
       const res = await fetch(`${API_BASE_URL}/inspections/item/${itemId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ status, notes, expenditure: expenditure ? Number(expenditure) : 0, photo_url, scope, recommendations })
+        body: JSON.stringify(body)
       });
       if (res.ok) {
         if (selectedInspection) {
-          const updatedItems = (selectedInspection.items || []).map(item => 
-            item.id === itemId ? { ...item, status: status as any, notes, expenditure, photo_url, scope, recommendations } : item
-          );
+          const updatedItems = (selectedInspection.items || []).map(item => {
+            if (item.id === itemId) {
+              const updatedItem = { ...item, status: status as any };
+              if (notes !== undefined) updatedItem.notes = notes;
+              if (expenditure !== undefined) updatedItem.expenditure = expenditure;
+              if (photo_url !== undefined) updatedItem.photo_url = photo_url;
+              if (scope !== undefined) updatedItem.scope = scope;
+              if (recommendations !== undefined) updatedItem.recommendations = recommendations;
+              return updatedItem;
+            }
+            return item;
+          });
           setSelectedInspection({ ...selectedInspection, items: updatedItems });
           await fetchSingleInspection(selectedInspection.id);
         }
