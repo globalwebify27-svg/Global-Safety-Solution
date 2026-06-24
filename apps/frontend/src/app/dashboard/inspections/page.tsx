@@ -33,6 +33,8 @@ interface InspectionItem {
   description: string;
   status: 'PENDING' | 'PASS' | 'FAIL' | 'NA';
   notes?: string;
+  scope?: string;
+  recommendations?: string;
   expenditure?: number | string;
   photo_url?: string;
 }
@@ -267,18 +269,18 @@ export default function InspectionsPage() {
     }
   };
 
-  const handleUpdateItem = async (itemId: string, status: string, notes?: string, expenditure?: number | string, photo_url?: string) => {
+  const handleUpdateItem = async (itemId: string, status: string, notes?: string, expenditure?: number | string, photo_url?: string, scope?: string, recommendations?: string) => {
     if (!token) return;
     try {
       const res = await fetch(`${API_BASE_URL}/inspections/item/${itemId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ status, notes, expenditure: expenditure ? Number(expenditure) : 0, photo_url })
+        body: JSON.stringify({ status, notes, expenditure: expenditure ? Number(expenditure) : 0, photo_url, scope, recommendations })
       });
       if (res.ok) {
         if (selectedInspection) {
           const updatedItems = (selectedInspection.items || []).map(item => 
-            item.id === itemId ? { ...item, status: status as any, notes, expenditure, photo_url } : item
+            item.id === itemId ? { ...item, status: status as any, notes, expenditure, photo_url, scope, recommendations } : item
           );
           setSelectedInspection({ ...selectedInspection, items: updatedItems });
           await fetchSingleInspection(selectedInspection.id);
@@ -930,7 +932,17 @@ export default function InspectionsPage() {
                         </div>
                         {item.notes && (
                           <p className="text-[11px] text-muted-foreground italic bg-muted/50 p-2 rounded border border-border/10">
-                            {item.notes}
+                            <span className="font-semibold text-foreground/75">Observations:</span> {item.notes}
+                          </p>
+                        )}
+                        {item.scope && (
+                          <p className="text-[11px] text-muted-foreground italic bg-muted/50 p-2 rounded border border-border/10">
+                            <span className="font-semibold text-foreground/75">Scope:</span> {item.scope}
+                          </p>
+                        )}
+                        {item.recommendations && (
+                          <p className="text-[11px] text-muted-foreground italic bg-muted/50 p-2 rounded border border-border/10">
+                            <span className="font-semibold text-foreground/75">Remarks & Recommendations:</span> {item.recommendations}
                           </p>
                         )}
                       </div>
@@ -973,7 +985,7 @@ export default function InspectionsPage() {
               <div className="space-y-6">
                 <DialogHeader>
                   <DialogTitle className="text-2xl font-black flex items-center gap-3">
-                    <ClipboardCheck className="w-6 h-6 text-blue-600" /> {selectedInspection.status === 'PENDING_REVIEW' ? 'Office Review & Issuance' : 'Inspection Checklist'}
+                    <ClipboardCheck className="w-6 h-6 text-blue-600" /> {selectedInspection.status === 'PENDING_REVIEW' || selectedInspection.status === 'IN_PROGRESS' ? 'Office Review & Issuance' : 'Inspection Checklist'}
                   </DialogTitle>
                   <DialogDescription>
                     Site Visit for <span className="font-bold text-foreground">{selectedInspection.client?.name}</span>
@@ -1136,7 +1148,7 @@ export default function InspectionsPage() {
                   </div>
                 )}
   
-                {selectedInspection.status === 'PENDING_REVIEW' ? (
+                {selectedInspection.status === 'PENDING_REVIEW' || selectedInspection.status === 'IN_PROGRESS' ? (
                   <div className="space-y-6">
                     {/* Draft Certificate details card */}
                     <div className="p-6 bg-blue-600/5 border border-blue-600/10 rounded-2xl space-y-4">
@@ -1184,7 +1196,13 @@ export default function InspectionsPage() {
                               </span>
                             </div>
                             {item.notes && (
-                              <p className="text-[11px] text-muted-foreground italic">Note: {item.notes}</p>
+                              <p className="text-[11px] text-muted-foreground italic">Observations: {item.notes}</p>
+                            )}
+                            {item.scope && (
+                              <p className="text-[11px] text-muted-foreground italic">Scope: {item.scope}</p>
+                            )}
+                            {item.recommendations && (
+                              <p className="text-[11px] text-muted-foreground italic">Remarks & Recommendations: {item.recommendations}</p>
                             )}
                             {item.photo_url && parseItemPhotos(item.photo_url).length > 0 && (
                               <div className="flex gap-2 flex-wrap pt-1">
@@ -1301,16 +1319,45 @@ export default function InspectionsPage() {
                             </div>
                           </div>
                           <div className="flex flex-col gap-3">
-                            <Input 
-                              placeholder="Add observations..." 
-                              className="bg-background h-10 text-sm flex-1"
-                              defaultValue={item.notes || ""}
-                              onBlur={(e) => {
-                                if (e.target.value !== (item.notes || "")) {
-                                  handleUpdateItem(item.id, item.status, e.target.value);
-                                }
-                              }}
-                            />
+                            <div className="space-y-1">
+                              <Label className="text-[10px] font-bold text-muted-foreground uppercase">Observations / Notes</Label>
+                              <Input 
+                                placeholder="Add observations..." 
+                                className="bg-background h-10 text-sm flex-1"
+                                defaultValue={item.notes || ""}
+                                onBlur={(e) => {
+                                  if (e.target.value !== (item.notes || "")) {
+                                    handleUpdateItem(item.id, item.status, e.target.value, undefined, undefined, item.scope, item.recommendations);
+                                  }
+                                }}
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-[10px] font-bold text-muted-foreground uppercase">Scope of Inspection</Label>
+                              <Input 
+                                placeholder="Scope of Inspection..." 
+                                className="bg-background h-10 text-sm flex-1"
+                                defaultValue={item.scope || ""}
+                                onBlur={(e) => {
+                                  if (e.target.value !== (item.scope || "")) {
+                                    handleUpdateItem(item.id, item.status, item.notes, undefined, undefined, e.target.value, item.recommendations);
+                                  }
+                                }}
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-[10px] font-bold text-muted-foreground uppercase">Remarks & Recommendations</Label>
+                              <Input 
+                                placeholder="Remarks & Recommendations..." 
+                                className="bg-background h-10 text-sm flex-1"
+                                defaultValue={item.recommendations || ""}
+                                onBlur={(e) => {
+                                  if (e.target.value !== (item.recommendations || "")) {
+                                    handleUpdateItem(item.id, item.status, item.notes, undefined, undefined, item.scope, e.target.value);
+                                  }
+                                }}
+                              />
+                            </div>
                             
                             {/* Per-item Photo Upload & Preview */}
                             <div className="space-y-2">
@@ -1400,73 +1447,7 @@ export default function InspectionsPage() {
                       </div>
                     </div>
     
-                    <div className="space-y-4">
-                      <div className="p-4 bg-blue-500/5 border border-blue-500/10 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
-                        <div className="flex items-center gap-4">
-                          <div className="p-3 bg-blue-500/10 rounded-xl">
-                            <Camera className="w-6 h-6 text-blue-600 animate-pulse" />
-                          </div>
-                          <div>
-                            <p className="text-sm font-bold text-foreground">Site Verification Photos</p>
-                            <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">
-                              Upload multiple verification photos for this visit
-                            </p>
-                          </div>
-                        </div>
-    
-                        <div className="flex items-center gap-3 self-end md:self-auto">
-                          <input 
-                            type="file" 
-                            ref={fileInputRef} 
-                            onChange={handlePhotoUpload} 
-                            accept="image/*" 
-                            className="hidden" 
-                            multiple
-                          />
-                          
-                          {uploadingPhoto ? (
-                            <Button disabled variant="outline" className="rounded-xl h-10 border-blue-500/20 text-blue-600 flex items-center gap-2">
-                              <Loader2 className="w-4 h-4 animate-spin" /> Uploading...
-                            </Button>
-                          ) : selectedInspection.status !== 'COMPLETED' ? (
-                            <Button 
-                              type="button"
-                              variant="outline" 
-                              onClick={() => fileInputRef.current?.click()}
-                              className="rounded-xl h-10 border-blue-500/20 text-blue-600 hover:bg-blue-500/10 font-bold transition-all"
-                            >
-                              {uploadedPhotoUrls.length > 0 ? "Add More Photos" : "Upload Photos"}
-                            </Button>
-                          ) : null}
-                        </div>
-                      </div>
-    
-                      {uploadedPhotoUrls.length > 0 && (
-                        <div className="grid grid-cols-4 sm:grid-cols-6 gap-3 p-4 bg-muted/20 border border-border/50 rounded-2xl">
-                          {uploadedPhotoUrls.map((url, index) => (
-                            <div key={index} className="relative aspect-square rounded-xl overflow-hidden border border-border group shadow-sm bg-background">
-                              <img 
-                                src={url} 
-                                alt={`Verification preview ${index + 1}`} 
-                                className="w-full h-full object-cover transition-all duration-300 group-hover:scale-110 cursor-pointer" 
-                                onClick={() => window.open(url, '_blank')}
-                              />
-                              {selectedInspection.status !== 'COMPLETED' && (
-                                <button
-                                  type="button"
-                                  onClick={() => setUploadedPhotoUrls(prev => prev.filter((_, idx) => idx !== index))}
-                                  className="absolute top-1.5 right-1.5 bg-rose-500 hover:bg-rose-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow duration-200 cursor-pointer"
-                                >
-                                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-3 h-3">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                                  </svg>
-                                </button>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
+                    {/* Removed main site verification photos section as per requirements */}
     
                     {/* Safety Officer Certificate Preparation section */}
                     {selectedInspection.status !== 'COMPLETED' && (

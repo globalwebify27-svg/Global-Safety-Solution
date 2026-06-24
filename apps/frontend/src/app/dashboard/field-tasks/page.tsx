@@ -300,18 +300,18 @@ export default function FieldTasksPage() {
     return photoUrl.split(',').filter(Boolean);
   };
 
-  const handleUpdateItem = async (itemId: string, status: string, notes?: string, photo_url?: string) => {
+  const handleUpdateItem = async (itemId: string, status: string, notes?: string, photo_url?: string, scope?: string, recommendations?: string) => {
     if (!token) return;
     try {
       const res = await fetch(`${API_BASE_URL}/inspections/item/${itemId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ status, notes, photo_url })
+        body: JSON.stringify({ status, notes, photo_url, scope, recommendations })
       });
       if (res.ok) {
         if (selectedTask) {
           const updatedItems = selectedTask.items.map(item => 
-            item.id === itemId ? { ...item, status, notes, photo_url } : item
+            item.id === itemId ? { ...item, status, notes, photo_url, scope, recommendations } : item
           );
           setSelectedTask({ ...selectedTask, items: updatedItems });
         }
@@ -489,7 +489,7 @@ export default function FieldTasksPage() {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ 
-          status: 'PENDING_REVIEW', 
+          status: 'IN_PROGRESS', 
           completed_date: new Date().toISOString(),
           remarks: JSON.stringify(remarksJson),
           lat,
@@ -573,12 +573,33 @@ export default function FieldTasksPage() {
                 </div>
                 
                 <div className="flex flex-col gap-3">
-                  <Input 
-                    placeholder="Observations / Notes..." 
-                    className="bg-muted/30 border-none rounded-xl h-12"
-                    value={item.notes || ""}
-                    onChange={(e) => handleUpdateItem(item.id, item.status, e.target.value)}
-                  />
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase">Observations / Notes</label>
+                    <Input 
+                      placeholder="Observations / Notes..." 
+                      className="bg-muted/30 border-none rounded-xl h-12"
+                      value={item.notes || ""}
+                      onChange={(e) => handleUpdateItem(item.id, item.status, e.target.value, undefined, item.scope, item.recommendations)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase">Scope of Inspection</label>
+                    <Input 
+                      placeholder="Scope of Inspection..." 
+                      className="bg-muted/30 border-none rounded-xl h-12"
+                      value={item.scope || ""}
+                      onChange={(e) => handleUpdateItem(item.id, item.status, item.notes, undefined, e.target.value, item.recommendations)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase">Remarks & Recommendations</label>
+                    <Input 
+                      placeholder="Remarks & Recommendations..." 
+                      className="bg-muted/30 border-none rounded-xl h-12"
+                      value={item.recommendations || ""}
+                      onChange={(e) => handleUpdateItem(item.id, item.status, item.notes, undefined, item.scope, e.target.value)}
+                    />
+                  </div>
 
                   {/* Per-item Photo Upload & Preview */}
                   <div className="space-y-2">

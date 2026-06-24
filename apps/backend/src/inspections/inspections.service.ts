@@ -306,8 +306,15 @@ export class InspectionsService {
 
     if (!inspection) return;
 
-    // Don't auto-update if status is CANCELLED
-    if (inspection.status === 'CANCELLED') return;
+    // Do not automatically transition if status is SCHEDULED, CANCELLED, IN_PROGRESS, or COMPLETED
+    if (
+      inspection.status === 'SCHEDULED' ||
+      inspection.status === 'CANCELLED' ||
+      inspection.status === 'IN_PROGRESS' ||
+      inspection.status === 'COMPLETED'
+    ) {
+      return;
+    }
 
     const items = inspection.items || [];
 
@@ -326,8 +333,7 @@ export class InspectionsService {
       // There are still unresolved items — must be IN_PROGRESS (or stay as-is if already there)
       if (
         inspection.status === 'COMPLETED' ||
-        inspection.status === 'REJECTED' ||
-        inspection.status === 'SCHEDULED'
+        inspection.status === 'REJECTED'
       ) {
         newStatus = 'IN_PROGRESS';
       }
@@ -377,6 +383,8 @@ export class InspectionsService {
         description: data.description,
         status: data.status || 'PENDING',
         notes: data.notes || '',
+        scope: data.scope || null,
+        recommendations: data.recommendations || null,
         expenditure: data.expenditure || 0,
         photo_url: data.photo_url || null,
       },

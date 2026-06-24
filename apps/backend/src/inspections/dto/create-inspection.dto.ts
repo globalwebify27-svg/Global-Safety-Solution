@@ -28,6 +28,14 @@ export class CreateInspectionItemDto {
   notes?: string;
 
   @IsOptional()
+  @IsString()
+  scope?: string;
+
+  @IsOptional()
+  @IsString()
+  recommendations?: string;
+
+  @IsOptional()
   @IsNumber()
   expenditure?: number;
 }
@@ -121,6 +129,14 @@ export class UpdateInspectionItemDto {
   photo_url?: string;
 
   @IsOptional()
+  @IsString()
+  scope?: string;
+
+  @IsOptional()
+  @IsString()
+  recommendations?: string;
+
+  @IsOptional()
   @IsNumber()
   expenditure?: number;
 }
@@ -139,6 +155,14 @@ export class AddInspectionItemDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @IsOptional()
+  @IsString()
+  scope?: string;
+
+  @IsOptional()
+  @IsString()
+  recommendations?: string;
 
   @IsOptional()
   @IsNumber()
