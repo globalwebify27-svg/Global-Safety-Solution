@@ -605,7 +605,7 @@ model Asset {
 model Document {
   id            String      @id @default(uuid()) @db.VarChar(36)
   name          String      @db.VarChar(255)
-  file_url      String
+  file_url      String      @db.LongText
   file_type     String      @db.VarChar(50)
   file_size     Int
   category      String      @db.VarChar(100)

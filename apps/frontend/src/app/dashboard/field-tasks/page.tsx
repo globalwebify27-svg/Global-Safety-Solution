@@ -22,6 +22,19 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
+const openImageInNewTab = (url: string) => {
+  if (url.startsWith('data:')) {
+    const newWindow = window.open();
+    if (newWindow) {
+      newWindow.document.write(`<img src="${url}" style="max-width: 100%; max-height: 100vh; display: block; margin: auto; padding: 20px;" />`);
+      newWindow.document.title = "View Image";
+      newWindow.document.close();
+    }
+  } else {
+    window.open(url, '_blank');
+  }
+};
+
 interface Task {
   id: string;
   status: string;
@@ -295,11 +308,20 @@ export default function FieldTasksPage() {
     
     // Trim spaces and quotes
     let clean = photoUrl.trim();
+    if (clean.startsWith('data:')) {
+      return [clean];
+    }
     if ((clean.startsWith('"') && clean.endsWith('"')) || (clean.startsWith("'") && clean.endsWith("'"))) {
       clean = clean.substring(1, clean.length - 1).trim();
     }
+    if (clean.startsWith('data:')) {
+      return [clean];
+    }
     if (clean.startsWith('\\"') && clean.endsWith('\\"')) {
       clean = clean.substring(2, clean.length - 2).trim();
+    }
+    if (clean.startsWith('data:')) {
+      return [clean];
     }
 
     if (clean.startsWith('[') && clean.endsWith(']')) {
@@ -377,14 +399,71 @@ export default function FieldTasksPage() {
     }
   };
 
+  const compressImage = (file: File, maxWidth = 1024, maxHeight = 1024, quality = 0.7): Promise<Blob> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > maxWidth) {
+              height = Math.round((height * maxWidth) / width);
+              width = maxWidth;
+            }
+          } else {
+            if (height > maxHeight) {
+              width = Math.round((width * maxHeight) / height);
+              height = maxHeight;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+
+          canvas.toBlob(
+            (blob) => {
+              if (blob) {
+                resolve(blob);
+              } else {
+                reject(new Error('Canvas to Blob conversion failed'));
+              }
+            },
+            'image/jpeg',
+            quality
+          );
+        };
+        img.onerror = (err) => reject(err);
+      };
+      reader.onerror = (err) => reject(err);
+    });
+  };
+
   const handleItemPhotoUpload = async (itemId: string, files: FileList) => {
     if (files.length === 0 || !token || !selectedTask) return;
     try {
       const uploadedUrls: string[] = [];
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
+        
+        let compressedFile: File | Blob = file;
+        try {
+          // Compress the image down to under 150KB
+          const blob = await compressImage(file);
+          compressedFile = new File([blob], file.name.replace(/\.[^/.]+$/, "") + ".jpg", { type: 'image/jpeg' });
+        } catch (err) {
+          console.error("Compression failed, using original file", err);
+        }
+
         const formData = new FormData();
-        formData.append('file', file);
+        formData.append('file', compressedFile);
         formData.append('name', `Item Photo - ${selectedTask.client?.name || 'Inspection'} - Item ${itemId}`);
         formData.append('category', 'OTHER');
         if (selectedTask.client_id) {
@@ -681,7 +760,7 @@ export default function FieldTasksPage() {
                               src={url} 
                               alt={`Item photo ${index + 1}`} 
                               className="w-full h-full object-cover transition-all duration-300 group-hover:scale-110 cursor-pointer" 
-                              onClick={() => window.open(url, '_blank')}
+                              onClick={() => openImageInNewTab(url)}
                             />
                             <button
                               type="button"

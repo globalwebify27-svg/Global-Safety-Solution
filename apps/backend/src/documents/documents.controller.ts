@@ -12,9 +12,6 @@ import {
   UploadedFile,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import { extname, join } from 'path';
-import { existsSync, mkdirSync } from 'fs';
 import { DocumentsService } from './documents.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../auth/guards/permissions.guard';
@@ -48,40 +45,43 @@ export class DocumentsController {
 
   @Post()
   @Permissions('CREATE_DOCUMENT')
-  @UseInterceptors(
-    FileInterceptor('file', {
-      storage: diskStorage({
-        destination: (req: any, file: any, cb: any) => {
-          const category = req.body.category || 'OTHER';
-          const uploadPath = join(process.cwd(), 'public', category);
-          if (!existsSync(uploadPath)) {
-            mkdirSync(uploadPath, { recursive: true });
-          }
-          cb(null, uploadPath);
+  @UseInterceptors(FileInterceptor('file'))
+  async create(@UploadedFile() file: any, @Body() data: any, @Req() req: any) {
+    try {
+      console.log('--- UPLOAD START ---');
+      console.log('Body data:', data);
+      console.log('File received:', file ? {
+        originalname: file.originalname,
+        mimetype: file.mimetype,
+        size: file.size,
+        hasBuffer: !!file.buffer
+      } : 'No file received');
+
+      let fileUrl = data.file_url;
+      if (file && file.buffer) {
+        const base64 = file.buffer.toString('base64');
+        fileUrl = `data:${file.mimetype};base64,${base64}`;
+        console.log('Base64 string successfully generated (Length:', fileUrl.length, ')');
+      } else {
+        console.warn('Warning: No file buffer found to convert to Base64');
+      }
+
+      const result = await this.documentsService.create(
+        {
+          ...data,
+          file_url: fileUrl,
+          file_size: file?.size || data.file_size,
         },
-        filename: (req: any, file: any, cb: any) => {
-          const uniqueSuffix =
-            Date.now() + '-' + Math.round(Math.random() * 1e9);
-          cb(null, `${uniqueSuffix}${extname(file.originalname)}`);
-        },
-      }),
-    }),
-  )
-  create(@UploadedFile() file: any, @Body() data: any, @Req() req: any) {
-    console.log('CREATE DOCUMENT BODY:', data);
-    const host = req.get('host');
-    const protocol = req.headers['x-forwarded-proto'] || req.protocol;
-    const fileUrl = file
-      ? `${protocol}://${host}/public/${data.category || 'OTHER'}/${file.filename}`
-      : data.file_url;
-    return this.documentsService.create(
-      {
-        ...data,
-        file_url: fileUrl,
-        file_size: file?.size || data.file_size,
-      },
-      req.user.userId,
-    );
+        req.user.userId,
+      );
+      console.log('Document successfully saved in database. ID:', result.id);
+      console.log('--- UPLOAD SUCCESS ---');
+      return result;
+    } catch (error) {
+      console.error('--- UPLOAD FAILED ---');
+      console.error('Error details:', error);
+      throw error;
+    }
   }
 
   @Delete(':id')

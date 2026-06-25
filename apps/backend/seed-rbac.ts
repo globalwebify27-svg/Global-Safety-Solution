@@ -58,6 +58,34 @@ async function main() {
   }
   console.log('Roles seeded.');
 
+  console.log('Mapping Permissions to Roles...');
+  const allPerms = await prisma.permission.findMany();
+  const rolePermissionMapping: Record<string, string[]> = {
+    SUPER_ADMIN: allPerms.filter(p => p.module !== 'FIELD_TASKS').map(p => p.id),
+    HR_MANAGER: allPerms.filter(p => ['DASHBOARD', 'HR', 'SYSTEM'].includes(p.module)).map(p => p.id),
+    SALES_EXECUTIVE: allPerms.filter(p => ['DASHBOARD', 'SALES', 'FINANCE', 'CLIENTS'].includes(p.module)).map(p => p.id),
+    FIELD_ENGINEER: allPerms.filter(p => ['DASHBOARD', 'FIELD_TASKS'].includes(p.module)).map(p => p.id),
+    CLIENT: allPerms.filter(p => p.name === 'READ_DOCUMENT').map(p => p.id),
+  };
+
+  for (const [roleName, permIds] of Object.entries(rolePermissionMapping)) {
+    const role = await prisma.role.findUnique({ where: { name: roleName } });
+    if (role) {
+      // Clear existing mappings to prevent duplicates
+      await prisma.rolePermission.deleteMany({ where: { role_id: role.id } });
+      // Create new mappings
+      for (const permId of permIds) {
+        await prisma.rolePermission.create({
+          data: {
+            role_id: role.id,
+            permission_id: permId,
+          },
+        });
+      }
+    }
+  }
+  console.log('Permissions mapped to roles successfully.');
+
   // Find Super Admin and assign role
   const admin = await prisma.user.findUnique({ where: { email: 'admin@globalsafety.com' } });
   const superAdminRole = await prisma.role.findUnique({ where: { name: 'SUPER_ADMIN' } });
