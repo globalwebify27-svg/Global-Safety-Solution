@@ -6,19 +6,82 @@ export class AccountingService {
   constructor(private prisma: PrismaService) {}
 
   async getAccounts() {
-    return this.prisma.account.findMany({
+    const accounts = await this.prisma.account.findMany({
       orderBy: { code: 'asc' },
     });
+
+    const balancesMap = new Map<string, number>();
+    accounts.forEach(acc => {
+      balancesMap.set(acc.id, Number(acc.balance));
+    });
+
+    const getAggregateBalance = (accId: string): number => {
+      let total = balancesMap.get(accId) || 0;
+      const children = accounts.filter(a => a.parent_id === accId);
+      children.forEach(child => {
+        total += getAggregateBalance(child.id);
+      });
+      return total;
+    };
+
+    return accounts.map(acc => ({
+      ...acc,
+      balance: getAggregateBalance(acc.id),
+    }));
   }
 
-  async createAccount(data: { name: string; code: string; type: string }) {
+  async createAccount(data: { name: string; code: string; type: string; parent_id?: string; opening_balance?: number }) {
     const existingCode = await this.prisma.account.findUnique({ where: { code: data.code } });
     if (existingCode) throw new BadRequestException('Account code already exists');
 
     const existingName = await this.prisma.account.findUnique({ where: { name: data.name } });
     if (existingName) throw new BadRequestException('Account name already exists');
 
-    return this.prisma.account.create({ data });
+    if (data.parent_id) {
+      const parentAcc = await this.prisma.account.findUnique({ where: { id: data.parent_id } });
+      if (!parentAcc) throw new BadRequestException('Parent account not found');
+    }
+
+    const account = await this.prisma.account.create({
+      data: {
+        name: data.name,
+        code: data.code,
+        type: data.type,
+        parent_id: data.parent_id || null,
+        balance: 0,
+      },
+    });
+
+    const openingBal = Number(data.opening_balance);
+    if (openingBal && openingBal > 0) {
+      let obeAcc = await this.prisma.account.findUnique({ where: { code: '3999' } });
+      if (!obeAcc) {
+        obeAcc = await this.prisma.account.create({
+          data: {
+            name: 'Opening Balance Equity',
+            code: '3999',
+            type: 'EQUITY',
+            balance: 0,
+          },
+        });
+      }
+
+      const isDebitClass = data.type === 'ASSET' || data.type === 'EXPENSE';
+      const debit_code = isDebitClass ? data.code : '3999';
+      const credit_code = isDebitClass ? '3999' : data.code;
+
+      await this.postVoucher({
+        description: `Opening Balance for ${data.name}`,
+        amount: openingBal,
+        debit_code,
+        credit_code,
+        created_by: 'System',
+      });
+    }
+
+    return this.prisma.account.findUnique({
+      where: { id: account.id },
+    });
   }
 
   async postVoucher(data: {
@@ -135,7 +198,7 @@ export class AccountingService {
     });
 
     // Compute dynamic statement balances inside range
-    const statementBalances = accounts.map(acc => {
+    const baseBalances = accounts.map(acc => {
       let balance = 0;
       ledgerEntries.forEach(entry => {
         if (entry.debit_account_id === acc.id) {
@@ -149,9 +212,34 @@ export class AccountingService {
       });
       return {
         ...acc,
-        periodBalance: balance,
+        baseBalance: balance,
       };
     });
+
+    const balancesMap = new Map<string, number>();
+    baseBalances.forEach(acc => {
+      balancesMap.set(acc.id, acc.baseBalance);
+    });
+
+    const getAggregatePeriodBalance = (accId: string): number => {
+      let total = balancesMap.get(accId) || 0;
+      const children = baseBalances.filter(a => a.parent_id === accId);
+      children.forEach(child => {
+        total += getAggregatePeriodBalance(child.id);
+      });
+      return total;
+    };
+
+    const statementBalances = baseBalances.map(acc => {
+      return {
+        ...acc,
+        periodBalance: getAggregatePeriodBalance(acc.id),
+      };
+    });
+
+    const isLeafAccount = (accId: string) => {
+      return !accounts.some(a => a.parent_id === accId);
+    };
 
     const trialBalance = statementBalances.map(acc => {
       const isDebit = acc.type === 'ASSET' || acc.type === 'EXPENSE';
@@ -170,17 +258,17 @@ export class AccountingService {
     const profitAndLoss = {
       revenues: statementBalances.filter(a => a.type === 'REVENUE'),
       expenses: statementBalances.filter(a => a.type === 'EXPENSE'),
-      totalRevenue: statementBalances.filter(a => a.type === 'REVENUE').reduce((sum, a) => sum + a.periodBalance, 0),
-      totalExpense: statementBalances.filter(a => a.type === 'EXPENSE').reduce((sum, a) => sum + a.periodBalance, 0),
+      totalRevenue: statementBalances.filter(a => a.type === 'REVENUE' && isLeafAccount(a.id)).reduce((sum, a) => sum + a.periodBalance, 0),
+      totalExpense: statementBalances.filter(a => a.type === 'EXPENSE' && isLeafAccount(a.id)).reduce((sum, a) => sum + a.periodBalance, 0),
     };
 
     const balanceSheet = {
       assets: statementBalances.filter(a => a.type === 'ASSET'),
       liabilities: statementBalances.filter(a => a.type === 'LIABILITY'),
       equity: statementBalances.filter(a => a.type === 'EQUITY'),
-      totalAssets: statementBalances.filter(a => a.type === 'ASSET').reduce((sum, a) => sum + a.periodBalance, 0),
-      totalLiabilities: statementBalances.filter(a => a.type === 'LIABILITY').reduce((sum, a) => sum + a.periodBalance, 0),
-      totalEquity: statementBalances.filter(a => a.type === 'EQUITY').reduce((sum, a) => sum + a.periodBalance, 0),
+      totalAssets: statementBalances.filter(a => a.type === 'ASSET' && isLeafAccount(a.id)).reduce((sum, a) => sum + a.periodBalance, 0),
+      totalLiabilities: statementBalances.filter(a => a.type === 'LIABILITY' && isLeafAccount(a.id)).reduce((sum, a) => sum + a.periodBalance, 0),
+      totalEquity: statementBalances.filter(a => a.type === 'EQUITY' && isLeafAccount(a.id)).reduce((sum, a) => sum + a.periodBalance, 0),
     };
 
     return {
@@ -201,6 +289,43 @@ export class AccountingService {
     return this.prisma.auditLog.findMany({
       where: { entity_type: { in: ['ACCOUNT', 'LEDGER_ENTRY'] } },
       orderBy: { created_at: 'desc' },
+    });
+  }
+
+  async postTransaction(data: {
+    type: 'EXPENSE' | 'REVENUE';
+    category_id: string;
+    bank_account_id: string;
+    amount: number;
+    description: string;
+    transaction_date?: string;
+    created_by?: string;
+  }) {
+    const categoryAcc = await this.prisma.account.findUnique({ where: { id: data.category_id } });
+    const bankAcc = await this.prisma.account.findUnique({ where: { id: data.bank_account_id } });
+
+    if (!categoryAcc) throw new BadRequestException('Selected category account not found');
+    if (!bankAcc) throw new BadRequestException('Selected bank account not found');
+    if (bankAcc.type !== 'ASSET') throw new BadRequestException('Payment/Deposit account must be of classification ASSET');
+
+    let debit_code: string;
+    let credit_code: string;
+
+    if (data.type === 'EXPENSE') {
+      debit_code = categoryAcc.code;
+      credit_code = bankAcc.code;
+    } else {
+      debit_code = bankAcc.code;
+      credit_code = categoryAcc.code;
+    }
+
+    return this.postVoucher({
+      description: data.description,
+      amount: data.amount,
+      debit_code,
+      credit_code,
+      created_by: data.created_by,
+      transaction_date: data.transaction_date,
     });
   }
 }

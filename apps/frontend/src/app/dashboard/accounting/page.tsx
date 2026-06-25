@@ -5,6 +5,7 @@ import { useAuthStore } from "@/store/auth";
 import { API_BASE_URL } from "@/lib/config";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import * as XLSX from "xlsx";
 import { 
   Plus, 
   Calculator, 
@@ -19,7 +20,8 @@ import {
   TrendingUp, 
   DollarSign, 
   ShieldAlert,
-  ChevronDown
+  ChevronDown,
+  ChevronRight
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
@@ -34,6 +36,7 @@ interface Account {
   code: string;
   type: string;
   balance: number;
+  parent_id?: string | null;
 }
 
 interface Voucher {
@@ -55,6 +58,17 @@ export default function AccountingPage() {
   const [loading, setLoading] = useState(true);
   const [openVoucherDialog, setOpenVoucherDialog] = useState(false);
   const [openAccountDialog, setOpenAccountDialog] = useState(false);
+  const [openTransactionDialog, setOpenTransactionDialog] = useState(false);
+  
+  // Transaction form state
+  const [transactionForm, setTransactionForm] = useState({
+    type: "EXPENSE" as "EXPENSE" | "REVENUE",
+    category_id: "",
+    bank_account_id: "",
+    amount: "",
+    description: "",
+    transaction_date: new Date().toISOString().split('T')[0]
+  });
   
   // Voucher form state
   const [voucherForm, setVoucherForm] = useState({
@@ -69,7 +83,9 @@ export default function AccountingPage() {
   const [accountForm, setAccountForm] = useState({
     name: "",
     code: "",
-    type: "ASSET"
+    type: "ASSET",
+    parent_id: "",
+    opening_balance: ""
   });
 
   // Report filters and states
@@ -80,6 +96,76 @@ export default function AccountingPage() {
   });
   const [reportData, setReportData] = useState<any>(null);
   const [loadingReport, setLoadingReport] = useState(false);
+  const [expandedAccounts, setExpandedAccounts] = useState<Record<string, boolean>>({});
+  
+  const toggleAccountExpand = (accountId: string) => {
+    setExpandedAccounts(prev => ({
+      ...prev,
+      [accountId]: !prev[accountId]
+    }));
+  };
+
+  const renderCollapsibleAccountRows = (
+    accountsList: any[],
+    type: string,
+    colorClass: string
+  ) => {
+    if (!accountsList) return null;
+
+    const topLevel = accountsList.filter(
+      (a: any) => a.type === type && (!a.parent_id || !accountsList.some((p: any) => p.id === a.parent_id))
+    );
+
+    return topLevel.map((parent: any) => {
+      const children = accountsList.filter((a: any) => a.parent_id === parent.id);
+      const hasChildren = children.length > 0;
+      const isExpanded = !!expandedAccounts[parent.id];
+
+      return (
+        <div key={parent.id} className="space-y-1">
+          <div 
+            onClick={() => hasChildren && toggleAccountExpand(parent.id)}
+            className={cn(
+              "flex justify-between items-center py-2.5 text-sm border-b border-border/40 font-semibold select-none",
+              hasChildren ? "cursor-pointer hover:bg-accent/5 px-2 -mx-2 rounded-lg transition-colors" : ""
+            )}
+          >
+            <div className="flex items-center gap-1.5">
+              {hasChildren ? (
+                isExpanded ? (
+                  <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
+                ) : (
+                  <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+                )
+              ) : (
+                <div className="w-4 h-4 shrink-0" />
+              )}
+              <span>{parent.name} ({parent.code})</span>
+            </div>
+            <span className={cn("font-bold shrink-0", colorClass)}>
+              ₹{Number(parent.periodBalance).toLocaleString()}
+            </span>
+          </div>
+
+          {hasChildren && isExpanded && (
+            <div className="pl-6 border-l border-border/60 ml-2 space-y-1 mt-1 transition-all duration-300">
+              {children.map((child: any) => (
+                <div
+                  key={child.id}
+                  className="flex justify-between items-center py-1.5 text-xs text-muted-foreground border-b border-border/20"
+                >
+                  <span>{child.name} ({child.code})</span>
+                  <span className="font-semibold">
+                    ₹{Number(child.periodBalance).toLocaleString()}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    });
+  };
 
   const token = useAuthStore((state) => state.token);
 
@@ -199,13 +285,19 @@ export default function AccountingPage() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify(accountForm)
+        body: JSON.stringify({
+          name: accountForm.name,
+          code: accountForm.code,
+          type: accountForm.type,
+          parent_id: accountForm.parent_id || undefined,
+          opening_balance: accountForm.opening_balance ? parseFloat(accountForm.opening_balance) : undefined
+        })
       });
 
       if (res.ok) {
         toast.success("New account added to Chart of Accounts!");
         setOpenAccountDialog(false);
-        setAccountForm({ name: "", code: "", type: "ASSET" });
+        setAccountForm({ name: "", code: "", type: "ASSET", parent_id: "", opening_balance: "" });
         fetchAccountsAndVouchers();
       } else {
         const err = await res.json();
@@ -213,6 +305,143 @@ export default function AccountingPage() {
       }
     } catch (e) {
       toast.error("Network error.");
+    }
+  };
+
+  const handleCreateTransaction = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!token) return;
+
+    if (!transactionForm.category_id || !transactionForm.bank_account_id || !transactionForm.amount || !transactionForm.description) {
+      toast.error("Please fill in all transaction details.");
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/accounting/transactions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          type: transactionForm.type,
+          category_id: transactionForm.category_id,
+          bank_account_id: transactionForm.bank_account_id,
+          amount: parseFloat(transactionForm.amount),
+          description: transactionForm.description,
+          transaction_date: transactionForm.transaction_date
+        })
+      });
+
+      if (res.ok) {
+        toast.success("Transaction recorded and synced successfully!");
+        setOpenTransactionDialog(false);
+        setTransactionForm({
+          type: "EXPENSE",
+          category_id: "",
+          bank_account_id: "",
+          amount: "",
+          description: "",
+          transaction_date: new Date().toISOString().split('T')[0]
+        });
+        fetchAccountsAndVouchers();
+        if (activeTab === "reports") {
+          fetchReport();
+        }
+      } else {
+        const err = await res.json();
+        toast.error(err.message || "Failed to record transaction.");
+      }
+    } catch (e) {
+      toast.error("Network error.");
+    }
+  };
+
+  const downloadExcelReport = () => {
+    if (!reportData) {
+      toast.error("No report data available to export.");
+      return;
+    }
+
+    try {
+      // 1. Prepare Financial Report Sheet Data
+      const plData = [
+        ["Financial Statement Type", "Account", "Code", "Amount (INR)"],
+        ["PROFIT & LOSS STATEMENT", "", "", ""],
+        ["Revenue Stream", "", "", ""],
+        ...reportData.profitAndLoss.revenues.map((r: any) => ["Revenue", r.name, r.code, Number(r.periodBalance)]),
+        ["Total Revenue", "", "", Number(reportData.profitAndLoss.totalRevenue)],
+        [],
+        ["Operating Expense", "", "", ""],
+        ...reportData.profitAndLoss.expenses.map((e: any) => ["Expense", e.name, e.code, Number(e.periodBalance)]),
+        ["Total Expense", "", "", Number(reportData.profitAndLoss.totalExpense)],
+        [],
+        ["Net Business Profit", "", "", Number(reportData.profitAndLoss.netProfit)],
+        [],
+        ["BALANCE SHEET SUMMARY", "", "", ""],
+        ["Assets (Dr.)", "", "", ""],
+        ...reportData.balanceSheet.assets.map((a: any) => ["Asset", a.name, a.code, Number(a.periodBalance)]),
+        ["Total Assets", "", "", Number(reportData.balanceSheet.totalAssets)],
+        [],
+        ["Liabilities & Equity (Cr.)", "", "", ""],
+        ...reportData.balanceSheet.liabilities.map((l: any) => ["Liability", l.name, l.code, Number(l.periodBalance)]),
+        ...reportData.balanceSheet.equity.map((eq: any) => ["Equity", eq.name, eq.code, Number(eq.periodBalance)]),
+        ["Total Liabilities & Equity", "", "", Number(reportData.balanceSheet.totalLiabilities) + Number(reportData.balanceSheet.totalEquity)],
+      ];
+
+      // 2. Prepare Chart of Accounts Sheet Data
+      const coaData = [
+        ["Code", "Account Name", "Type", "Current Balance (INR)"],
+        ...accounts.map(a => [a.code, a.name, a.type, Number(a.balance)])
+      ];
+
+      // 3. Prepare Ledger Board Sheet Data
+      const start = new Date(reportData.period.startDate);
+      const end = new Date(reportData.period.endDate);
+      const periodVouchers = vouchers.filter(v => {
+        const d = new Date(v.transaction_date);
+        return d >= start && d <= end;
+      });
+
+      const ledgerData = [
+        ["Voucher No", "Date", "Debit Account (Dr.)", "Credit Account (Cr.)", "Debit Amount (Dr.)", "Credit Amount (Cr.)", "Narration", "Audited By"],
+        ...periodVouchers.map(v => [
+          v.voucher_no,
+          new Date(v.transaction_date).toLocaleDateString(),
+          `${v.debit_account.name} (${v.debit_account.code})`,
+          `${v.credit_account.name} (${v.credit_account.code})`,
+          Number(v.amount),
+          Number(v.amount),
+          v.description,
+          v.created_by
+        ])
+      ];
+
+      // Create Workbook
+      const wb = XLSX.utils.book_new();
+
+      // Convert arrays to sheets
+      const wsFinancials = XLSX.utils.aoa_to_sheet(plData);
+      const wsCOA = XLSX.utils.aoa_to_sheet(coaData);
+      const wsLedger = XLSX.utils.aoa_to_sheet(ledgerData);
+
+      // Append sheets to workbook
+      XLSX.utils.book_append_sheet(wb, wsFinancials, "Financial Reports");
+      XLSX.utils.book_append_sheet(wb, wsCOA, "Chart of Accounts");
+      XLSX.utils.book_append_sheet(wb, wsLedger, "Ledger Board");
+
+      // Generate file name
+      const { period, year, month } = reportFilter;
+      const dateStr = period === 'monthly'
+        ? `${new Date(year, month).toLocaleString('default', { month: 'short' })}-${year}`
+        : period === 'halfyearly' ? `H-${year}` : `Yearly-${year}`;
+
+      XLSX.writeFile(wb, `Consolidated_Financial_Report_${dateStr}.xlsx`);
+      toast.success("Excel audit file downloaded successfully!");
+    } catch (e) {
+      toast.error("Failed to generate Excel file.");
+      console.error(e);
     }
   };
 
@@ -224,33 +453,33 @@ export default function AccountingPage() {
       ? new Date(year, month).toLocaleString('default', { month: 'long', year: 'numeric' })
       : period === 'halfyearly' ? `Half Yearly (${year})` : `Yearly (${year})`;
 
-    // Header styling
-    doc.setFontSize(20);
+    // Page 1: Financial Performance Summary
+    doc.setFontSize(22);
     doc.setFont("helvetica", "bold");
-    doc.text("GLOBAL SAFETY SOLUTION ERP", 14, 20);
+    doc.text("GLOBAL SAFETY SOLUTION", 14, 22);
     doc.setFontSize(14);
     doc.setFont("helvetica", "normal");
-    doc.text(`Financial Performance Report - ${dateStr}`, 14, 28);
-    doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 14, 35);
-    doc.line(14, 38, 196, 38);
+    doc.text(`Consolidated Audit Statement - ${dateStr}`, 14, 30);
+    doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 14, 37);
+    doc.line(14, 40, 196, 40);
 
-    let currentY = 45;
+    let currentY = 48;
 
     // Profit & Loss Table
     doc.setFontSize(12);
     doc.setFont("helvetica", "bold");
-    doc.text("Profit & Loss Summary", 14, currentY);
+    doc.text("1. Profit & Loss Summary", 14, currentY);
     currentY += 5;
 
     const plRows = [
-      ["Revenue Total", `INR ${reportData.profitAndLoss.totalRevenue.toLocaleString()}`],
-      ["Expense Total", `INR ${reportData.profitAndLoss.totalExpense.toLocaleString()}`],
-      ["Net Profit", `INR ${reportData.profitAndLoss.netProfit.toLocaleString()}`]
+      ["Total Revenue", `INR ${reportData.profitAndLoss.totalRevenue.toLocaleString()}`],
+      ["Total Operating Expenses", `INR ${reportData.profitAndLoss.totalExpense.toLocaleString()}`],
+      ["Net Business Profit", `INR ${reportData.profitAndLoss.netProfit.toLocaleString()}`]
     ];
 
     autoTable(doc, {
       startY: currentY,
-      head: [["Indicator", "Value"]],
+      head: [["Indicator / Stream", "Balance"]],
       body: plRows,
       theme: "striped",
       styles: { fontSize: 10 },
@@ -261,26 +490,92 @@ export default function AccountingPage() {
 
     // Balance Sheet Table
     doc.setFont("helvetica", "bold");
-    doc.text("Balance Sheet Summary", 14, currentY);
+    doc.text("2. Balance Sheet Summary", 14, currentY);
     currentY += 5;
 
     const bsRows = [
       ["Assets Total", `INR ${reportData.balanceSheet.totalAssets.toLocaleString()}`],
       ["Liabilities Total", `INR ${reportData.balanceSheet.totalLiabilities.toLocaleString()}`],
-      ["Equity Total", `INR ${reportData.balanceSheet.totalEquity.toLocaleString()}`]
+      ["Equity Total", `INR ${reportData.balanceSheet.totalEquity.toLocaleString()}`],
+      ["Total Liabilities & Equity", `INR ${(reportData.balanceSheet.totalLiabilities + reportData.balanceSheet.totalEquity).toLocaleString()}`]
     ];
 
     autoTable(doc, {
       startY: currentY,
-      head: [["Category", "Value"]],
+      head: [["Classification", "Balance"]],
       body: bsRows,
       theme: "striped",
       styles: { fontSize: 10 },
       headStyles: { fillColor: [13, 148, 136] }
     });
 
-    doc.save(`Financial_Report_${period}_${year}.pdf`);
-    toast.success("PDF audit statement downloaded.");
+    // Page 2: Chart of Accounts
+    doc.addPage();
+    doc.setFontSize(18);
+    doc.setFont("helvetica", "bold");
+    doc.text("3. Chart of Accounts (COA)", 14, 20);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text("Active ledger classifications and aggregated current balances", 14, 26);
+    doc.line(14, 29, 196, 29);
+
+    const coaRows = accounts.map(a => [
+      a.code,
+      a.name,
+      a.type,
+      `INR ${Number(a.balance).toLocaleString()}`
+    ]);
+
+    autoTable(doc, {
+      startY: 33,
+      head: [["Code", "Account Name", "Type", "Current Balance"]],
+      body: coaRows,
+      theme: "striped",
+      styles: { fontSize: 9 },
+      headStyles: { fillColor: [147, 51, 234] }
+    });
+
+    // Page 3: Ledger Board / Audit Trail
+    doc.addPage();
+    doc.setFontSize(18);
+    doc.setFont("helvetica", "bold");
+    doc.text("4. Ledger Board (Journal Vouchers)", 14, 20);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Transaction ledger audit log for period: ${dateStr}`, 14, 26);
+    doc.line(14, 29, 196, 29);
+
+    const start = new Date(reportData.period.startDate);
+    const end = new Date(reportData.period.endDate);
+    const periodVouchers = vouchers.filter(v => {
+      const d = new Date(v.transaction_date);
+      return d >= start && d <= end;
+    });
+
+    const ledgerRows = periodVouchers.map(v => [
+      v.voucher_no,
+      new Date(v.transaction_date).toLocaleDateString(),
+      `${v.debit_account.name} (Dr) / ${v.credit_account.name} (Cr)`,
+      `INR ${Number(v.amount).toLocaleString()}`,
+      v.description,
+      v.created_by
+    ]);
+
+    autoTable(doc, {
+      startY: 33,
+      head: [["Voucher No", "Date", "Particulars", "Amount", "Narration", "Audited By"]],
+      body: ledgerRows,
+      theme: "striped",
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [100, 116, 139] }
+    });
+
+    const saveDateStr = period === 'monthly'
+      ? `${new Date(year, month).toLocaleString('default', { month: 'short' })}-${year}`
+      : period === 'halfyearly' ? `H-${year}` : `Yearly-${year}`;
+
+    doc.save(`Consolidated_Financial_Report_${saveDateStr}.pdf`);
+    toast.success("Consolidated PDF audit statement downloaded.");
   };
 
   return (
@@ -328,7 +623,7 @@ export default function AccountingPage() {
                   <Label>Classification</Label>
                   <select 
                     value={accountForm.type}
-                    onChange={(e) => setAccountForm({ ...accountForm, type: e.target.value })}
+                    onChange={(e) => setAccountForm({ ...accountForm, type: e.target.value, parent_id: "" })}
                     className="w-full h-10 px-3 rounded-lg border border-border bg-background text-foreground"
                   >
                     <option value="ASSET">ASSET</option>
@@ -338,9 +633,136 @@ export default function AccountingPage() {
                     <option value="EXPENSE">EXPENSE</option>
                   </select>
                 </div>
+                <div className="space-y-1">
+                  <Label>Parent Account (Optional Sub-category)</Label>
+                  <select 
+                    value={accountForm.parent_id}
+                    onChange={(e) => setAccountForm({ ...accountForm, parent_id: e.target.value })}
+                    className="w-full h-10 px-3 rounded-lg border border-border bg-background text-foreground"
+                  >
+                    <option value="">None (Primary Category)</option>
+                    {accounts
+                      .filter(a => a.type === accountForm.type && !a.parent_id)
+                      .map(a => (
+                        <option key={a.id} value={a.id}>{a.name} ({a.code})</option>
+                      ))
+                    }
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <Label>Opening Balance (INR - Optional)</Label>
+                  <Input 
+                    type="number"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={accountForm.opening_balance}
+                    onChange={(e) => setAccountForm({ ...accountForm, opening_balance: e.target.value })}
+                    className="bg-background border-border"
+                  />
+                </div>
                 <DialogFooter className="pt-4">
                   <Button type="submit" className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold w-full rounded-xl">
                     Create Account
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={openTransactionDialog} onOpenChange={setOpenTransactionDialog}>
+            <DialogTrigger asChild>
+              <Button className="bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl h-11 font-bold px-6 shadow-lg shadow-emerald-500/20">
+                <Plus className="w-4 h-4 mr-2" /> Log Transaction
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="bg-card border-border text-foreground rounded-2xl max-w-lg p-6">
+              <DialogHeader>
+                <DialogTitle className="text-xl font-bold">Log Transaction</DialogTitle>
+                <DialogDescription>Quickly record a manual expense payment or income receipt.</DialogDescription>
+              </DialogHeader>
+              <form onSubmit={handleCreateTransaction} className="space-y-4 py-4">
+                <div className="space-y-1">
+                  <Label>Transaction Type</Label>
+                  <select
+                    value={transactionForm.type}
+                    onChange={(e) => setTransactionForm({ ...transactionForm, type: e.target.value as any, category_id: "" })}
+                    className="w-full h-10 px-3 rounded-lg border border-border bg-background text-foreground"
+                  >
+                    <option value="EXPENSE">Expense (Outflow / Payment)</option>
+                    <option value="REVENUE">Revenue (Inflow / Receipt)</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <Label>Category Account</Label>
+                  <select
+                    value={transactionForm.category_id}
+                    onChange={(e) => setTransactionForm({ ...transactionForm, category_id: e.target.value })}
+                    className="w-full h-10 px-3 rounded-lg border border-border bg-background text-foreground"
+                  >
+                    <option value="">Select Category</option>
+                    {accounts
+                      .filter(a => a.type === (transactionForm.type === 'EXPENSE' ? 'EXPENSE' : 'REVENUE'))
+                      .map(a => (
+                        <option key={a.id} value={a.id}>{a.name} ({a.code})</option>
+                      ))
+                    }
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <Label>{transactionForm.type === 'EXPENSE' ? 'Paid From (Bank/Cash Account)' : 'Deposit To (Bank/Cash Account)'}</Label>
+                  <select
+                    value={transactionForm.bank_account_id}
+                    onChange={(e) => setTransactionForm({ ...transactionForm, bank_account_id: e.target.value })}
+                    className="w-full h-10 px-3 rounded-lg border border-border bg-background text-foreground"
+                  >
+                    <option value="">Select Account</option>
+                    {accounts
+                      .filter(a => a.type === 'ASSET')
+                      .map(a => (
+                        <option key={a.id} value={a.id}>{a.name} ({a.code})</option>
+                      ))
+                    }
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <Label>Amount (INR)</Label>
+                    <Input 
+                      type="number"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={transactionForm.amount}
+                      onChange={(e) => setTransactionForm({ ...transactionForm, amount: e.target.value })}
+                      className="bg-background border-border"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Transaction Date</Label>
+                    <Input 
+                      type="date"
+                      value={transactionForm.transaction_date}
+                      onChange={(e) => setTransactionForm({ ...transactionForm, transaction_date: e.target.value })}
+                      className="bg-background border-border"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <Label>Narration / Description</Label>
+                  <Input 
+                    placeholder="Enter details (e.g. Paid Wi-Fi bill)"
+                    value={transactionForm.description}
+                    onChange={(e) => setTransactionForm({ ...transactionForm, description: e.target.value })}
+                    className="bg-background border-border"
+                  />
+                </div>
+
+                <DialogFooter className="pt-4">
+                  <Button type="submit" className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold w-full rounded-xl">
+                    Save Transaction
                   </Button>
                 </DialogFooter>
               </form>
@@ -552,8 +974,13 @@ export default function AccountingPage() {
                     <tbody className="divide-y divide-border/60 text-sm">
                       {accounts.map(a => (
                         <tr key={a.id} className="hover:bg-accent/5 transition-colors">
-                          <td className="py-4 px-6 font-mono font-bold text-indigo-500">{a.code}</td>
-                          <td className="py-4 px-6 font-medium">{a.name}</td>
+                          <td className={cn("py-4 px-6 font-mono font-bold text-indigo-500", a.parent_id ? "pl-8 text-indigo-500/70" : "")}>
+                            {a.parent_id && <span className="text-muted-foreground mr-1">↳</span>}
+                            {a.code}
+                          </td>
+                          <td className={cn("py-4 px-6 font-medium", a.parent_id ? "pl-8 text-muted-foreground text-xs" : "")}>
+                            {a.name}
+                          </td>
                           <td className="py-4 px-6">
                             <span className={cn(
                               "text-xs px-2.5 py-1 rounded-full font-bold",
@@ -654,9 +1081,14 @@ export default function AccountingPage() {
                   </div>
                 </div>
 
-                <Button onClick={downloadPDFReport} className="bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl h-10 font-bold self-end shadow-md shadow-emerald-500/20">
-                  <Download className="w-4 h-4 mr-2" /> Audit PDF
-                </Button>
+                <div className="flex items-center gap-3 self-end">
+                  <Button onClick={downloadExcelReport} className="bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl h-10 font-bold shadow-md shadow-indigo-500/20">
+                    <Download className="w-4 h-4 mr-2" /> Audit Excel
+                  </Button>
+                  <Button onClick={downloadPDFReport} className="bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl h-10 font-bold shadow-md shadow-emerald-500/20">
+                    <Download className="w-4 h-4 mr-2" /> Audit PDF
+                  </Button>
+                </div>
               </div>
 
               {loadingReport ? (
@@ -675,12 +1107,9 @@ export default function AccountingPage() {
                     <div className="space-y-4">
                       <div>
                         <h4 className="text-xs font-black text-muted-foreground uppercase mb-2">Revenue Streams</h4>
-                        {reportData.profitAndLoss.revenues.map((r: any) => (
-                          <div key={r.id} className="flex justify-between py-2 text-sm border-b border-border/40">
-                            <span>{r.name} ({r.code})</span>
-                            <span className="font-bold text-emerald-500">₹{Number(r.periodBalance).toLocaleString()}</span>
-                          </div>
-                        ))}
+                        <div className="space-y-1">
+                          {renderCollapsibleAccountRows(reportData.profitAndLoss.revenues, 'REVENUE', 'text-emerald-500')}
+                        </div>
                         <div className="flex justify-between py-3 font-bold text-sm border-b-2 border-border/80 mt-1">
                           <span>Total Revenue</span>
                           <span className="text-emerald-500 underline decoration-double">₹{Number(reportData.profitAndLoss.totalRevenue).toLocaleString()}</span>
@@ -689,12 +1118,9 @@ export default function AccountingPage() {
 
                       <div className="pt-4">
                         <h4 className="text-xs font-black text-muted-foreground uppercase mb-2">Operating Expenses</h4>
-                        {reportData.profitAndLoss.expenses.map((e: any) => (
-                          <div key={e.id} className="flex justify-between py-2 text-sm border-b border-border/40">
-                            <span>{e.name} ({e.code})</span>
-                            <span className="font-bold text-rose-500">₹{Number(e.periodBalance).toLocaleString()}</span>
-                          </div>
-                        ))}
+                        <div className="space-y-1">
+                          {renderCollapsibleAccountRows(reportData.profitAndLoss.expenses, 'EXPENSE', 'text-rose-500')}
+                        </div>
                         <div className="flex justify-between py-3 font-bold text-sm border-b-2 border-border/80 mt-1">
                           <span>Total Expenses</span>
                           <span className="text-rose-500">₹{Number(reportData.profitAndLoss.totalExpense).toLocaleString()}</span>
@@ -723,12 +1149,9 @@ export default function AccountingPage() {
                     <div className="space-y-4">
                       <div>
                         <h4 className="text-xs font-black text-muted-foreground uppercase mb-2">Assets (Dr.)</h4>
-                        {reportData.balanceSheet.assets.map((a: any) => (
-                          <div key={a.id} className="flex justify-between py-2 text-sm border-b border-border/40">
-                            <span>{a.name} ({a.code})</span>
-                            <span className="font-bold text-emerald-500">₹{Number(a.periodBalance).toLocaleString()}</span>
-                          </div>
-                        ))}
+                        <div className="space-y-1">
+                          {renderCollapsibleAccountRows(reportData.balanceSheet.assets, 'ASSET', 'text-emerald-500')}
+                        </div>
                         <div className="flex justify-between py-3 font-bold text-sm border-b-2 border-border/80 mt-1">
                           <span>Total Assets</span>
                           <span className="text-emerald-500 underline decoration-double">₹{Number(reportData.balanceSheet.totalAssets).toLocaleString()}</span>
@@ -737,18 +1160,10 @@ export default function AccountingPage() {
 
                       <div className="pt-4">
                         <h4 className="text-xs font-black text-muted-foreground uppercase mb-2">Liabilities & Equity (Cr.)</h4>
-                        {reportData.balanceSheet.liabilities.map((l: any) => (
-                          <div key={l.id} className="flex justify-between py-2 text-sm border-b border-border/40">
-                            <span>{l.name} ({l.code})</span>
-                            <span className="font-bold text-rose-500">₹{Number(l.periodBalance).toLocaleString()}</span>
-                          </div>
-                        ))}
-                        {reportData.balanceSheet.equity.map((eq: any) => (
-                          <div key={eq.id} className="flex justify-between py-2 text-sm border-b border-border/40">
-                            <span>{eq.name} ({eq.code})</span>
-                            <span className="font-bold text-purple-500">₹{Number(eq.periodBalance).toLocaleString()}</span>
-                          </div>
-                        ))}
+                        <div className="space-y-1">
+                          {renderCollapsibleAccountRows(reportData.balanceSheet.liabilities, 'LIABILITY', 'text-rose-500')}
+                          {renderCollapsibleAccountRows(reportData.balanceSheet.equity, 'EQUITY', 'text-purple-500')}
+                        </div>
                         <div className="flex justify-between py-3 font-bold text-sm border-b-2 border-border/80 mt-1">
                           <span>Total Liabilities & Equity</span>
                           <span className="text-teal-500 underline decoration-double">

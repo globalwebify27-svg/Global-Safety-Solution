@@ -963,16 +963,20 @@ model Stock {
 }
 
 model Account {
-  id          String        @id @default(uuid()) @db.VarChar(36)
-  name        String        @unique @db.VarChar(255)
-  code        String        @unique @db.VarChar(50)
-  type        String        @db.VarChar(50)         // ASSET, LIABILITY, EQUITY, REVENUE, EXPENSE
-  balance     Decimal       @default(0.00) @db.Decimal(15, 2)
-  created_at  DateTime      @default(now()) @db.DateTime(6)
-  updated_at  DateTime      @updatedAt @db.DateTime(6)
-  debits      LedgerEntry[] @relation("DebitAccount")
-  credits     LedgerEntry[] @relation("CreditAccount")
+  id             String        @id @default(uuid()) @db.VarChar(36)
+  name           String        @unique @db.VarChar(255)
+  code           String        @unique @db.VarChar(50)
+  type           String        @db.VarChar(50)         // ASSET, LIABILITY, EQUITY, REVENUE, EXPENSE
+  balance        Decimal       @default(0.00) @db.Decimal(15, 2)
+  parent_id      String?       @db.VarChar(36)
+  created_at     DateTime      @default(now()) @db.DateTime(6)
+  updated_at     DateTime      @updatedAt @db.DateTime(6)
+  debits         LedgerEntry[] @relation("DebitAccount")
+  credits        LedgerEntry[] @relation("CreditAccount")
+  parent         Account?      @relation("ParentChild", fields: [parent_id], references: [id])
+  children       Account[]     @relation("ParentChild")
 
+  @@index([parent_id], map: "accounts_parent_id_fkey")
   @@map("accounts")
 }
 

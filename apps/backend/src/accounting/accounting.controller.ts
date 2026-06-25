@@ -11,7 +11,9 @@ export class AccountingController {
   }
 
   @Post('accounts')
-  async createAccount(@Body() body: { name: string; code: string; type: string }) {
+  async createAccount(
+    @Body() body: { name: string; code: string; type: string; parent_id?: string; opening_balance?: number }
+  ) {
     return this.accountingService.createAccount(body);
   }
 
@@ -24,6 +26,15 @@ export class AccountingController {
   async postVoucher(@Body() body: any, @Req() req: any) {
     const user = req.user?.email || 'Admin';
     return this.accountingService.postVoucher({
+      ...body,
+      created_by: user,
+    });
+  }
+
+  @Post('transactions')
+  async postTransaction(@Body() body: any, @Req() req: any) {
+    const user = req.user?.email || 'Admin';
+    return this.accountingService.postTransaction({
       ...body,
       created_by: user,
     });
