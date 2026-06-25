@@ -29,6 +29,7 @@ async function main() {
       { name: 'READ_DOCUMENT', module: 'VAULT', description: 'Read and download vault documents' },
       { name: 'CREATE_DOCUMENT', module: 'VAULT', description: 'Upload and encrypt documents to vault' },
       { name: 'DELETE_DOCUMENT', module: 'VAULT', description: 'Revoke and delete vault documents' },
+      { name: 'VIEW_FIELD_TASKS', module: 'FIELD_TASKS', description: 'View field task board' },
   ];
 
   for (const p of permissions) {
