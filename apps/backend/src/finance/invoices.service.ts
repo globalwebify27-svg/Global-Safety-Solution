@@ -130,13 +130,36 @@ export class InvoicesService {
 
     try {
       const clientName = invoice.client?.name || 'Unknown Client';
-      await this.accountingService.postVoucher({
-        description: `Auto-generated: Invoice created for ${invoice.invoice_number} (${clientName})`,
-        amount: totalAmount,
-        debit_code: '1200', // Accounts Receivable
-        credit_code: '4000', // Sales Revenue
-        created_by: 'System',
-      });
+      const sub = Number(subtotal);
+      const tax = Number(taxAmount);
+
+      if (tax > 0) {
+        // 1. Post voucher for subtotal (Revenue)
+        await this.accountingService.postVoucher({
+          description: `Auto-generated: Invoice subtotal for ${invoice.invoice_number} (${clientName})`,
+          amount: sub,
+          debit_code: '1200', // Accounts Receivable
+          credit_code: '4000', // Sales Revenue
+          created_by: 'System',
+        });
+
+        // 2. Post voucher for tax (GST / Indirect Tax Payable)
+        await this.accountingService.postVoucher({
+          description: `Auto-generated: GST (Tax) for ${invoice.invoice_number} (${clientName})`,
+          amount: tax,
+          debit_code: '1200', // Accounts Receivable
+          credit_code: '2200', // GST / Indirect Tax Payable
+          created_by: 'System',
+        });
+      } else {
+        await this.accountingService.postVoucher({
+          description: `Auto-generated: Invoice created for ${invoice.invoice_number} (${clientName})`,
+          amount: totalAmount,
+          debit_code: '1200', // Accounts Receivable
+          credit_code: '4000', // Sales Revenue
+          created_by: 'System',
+        });
+      }
     } catch (err) {
       console.warn('[Auto-Accounting] Failed to post invoice voucher:', err.message);
     }
