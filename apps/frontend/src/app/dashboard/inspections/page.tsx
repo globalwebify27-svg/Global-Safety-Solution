@@ -1507,6 +1507,7 @@ export default function InspectionsPage() {
                                   onChange={(e) => {
                                     if (e.target.files) {
                                       handleItemPhotoUpload(item.id, e.target.files);
+                                      e.target.value = "";
                                     }
                                   }}
                                   accept="image/*" 

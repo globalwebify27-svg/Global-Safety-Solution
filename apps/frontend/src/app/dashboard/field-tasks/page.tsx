@@ -784,6 +784,7 @@ export default function FieldTasksPage() {
                         onChange={(e) => {
                           if (e.target.files) {
                             handleItemPhotoUpload(item.id, e.target.files);
+                            e.target.value = "";
                           }
                         }}
                         accept="image/*" 
@@ -796,6 +797,7 @@ export default function FieldTasksPage() {
                         onChange={(e) => {
                           if (e.target.files) {
                             handleItemPhotoUpload(item.id, e.target.files);
+                            e.target.value = "";
                           }
                         }}
                         accept="image/*" 
