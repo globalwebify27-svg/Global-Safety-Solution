@@ -43,3 +43,10 @@ Global_Safety_Solution_Codebase_Review.md
 
 # Learning Folder
 Learning folder/
+
+# SQL Database Backups
+drop_profiles.sql
+globalsafety_backup.sql
+hostinger_backup.sql
+*.sql
+
