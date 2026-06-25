@@ -353,11 +353,56 @@ export class InspectionsService {
     }
   }
 
+  private parsePhotos(photoUrl?: string | null): string[] {
+    if (!photoUrl) return [];
+    let clean = photoUrl.trim();
+    if (clean.startsWith('data:')) {
+      return [clean];
+    }
+    if (clean.startsWith('[') && clean.endsWith(']')) {
+      try {
+        const parsed = JSON.parse(clean);
+        if (Array.isArray(parsed)) {
+          return parsed.map((url) =>
+            typeof url === 'string' ? url.trim() : url,
+          );
+        }
+      } catch (e) {
+        // fallback
+      }
+    }
+    return clean
+      .split(',')
+      .map((url) => url.trim())
+      .filter(Boolean);
+  }
+
   async updateItem(itemId: string, data: UpdateInspectionItemDto) {
+    const currentItem = await this.prisma.inspectionItem.findUnique({
+      where: { id: itemId },
+    });
+
     const updatedItem = await this.prisma.inspectionItem.update({
       where: { id: itemId },
       data,
     });
+
+    // Clean up deleted images from the Document table
+    if (currentItem && currentItem.photo_url && data.photo_url !== undefined) {
+      const oldUrls = this.parsePhotos(currentItem.photo_url);
+      const newUrls = this.parsePhotos(data.photo_url);
+      const removedUrls = oldUrls.filter((url) => !newUrls.includes(url));
+
+      for (const url of removedUrls) {
+        try {
+          await this.prisma.document.deleteMany({
+            where: { file_url: url },
+          });
+        } catch (e) {
+          console.error('Failed to clean up deleted document from DB:', e);
+        }
+      }
+    }
 
     // Automatically recalculate and update parent inspection status in real-time
     await this.autoUpdateInspectionStatus(updatedItem.inspection_id);
@@ -366,9 +411,27 @@ export class InspectionsService {
   }
 
   async deleteItem(itemId: string) {
+    const currentItem = await this.prisma.inspectionItem.findUnique({
+      where: { id: itemId },
+    });
+
     const deletedItem = await this.prisma.inspectionItem.delete({
       where: { id: itemId },
     });
+
+    // Clean up all images associated with this deleted item from the Document table
+    if (currentItem && currentItem.photo_url) {
+      const urls = this.parsePhotos(currentItem.photo_url);
+      for (const url of urls) {
+        try {
+          await this.prisma.document.deleteMany({
+            where: { file_url: url },
+          });
+        } catch (e) {
+          console.error('Failed to clean up deleted document from DB:', e);
+        }
+      }
+    }
 
     // Automatically recalculate and update parent inspection status in real-time
     await this.autoUpdateInspectionStatus(deletedItem.inspection_id);
