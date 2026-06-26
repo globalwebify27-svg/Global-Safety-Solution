@@ -35,6 +35,69 @@ const openImageInNewTab = (url: string) => {
   }
 };
 
+interface IsolatedInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange'> {
+  value: string;
+  onChange: (value: string) => void;
+}
+
+const IsolatedInput = ({ value, onChange, ...props }: IsolatedInputProps) => {
+  const [localValue, setLocalValue] = useState(value);
+
+  useEffect(() => {
+    setLocalValue(value);
+  }, [value]);
+
+  const handleBlur = () => {
+    if (localValue !== value) {
+      onChange(localValue);
+    }
+  };
+
+  return (
+    <Input
+      {...props}
+      value={localValue}
+      onChange={(e) => setLocalValue(e.target.value)}
+      onBlur={handleBlur}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          handleBlur();
+        }
+      }}
+    />
+  );
+};
+
+interface IsolatedTextareaProps extends Omit<React.TextareaHTMLAttributes<HTMLTextAreaElement>, 'value' | 'onChange'> {
+  value: string;
+  onChange: (value: string) => void;
+}
+
+const IsolatedTextarea = ({ value, onChange, ...props }: IsolatedTextareaProps) => {
+  const [localValue, setLocalValue] = useState(value);
+
+  useEffect(() => {
+    setLocalValue(value);
+  }, [value]);
+
+  const handleBlur = () => {
+    if (localValue !== value) {
+      onChange(localValue);
+    }
+  };
+
+  return (
+    <textarea
+      {...props}
+      value={localValue}
+      onChange={(e) => setLocalValue(e.target.value)}
+      onBlur={handleBlur}
+    />
+  );
+};
+
+
+
 interface Task {
   id: string;
   status: string;
@@ -724,29 +787,29 @@ export default function FieldTasksPage() {
                 <div className="flex flex-col gap-3">
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-muted-foreground uppercase">Observations / Notes</label>
-                    <Input 
+                    <IsolatedInput 
                       placeholder="Observations / Notes..." 
                       className="bg-muted/30 border-none rounded-xl h-12"
                       value={item.notes || ""}
-                      onChange={(e) => handleUpdateItem(item.id, item.status, e.target.value, undefined, item.scope, item.recommendations)}
+                      onChange={(value) => handleUpdateItem(item.id, item.status, value, undefined, item.scope, item.recommendations)}
                     />
                   </div>
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-muted-foreground uppercase">Scope of Inspection</label>
-                    <Input 
+                    <IsolatedInput 
                       placeholder="Scope of Inspection..." 
                       className="bg-muted/30 border-none rounded-xl h-12"
                       value={item.scope || ""}
-                      onChange={(e) => handleUpdateItem(item.id, item.status, item.notes, undefined, e.target.value, item.recommendations)}
+                      onChange={(value) => handleUpdateItem(item.id, item.status, item.notes, undefined, value, item.recommendations)}
                     />
                   </div>
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-muted-foreground uppercase">Remarks & Recommendations</label>
-                    <Input 
+                    <IsolatedInput 
                       placeholder="Remarks & Recommendations..." 
                       className="bg-muted/30 border-none rounded-xl h-12"
                       value={item.recommendations || ""}
-                      onChange={(e) => handleUpdateItem(item.id, item.status, item.notes, undefined, item.scope, e.target.value)}
+                      onChange={(value) => handleUpdateItem(item.id, item.status, item.notes, undefined, item.scope, value)}
                     />
                   </div>
 
@@ -954,10 +1017,8 @@ export default function FieldTasksPage() {
 
                 <div className="space-y-2">
                   <label className="text-xs font-bold text-muted-foreground uppercase">Expiry Date</label>
-                  <Input 
-                    type="date"
-                    value={draftCertExpiry}
-                    onChange={(e) => setDraftCertExpiry(e.target.value)}
+                  <IsolatedInput type="date"
+                    value={draftCertExpiry} onChange={setDraftCertExpiry}
                     className="h-11 bg-muted/30 border-border rounded-xl"
                   />
                 </div>
@@ -970,47 +1031,47 @@ export default function FieldTasksPage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2 col-span-full">
                       <label className="text-xs font-bold text-muted-foreground uppercase">Name of the Occupier of the Factory</label>
-                      <Input value={eqptOccupierName} onChange={(e) => setEqptOccupierName(e.target.value)} className="h-11 bg-muted/30 border-border rounded-xl" />
+                      <IsolatedInput value={eqptOccupierName} onChange={setEqptOccupierName} className="h-11 bg-muted/30 border-border rounded-xl" />
                     </div>
                     <div className="space-y-2 col-span-full">
                       <label className="text-xs font-bold text-muted-foreground uppercase">Address of the Factory</label>
-                      <textarea value={eqptFactoryAddress} onChange={(e) => setEqptFactoryAddress(e.target.value)} className="w-full p-3 bg-muted/30 border border-border rounded-xl text-sm min-h-[60px]" />
+                      <IsolatedTextarea value={eqptFactoryAddress} onChange={setEqptFactoryAddress} className="w-full p-3 bg-muted/30 border border-border rounded-xl text-sm min-h-[60px]" />
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-muted-foreground uppercase">Equipment Name / Description</label>
-                      <Input value={eqptName} onChange={(e) => setEqptName(e.target.value)} className="h-11 bg-muted/30 border-border rounded-xl" />
+                      <IsolatedInput value={eqptName} onChange={setEqptName} className="h-11 bg-muted/30 border-border rounded-xl" />
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-muted-foreground uppercase">Safe Working Load (Cap/S.W.L)</label>
-                      <Input value={eqptSwl} onChange={(e) => setEqptSwl(e.target.value)} className="h-11 bg-muted/30 border-border rounded-xl" />
+                      <IsolatedInput value={eqptSwl} onChange={setEqptSwl} className="h-11 bg-muted/30 border-border rounded-xl" />
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-muted-foreground uppercase">Lift Capacity (Meters)</label>
-                      <Input value={eqptLift} onChange={(e) => setEqptLift(e.target.value)} className="h-11 bg-muted/30 border-border rounded-xl" />
+                      <IsolatedInput value={eqptLift} onChange={setEqptLift} className="h-11 bg-muted/30 border-border rounded-xl" />
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-muted-foreground uppercase">Serial / Distinguishing ID No</label>
-                      <Input value={eqptSerialNo} onChange={(e) => setEqptSerialNo(e.target.value)} className="h-11 bg-muted/30 border-border rounded-xl" />
+                      <IsolatedInput value={eqptSerialNo} onChange={setEqptSerialNo} className="h-11 bg-muted/30 border-border rounded-xl" />
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-muted-foreground uppercase">Mfg Month/Year (e.g. 11/2023)</label>
-                      <Input value={eqptMfg} onChange={(e) => setEqptMfg(e.target.value)} className="h-11 bg-muted/30 border-border rounded-xl" />
+                      <IsolatedInput value={eqptMfg} onChange={setEqptMfg} className="h-11 bg-muted/30 border-border rounded-xl" />
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-muted-foreground uppercase">Load Chain Diameter (dia)</label>
-                      <Input value={eqptChainDia} onChange={(e) => setEqptChainDia(e.target.value)} className="h-11 bg-muted/30 border-border rounded-xl" />
+                      <IsolatedInput value={eqptChainDia} onChange={setEqptChainDia} className="h-11 bg-muted/30 border-border rounded-xl" />
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-muted-foreground uppercase">Hand Chain Diameter (dia)</label>
-                      <Input value={eqptHchainDia} onChange={(e) => setEqptHchainDia(e.target.value)} className="h-11 bg-muted/30 border-border rounded-xl" />
+                      <IsolatedInput value={eqptHchainDia} onChange={setEqptHchainDia} className="h-11 bg-muted/30 border-border rounded-xl" />
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-muted-foreground uppercase">Manufactured By</label>
-                      <Input value={eqptMfdBy} onChange={(e) => setEqptMfdBy(e.target.value)} className="h-11 bg-muted/30 border-border rounded-xl" />
+                      <IsolatedInput value={eqptMfdBy} onChange={setEqptMfdBy} className="h-11 bg-muted/30 border-border rounded-xl" />
                     </div>
                     <div className="space-y-2 col-span-full">
                       <label className="text-xs font-bold text-muted-foreground uppercase">Equipment Location Inside Factory</label>
-                      <Input value={eqptLocation} onChange={(e) => setEqptLocation(e.target.value)} className="h-11 bg-muted/30 border-border rounded-xl" />
+                      <IsolatedInput value={eqptLocation} onChange={setEqptLocation} className="h-11 bg-muted/30 border-border rounded-xl" />
                     </div>
                   </div>
                 </div>
@@ -1023,35 +1084,35 @@ export default function FieldTasksPage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2 col-span-full">
                       <label className="text-xs font-bold text-muted-foreground uppercase">Name of the Factory</label>
-                      <Input value={stabFactoryName} onChange={(e) => setStabFactoryName(e.target.value)} className="h-11 bg-muted/30 border-border rounded-xl" />
+                      <IsolatedInput value={stabFactoryName} onChange={setStabFactoryName} className="h-11 bg-muted/30 border-border rounded-xl" />
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-muted-foreground uppercase">Village, Town and District situated</label>
-                      <Input value={stabLocation} onChange={(e) => setStabLocation(e.target.value)} className="h-11 bg-muted/30 border-border rounded-xl" />
+                      <IsolatedInput value={stabLocation} onChange={setStabLocation} className="h-11 bg-muted/30 border-border rounded-xl" />
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-muted-foreground uppercase">Name of the Occupier</label>
-                      <Input value={stabOccupierName} onChange={(e) => setStabOccupierName(e.target.value)} className="h-11 bg-muted/30 border-border rounded-xl" />
+                      <IsolatedInput value={stabOccupierName} onChange={setStabOccupierName} className="h-11 bg-muted/30 border-border rounded-xl" />
                     </div>
                     <div className="space-y-2 col-span-full">
                       <label className="text-xs font-bold text-muted-foreground uppercase">Full Postal Address of Factory</label>
-                      <textarea value={stabPostalAddress} onChange={(e) => setStabPostalAddress(e.target.value)} className="w-full p-3 bg-muted/30 border border-border rounded-xl text-sm min-h-[60px]" />
+                      <IsolatedTextarea value={stabPostalAddress} onChange={setStabPostalAddress} className="w-full p-3 bg-muted/30 border border-border rounded-xl text-sm min-h-[60px]" />
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-muted-foreground uppercase">Nature of manufacturing process</label>
-                      <Input value={stabMfgProcess} onChange={(e) => setStabMfgProcess(e.target.value)} className="h-11 bg-muted/30 border-border rounded-xl" />
+                      <IsolatedInput value={stabMfgProcess} onChange={setStabMfgProcess} className="h-11 bg-muted/30 border-border rounded-xl" />
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-muted-foreground uppercase">No of Floors / Worker Layout Ref</label>
-                      <Input value={stabWorkerLayoutRef} onChange={(e) => setStabWorkerLayoutRef(e.target.value)} className="h-11 bg-muted/30 border-border rounded-xl" />
+                      <IsolatedInput value={stabWorkerLayoutRef} onChange={setStabWorkerLayoutRef} className="h-11 bg-muted/30 border-border rounded-xl" />
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-muted-foreground uppercase">Chief Inspector Plan Approval Letter No</label>
-                      <Input value={stabPlanLetterNo} onChange={(e) => setStabPlanLetterNo(e.target.value)} className="h-11 bg-muted/30 border-border rounded-xl" />
+                      <IsolatedInput value={stabPlanLetterNo} onChange={setStabPlanLetterNo} className="h-11 bg-muted/30 border-border rounded-xl" />
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-muted-foreground uppercase">Chief Inspector Plan Date</label>
-                      <Input value={stabPlanLetterDate} onChange={(e) => setStabPlanLetterDate(e.target.value)} className="h-11 bg-muted/30 border-border rounded-xl" />
+                      <IsolatedInput value={stabPlanLetterDate} onChange={setStabPlanLetterDate} className="h-11 bg-muted/30 border-border rounded-xl" />
                     </div>
                   </div>
                 </div>
@@ -1064,97 +1125,97 @@ export default function FieldTasksPage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2 col-span-full">
                       <label className="text-xs font-bold text-muted-foreground uppercase">Name of Occupier of Factory</label>
-                      <Input value={pvOccupierName} onChange={(e) => setPvOccupierName(e.target.value)} className="h-11 bg-muted/30 border-border rounded-xl" />
+                      <IsolatedInput value={pvOccupierName} onChange={setPvOccupierName} className="h-11 bg-muted/30 border-border rounded-xl" />
                     </div>
                     <div className="space-y-2 col-span-full">
                       <label className="text-xs font-bold text-muted-foreground uppercase">Location and Address of Factory</label>
-                      <textarea value={pvFactoryAddress} onChange={(e) => setPvFactoryAddress(e.target.value)} className="w-full p-3 bg-muted/30 border border-border rounded-xl text-sm min-h-[60px]" />
+                      <IsolatedTextarea value={pvFactoryAddress} onChange={setPvFactoryAddress} className="w-full p-3 bg-muted/30 border border-border rounded-xl text-sm min-h-[60px]" />
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-muted-foreground uppercase">Pressure Vessel Description / Distinct Name</label>
-                      <Input value={pvVesselDesc} onChange={(e) => setPvVesselDesc(e.target.value)} className="h-11 bg-muted/30 border-border rounded-xl" />
+                      <IsolatedInput value={pvVesselDesc} onChange={setPvVesselDesc} className="h-11 bg-muted/30 border-border rounded-xl" />
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-muted-foreground uppercase">Capacity, Serial & Room Location Specs</label>
-                      <Input value={pvVesselCapNo} onChange={(e) => setPvVesselCapNo(e.target.value)} className="h-11 bg-muted/30 border-border rounded-xl" />
+                      <IsolatedInput value={pvVesselCapNo} onChange={setPvVesselCapNo} className="h-11 bg-muted/30 border-border rounded-xl" />
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-muted-foreground uppercase">Name and Address of Manufacturer</label>
-                      <Input value={pvManufacturer} onChange={(e) => setPvManufacturer(e.target.value)} className="h-11 bg-muted/30 border-border rounded-xl" />
+                      <IsolatedInput value={pvManufacturer} onChange={setPvManufacturer} className="h-11 bg-muted/30 border-border rounded-xl" />
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-muted-foreground uppercase">Nature of process in which it is used</label>
-                      <Input value={pvProcess} onChange={(e) => setPvProcess(e.target.value)} className="h-11 bg-muted/30 border-border rounded-xl" />
+                      <IsolatedInput value={pvProcess} onChange={setPvProcess} className="h-11 bg-muted/30 border-border rounded-xl" />
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-muted-foreground uppercase">Year of Manufacture</label>
-                      <Input value={pvMfgYear} onChange={(e) => setPvMfgYear(e.target.value)} className="h-11 bg-muted/30 border-border rounded-xl" />
+                      <IsolatedInput value={pvMfgYear} onChange={setPvMfgYear} className="h-11 bg-muted/30 border-border rounded-xl" />
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-muted-foreground uppercase">Date first taken into use in factory</label>
-                      <Input value={pvFirstUseDate} onChange={(e) => setPvFirstUseDate(e.target.value)} className="h-11 bg-muted/30 border-border rounded-xl" />
+                      <IsolatedInput value={pvFirstUseDate} onChange={setPvFirstUseDate} className="h-11 bg-muted/30 border-border rounded-xl" />
                     </div>
                     <div className="space-y-2 col-span-full">
                       <label className="text-xs font-bold text-muted-foreground uppercase">Thickness of walls (Shell, T.Disc, B.Disc)</label>
-                      <textarea value={pvWallThickness} onChange={(e) => setPvWallThickness(e.target.value)} className="w-full p-3 bg-muted/30 border border-border rounded-xl text-xs min-h-[60px]" />
+                      <IsolatedTextarea value={pvWallThickness} onChange={setPvWallThickness} className="w-full p-3 bg-muted/30 border border-border rounded-xl text-xs min-h-[60px]" />
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-muted-foreground uppercase">Safe working pressure recommended (mfg)</label>
-                      <Input value={pvSafePressure} onChange={(e) => setPvSafePressure(e.target.value)} className="h-11 bg-muted/30 border-border rounded-xl" />
+                      <IsolatedInput value={pvSafePressure} onChange={setPvSafePressure} className="h-11 bg-muted/30 border-border rounded-xl" />
                     </div>
                     <div className="space-y-2 col-span-full">
                       <label className="text-xs font-bold text-muted-foreground uppercase">Vessel History (order since inspection)</label>
-                      <Input value={pvVesselHistory} onChange={(e) => setPvVesselHistory(e.target.value)} className="h-11 bg-muted/30 border-border rounded-xl" />
+                      <IsolatedInput value={pvVesselHistory} onChange={setPvVesselHistory} className="h-11 bg-muted/30 border-border rounded-xl" />
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-muted-foreground uppercase">Hydraulic Test conducted by Manufacturer</label>
-                      <Input value={pvHydTestByMfg} onChange={(e) => setPvHydTestByMfg(e.target.value)} className="h-11 bg-muted/30 border-border rounded-xl" />
+                      <IsolatedInput value={pvHydTestByMfg} onChange={setPvHydTestByMfg} className="h-11 bg-muted/30 border-border rounded-xl" />
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-muted-foreground uppercase">Is vessel open or exposed to weather?</label>
-                      <Input value={pvExposedWeather} onChange={(e) => setPvExposedWeather(e.target.value)} className="h-11 bg-muted/30 border-border rounded-xl" />
+                      <IsolatedInput value={pvExposedWeather} onChange={setPvExposedWeather} className="h-11 bg-muted/30 border-border rounded-xl" />
                     </div>
                     <div className="space-y-2 col-span-full">
                       <label className="text-xs font-bold text-muted-foreground uppercase">Details of exam & tests conducted (Ultrasonic)</label>
-                      <Input value={pvExamDetails} onChange={(e) => setPvExamDetails(e.target.value)} className="h-11 bg-muted/30 border-border rounded-xl" />
+                      <IsolatedInput value={pvExamDetails} onChange={setPvExamDetails} className="h-11 bg-muted/30 border-border rounded-xl" />
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 col-span-full">
                       <div className="space-y-2">
                         <label className="text-xs font-bold text-muted-foreground uppercase">Hydraulic test pressure applied</label>
-                        <Input value={pvHydTestPressure} onChange={(e) => setPvHydTestPressure(e.target.value)} className="h-11 bg-muted/30 border-border rounded-xl" />
+                        <IsolatedInput value={pvHydTestPressure} onChange={setPvHydTestPressure} className="h-11 bg-muted/30 border-border rounded-xl" />
                       </div>
                       <div className="space-y-2">
                         <label className="text-xs font-bold text-muted-foreground uppercase">What parts, if any, were inaccessible?</label>
-                        <Input value={pvInaccessibleParts} onChange={(e) => setPvInaccessibleParts(e.target.value)} className="h-11 bg-muted/30 border-border rounded-xl" />
+                        <IsolatedInput value={pvInaccessibleParts} onChange={setPvInaccessibleParts} className="h-11 bg-muted/30 border-border rounded-xl" />
                       </div>
                     </div>
                     <div className="space-y-2 col-span-full">
                       <label className="text-xs font-bold text-muted-foreground uppercase">Vessel Condition (External & Internal)</label>
-                      <Input value={pvVesselCondition} onChange={(e) => setPvVesselCondition(e.target.value)} className="h-11 bg-muted/30 border-border rounded-xl" />
+                      <IsolatedInput value={pvVesselCondition} onChange={setPvVesselCondition} className="h-11 bg-muted/30 border-border rounded-xl" />
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-muted-foreground uppercase">Are fittings provided in rules?</label>
-                      <Input value={pvFittingsProvided} onChange={(e) => setPvFittingsProvided(e.target.value)} className="h-11 bg-muted/30 border-border rounded-xl" />
+                      <IsolatedInput value={pvFittingsProvided} onChange={setPvFittingsProvided} className="h-11 bg-muted/30 border-border rounded-xl" />
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-muted-foreground uppercase">Are fittings properly maintained?</label>
-                      <Input value={pvFittingsMaintained} onChange={(e) => setPvFittingsMaintained(e.target.value)} className="h-11 bg-muted/30 border-border rounded-xl" />
+                      <IsolatedInput value={pvFittingsMaintained} onChange={setPvFittingsMaintained} className="h-11 bg-muted/30 border-border rounded-xl" />
                     </div>
                     <div className="space-y-2 col-span-full">
                       <label className="text-xs font-bold text-muted-foreground uppercase">Repairs, if any required, & execute period</label>
-                      <textarea value={pvRepairsRequired} onChange={(e) => setPvRepairsRequired(e.target.value)} className="w-full p-3 bg-muted/30 border border-border rounded-xl text-xs min-h-[60px]" />
+                      <IsolatedTextarea value={pvRepairsRequired} onChange={setPvRepairsRequired} className="w-full p-3 bg-muted/30 border border-border rounded-xl text-xs min-h-[60px]" />
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-muted-foreground uppercase">Safe working pressure calculated (thickness)</label>
-                      <Input value={pvCalculatedSafePressure} onChange={(e) => setPvCalculatedSafePressure(e.target.value)} className="h-11 bg-muted/30 border-border rounded-xl" />
+                      <IsolatedInput value={pvCalculatedSafePressure} onChange={setPvCalculatedSafePressure} className="h-11 bg-muted/30 border-border rounded-xl" />
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-muted-foreground uppercase">Where repairs affecting pressure are required</label>
-                      <Input value={pvRepairsSafePressure} onChange={(e) => setPvRepairsSafePressure(e.target.value)} className="h-11 bg-muted/30 border-border rounded-xl" />
+                      <IsolatedInput value={pvRepairsSafePressure} onChange={setPvRepairsSafePressure} className="h-11 bg-muted/30 border-border rounded-xl" />
                     </div>
                     <div className="space-y-2 col-span-full">
                       <label className="text-xs font-bold text-muted-foreground uppercase">Other Observations</label>
-                      <Input value={pvOtherObservations} onChange={(e) => setPvOtherObservations(e.target.value)} className="h-11 bg-muted/30 border-border rounded-xl" />
+                      <IsolatedInput value={pvOtherObservations} onChange={setPvOtherObservations} className="h-11 bg-muted/30 border-border rounded-xl" />
                     </div>
                   </div>
                 </div>
@@ -1167,75 +1228,75 @@ export default function FieldTasksPage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2 col-span-full">
                       <label className="text-xs font-bold text-muted-foreground uppercase">Name of occupier (or Factory)</label>
-                      <Input value={svOccupierName} onChange={(e) => setSvOccupierName(e.target.value)} className="h-11 bg-muted/30 border-border rounded-xl" />
+                      <IsolatedInput value={svOccupierName} onChange={setSvOccupierName} className="h-11 bg-muted/30 border-border rounded-xl" />
                     </div>
                     <div className="space-y-2 col-span-full">
                       <label className="text-xs font-bold text-muted-foreground uppercase">Situation and Address of Factory</label>
-                      <textarea value={svFactoryAddress} onChange={(e) => setSvFactoryAddress(e.target.value)} className="w-full p-3 bg-muted/30 border border-border rounded-xl text-sm min-h-[60px]" />
+                      <IsolatedTextarea value={svFactoryAddress} onChange={setSvFactoryAddress} className="w-full p-3 bg-muted/30 border border-border rounded-xl text-sm min-h-[60px]" />
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-muted-foreground uppercase">Thermal/Pressure Safety Valve Description</label>
-                      <Input value={svValveDesc} onChange={(e) => setSvValveDesc(e.target.value)} className="h-11 bg-muted/30 border-border rounded-xl" />
+                      <IsolatedInput value={svValveDesc} onChange={setSvValveDesc} className="h-11 bg-muted/30 border-border rounded-xl" />
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-muted-foreground uppercase">Capacity, Serial & Loc Specs</label>
-                      <Input value={svValveCapNo} onChange={(e) => setSvValveCapNo(e.target.value)} className="h-11 bg-muted/30 border-border rounded-xl" />
+                      <IsolatedInput value={svValveCapNo} onChange={setSvValveCapNo} className="h-11 bg-muted/30 border-border rounded-xl" />
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-muted-foreground uppercase">Name and Address of Manufacturer</label>
-                      <Input value={svManufacturer} onChange={(e) => setSvManufacturer(e.target.value)} className="h-11 bg-muted/30 border-border rounded-xl" />
+                      <IsolatedInput value={svManufacturer} onChange={setSvManufacturer} className="h-11 bg-muted/30 border-border rounded-xl" />
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-muted-foreground uppercase">Nature of process in which it is used</label>
-                      <Input value={svProcess} onChange={(e) => setSvProcess(e.target.value)} className="h-11 bg-muted/30 border-border rounded-xl" />
+                      <IsolatedInput value={svProcess} onChange={setSvProcess} className="h-11 bg-muted/30 border-border rounded-xl" />
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-muted-foreground uppercase">Year of Manufacture</label>
-                      <Input value={svMfgYear} onChange={(e) => setSvMfgYear(e.target.value)} className="h-11 bg-muted/30 border-border rounded-xl" />
+                      <IsolatedInput value={svMfgYear} onChange={setSvMfgYear} className="h-11 bg-muted/30 border-border rounded-xl" />
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-muted-foreground uppercase">Date of commissioning in service</label>
-                      <Input value={svCommissionDate} onChange={(e) => setSvCommissionDate(e.target.value)} className="h-11 bg-muted/30 border-border rounded-xl" />
+                      <IsolatedInput value={svCommissionDate} onChange={setSvCommissionDate} className="h-11 bg-muted/30 border-border rounded-xl" />
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-muted-foreground uppercase">Set pressure recommended by Manufacturer</label>
-                      <Input value={svSetPressure} onChange={(e) => setSvSetPressure(e.target.value)} className="h-11 bg-muted/30 border-border rounded-xl" />
+                      <IsolatedInput value={svSetPressure} onChange={setSvSetPressure} className="h-11 bg-muted/30 border-border rounded-xl" />
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-muted-foreground uppercase">Valve History (working in order since...)</label>
-                      <Input value={svValveHistory} onChange={(e) => setSvValveHistory(e.target.value)} className="h-11 bg-muted/30 border-border rounded-xl" />
+                      <IsolatedInput value={svValveHistory} onChange={setSvValveHistory} className="h-11 bg-muted/30 border-border rounded-xl" />
                     </div>
                     <div className="space-y-2 col-span-full">
                       <label className="text-xs font-bold text-muted-foreground uppercase">Date of last Hyd. test & pressure applied</label>
-                      <Input value={svLastHydTest} onChange={(e) => setSvLastHydTest(e.target.value)} className="h-11 bg-muted/30 border-border rounded-xl" />
+                      <IsolatedInput value={svLastHydTest} onChange={setSvLastHydTest} className="h-11 bg-muted/30 border-border rounded-xl" />
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-muted-foreground uppercase">Is TSV exposed to weather or damp?</label>
-                      <Input value={svExposedWeather} onChange={(e) => setSvExposedWeather(e.target.value)} className="h-11 bg-muted/30 border-border rounded-xl" />
+                      <IsolatedInput value={svExposedWeather} onChange={setSvExposedWeather} className="h-11 bg-muted/30 border-border rounded-xl" />
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-muted-foreground uppercase">What parts, if any, were inaccessible?</label>
-                      <Input value={svInaccessibleParts} onChange={(e) => setSvInaccessibleParts(e.target.value)} className="h-11 bg-muted/30 border-border rounded-xl" />
+                      <IsolatedInput value={svInaccessibleParts} onChange={setSvInaccessibleParts} className="h-11 bg-muted/30 border-border rounded-xl" />
                     </div>
                     <div className="space-y-2 col-span-full">
                       <label className="text-xs font-bold text-muted-foreground uppercase">What examination and were made? (Hydro test)</label>
-                      <Input value={svExamDetails} onChange={(e) => setSvExamDetails(e.target.value)} className="h-11 bg-muted/30 border-border rounded-xl" />
+                      <IsolatedInput value={svExamDetails} onChange={setSvExamDetails} className="h-11 bg-muted/30 border-border rounded-xl" />
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-muted-foreground uppercase">Are fittings properly maintained?</label>
-                      <Input value={svFittingsMaintained} onChange={(e) => setSvFittingsMaintained(e.target.value)} className="h-11 bg-muted/30 border-border rounded-xl" />
+                      <IsolatedInput value={svFittingsMaintained} onChange={setSvFittingsMaintained} className="h-11 bg-muted/30 border-border rounded-xl" />
                     </div>
                     <div className="space-y-2 col-span-full">
                       <label className="text-xs font-bold text-muted-foreground uppercase">Repairs, if any required, & execute period</label>
-                      <textarea value={svRepairsRequired} onChange={(e) => setSvRepairsRequired(e.target.value)} className="w-full p-3 bg-muted/30 border border-border rounded-xl text-sm min-h-[60px]" />
+                      <IsolatedTextarea value={svRepairsRequired} onChange={setSvRepairsRequired} className="w-full p-3 bg-muted/30 border border-border rounded-xl text-sm min-h-[60px]" />
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-muted-foreground uppercase">Where repairs affecting set pressure are required</label>
-                      <Input value={svRepairsSetPressure} onChange={(e) => setSvRepairsSetPressure(e.target.value)} className="h-11 bg-muted/30 border-border rounded-xl" />
+                      <IsolatedInput value={svRepairsSetPressure} onChange={setSvRepairsSetPressure} className="h-11 bg-muted/30 border-border rounded-xl" />
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-muted-foreground uppercase">Other Observations</label>
-                      <Input value={svOtherObservations} onChange={(e) => setSvOtherObservations(e.target.value)} className="h-11 bg-muted/30 border-border rounded-xl" />
+                      <IsolatedInput value={svOtherObservations} onChange={setSvOtherObservations} className="h-11 bg-muted/30 border-border rounded-xl" />
                     </div>
                   </div>
                 </div>
@@ -1248,11 +1309,11 @@ export default function FieldTasksPage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-muted-foreground uppercase">Competency Certificate & Govt Memo No</label>
-                      <Input value={certCompetencyNo} onChange={(e) => setCertCompetencyNo(e.target.value)} className="h-11 bg-muted/30 border-border rounded-xl" />
+                      <IsolatedInput value={certCompetencyNo} onChange={setCertCompetencyNo} className="h-11 bg-muted/30 border-border rounded-xl" />
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-muted-foreground uppercase">Name of Competent Person</label>
-                      <Input value={certCompetentPerson} onChange={(e) => setCertCompetentPerson(e.target.value)} className="h-11 bg-muted/30 border-border rounded-xl" />
+                      <IsolatedInput value={certCompetentPerson} onChange={setCertCompetentPerson} className="h-11 bg-muted/30 border-border rounded-xl" />
                     </div>
                   </div>
                 </div>
@@ -1263,20 +1324,16 @@ export default function FieldTasksPage() {
                 <>
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-muted-foreground uppercase">Scope of Inspection</label>
-                    <textarea
-                      placeholder="Describe the scope of safety inspection conducted..."
-                      value={draftCertScope}
-                      onChange={(e) => setDraftCertScope(e.target.value)}
+                    <IsolatedTextarea placeholder="Describe the scope of safety inspection conducted..."
+                      value={draftCertScope} onChange={setDraftCertScope}
                       className="w-full p-4 bg-muted/30 border border-border rounded-xl text-sm min-h-[80px] focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                     />
                   </div>
 
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-muted-foreground uppercase">Observations & Recommendations</label>
-                    <textarea
-                      placeholder="Enter field observations, recommendations, and corrective actions..."
-                      value={draftCertNotes}
-                      onChange={(e) => setDraftCertNotes(e.target.value)}
+                    <IsolatedTextarea placeholder="Enter field observations, recommendations, and corrective actions..."
+                      value={draftCertNotes} onChange={setDraftCertNotes}
                       className="w-full p-4 bg-muted/30 border border-border rounded-xl text-sm min-h-[80px] focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                     />
                   </div>
