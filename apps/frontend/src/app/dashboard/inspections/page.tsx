@@ -97,6 +97,17 @@ export default function InspectionsPage() {
   const [selectedTemplateIds, setSelectedTemplateIds] = useState<Record<string, string>>({});
   const [templateFieldValues, setTemplateFieldValues] = useState<Record<string, Record<string, string>>>({});
   
+  const getDefaultFieldValue = (fieldKey: string) => {
+    const key = fieldKey.toLowerCase();
+    if (key.includes("occupier") || key.includes("client_name") || key.includes("factory_name")) {
+      return (selectedInspection?.client as any)?.name || "";
+    }
+    if (key.includes("address") || key.includes("factory_address")) {
+      return (selectedInspection?.client as any)?.address || (selectedInspection?.client as any)?.city || "";
+    }
+    return "";
+  };
+  
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [uploadedPhotoUrls, setUploadedPhotoUrls] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1578,13 +1589,25 @@ export default function InspectionsPage() {
                                           return;
                                         }
                                         
+                                        const activeTemp = templates.find(t => t.id === templateId);
+                                        let tempFields: any[] = [];
                                         try {
-                                          const fieldVals = templateFieldValues[item.id] || {};
-                                          const metadata = {
-                                            template_id: templateId,
-                                            field_values: fieldVals
-                                          };
+                                          tempFields = JSON.parse(activeTemp.fields);
+                                        } catch(e){}
 
+                                        const fieldVals = { ...templateFieldValues[item.id] };
+                                        for (const f of tempFields) {
+                                          if (!fieldVals[f.key]) {
+                                            fieldVals[f.key] = getDefaultFieldValue(f.key) || f.default || "";
+                                          }
+                                        }
+
+                                        const metadata = {
+                                          template_id: templateId,
+                                          field_values: fieldVals
+                                        };
+                                        
+                                        try {
                                           // 1. Create the certificate
                                           const res = await fetch(`${API_BASE_URL}/certificates`, {
                                             method: "POST",
@@ -1656,7 +1679,7 @@ export default function InspectionsPage() {
                                             <Input
                                               placeholder={field.default || "Enter value..."}
                                               className="bg-background h-8 text-xs text-white"
-                                              value={templateFieldValues[item.id]?.[field.key] || ""}
+                                              value={templateFieldValues[item.id]?.[field.key] ?? (getDefaultFieldValue(field.key) || field.default || "")}
                                               onChange={(e) => {
                                                 const currentVals = templateFieldValues[item.id] || {};
                                                 setTemplateFieldValues({
