@@ -1101,7 +1101,14 @@ export class InspectionsService {
           const statusColor = item.status === 'PASS' ? '#059669' : item.status === 'FAIL' ? '#dc2626' : '#64748b';
           doc.fillColor(statusColor).font('Helvetica-Bold').text(item.status, 450, itemY, { align: 'right', width: 110 });
           doc.fillColor(primaryColor);
-          itemY += 18;
+          
+          if (item.notes) {
+            itemY += 10;
+            doc.fontSize(7.5).font('Helvetica-Oblique').fillColor('#475569').text(`   Observation: ${item.notes}`, 38, itemY, { width: 400 });
+            itemY += 12;
+          } else {
+            itemY += 16;
+          }
         });
 
         if (certRemarks) {

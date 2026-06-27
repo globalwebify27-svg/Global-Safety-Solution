@@ -260,7 +260,7 @@ export default function FieldTasksPage() {
 
       const remarksData = parseRemarksData(selectedTask.remarks);
       setAdminFeedback(remarksData.admin_feedback || "");
-      setDraftCertType(remarksData.draft_cert_type || "FIRE_SAFETY");
+      setDraftCertType(remarksData.draft_cert_type || "");
       
       if (remarksData.draft_cert_data) {
         try {
@@ -272,6 +272,13 @@ export default function FieldTasksPage() {
           setDraftCertExpiry(parsed.expiry_date || defaultExp);
           setDraftCertNotes(parsed.remarks || parsed.recommendations || "");
           setDraftCertScope(parsed.scope || "");
+
+          if (parsed.field_values) {
+            setTemplateFieldValues(prev => ({
+              ...prev,
+              "draft": parsed.field_values
+            }));
+          }
 
           // Restore Factories Act 28/29 inputs
           if (parsed.eqpt_occupier_name) setEqptOccupierName(parsed.eqpt_occupier_name);
@@ -615,6 +622,7 @@ export default function FieldTasksPage() {
         expiry_date: draftCertExpiry,
         scope: draftCertScope,
         remarks: draftCertNotes,
+        field_values: templateFieldValues["draft"] || {},
         
         // Factories Act 28/29 fields
         eqpt_occupier_name: eqptOccupierName,
@@ -849,193 +857,6 @@ export default function FieldTasksPage() {
                     />
                   </div>
 
-                  {/* Certificate configuration and download for this safety checklist section */}
-                  <div className="pt-4 mt-4 border-t border-border/40 space-y-4">
-                    <h4 className="text-xs font-black text-blue-600 uppercase tracking-wider">Section Certificate Details</h4>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-muted-foreground uppercase">Certificate Reference No.</label>
-                        <IsolatedInput 
-                          placeholder="e.g. GSS/TEST/CPB/01/2026" 
-                          className="bg-muted/30 border-none rounded-xl h-11"
-                          value={item.cert_ref_no || ""}
-                          onChange={(value) => handleUpdateItem(item.id, item.status, item.notes, undefined, item.scope, item.recommendations, value)}
-                        />
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-muted-foreground uppercase">License / Competency No.</label>
-                        <IsolatedInput 
-                          placeholder="e.g. 663, valid upto 10.11.2026" 
-                          className="bg-muted/30 border-none rounded-xl h-11"
-                          value={item.cert_competency_no || ""}
-                          onChange={(value) => handleUpdateItem(item.id, item.status, item.notes, undefined, item.scope, item.recommendations, item.cert_ref_no, undefined, undefined, value)}
-                        />
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-muted-foreground uppercase">Test Date</label>
-                        <input 
-                          type="date"
-                          className="w-full h-11 px-3 bg-muted/30 border-none rounded-xl text-xs text-white"
-                          defaultValue={item.cert_test_date ? item.cert_test_date.split('T')[0] : ""}
-                          onBlur={(e) => handleUpdateItem(item.id, item.status, item.notes, undefined, item.scope, item.recommendations, item.cert_ref_no, e.target.value)}
-                        />
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-muted-foreground uppercase">Expiry Date</label>
-                        <input 
-                          type="date"
-                          className="w-full h-11 px-3 bg-muted/30 border-none rounded-xl text-xs text-white"
-                          defaultValue={item.cert_expiry_date ? item.cert_expiry_date.split('T')[0] : ""}
-                          onBlur={(e) => handleUpdateItem(item.id, item.status, item.notes, undefined, item.scope, item.recommendations, item.cert_ref_no, item.cert_test_date, e.target.value)}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="space-y-3 p-4 bg-blue-500/5 rounded-xl border border-blue-500/10">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-bold text-muted-foreground uppercase">Select Certificate Template</label>
-                          <select
-                            value={selectedTemplateIds[item.id] || ""}
-                            onChange={(e) => setSelectedTemplateIds({ ...selectedTemplateIds, [item.id]: e.target.value })}
-                            className="w-full h-11 px-3 bg-background border border-border rounded-xl text-xs focus:outline-none text-white"
-                          >
-                            <option value="" className="text-slate-900">Select a template...</option>
-                            {templates.map(t => (
-                              <option key={t.id} value={t.id} className="text-slate-900">{t.name}</option>
-                            ))}
-                          </select>
-                        </div>
-
-                        <div className="flex items-end">
-                          <Button
-                            type="button"
-                            onClick={async () => {
-                              const templateId = selectedTemplateIds[item.id];
-                              if (!templateId) {
-                                toast.error("Please select a template first");
-                                return;
-                              }
-                              if (!item.cert_ref_no) {
-                                toast.error("Certificate Reference Number is required");
-                                return;
-                              }
-                              
-                              try {
-                                const activeTemp = templates.find(t => t.id === templateId);
-                                let tempFields: any[] = [];
-                                try {
-                                  tempFields = JSON.parse(activeTemp.fields);
-                                } catch(e){}
-
-                                const fieldVals = { ...templateFieldValues[item.id] };
-                                for (const f of tempFields) {
-                                  if (!fieldVals[f.key]) {
-                                    fieldVals[f.key] = getDefaultFieldValue(f.key) || f.default || "";
-                                  }
-                                }
-
-                                const metadata = {
-                                  template_id: templateId,
-                                  field_values: fieldVals
-                                };
-
-                                // 1. Create the certificate
-                                const res = await fetch(`${API_BASE_URL}/certificates`, {
-                                  method: "POST",
-                                  headers: {
-                                    "Content-Type": "application/json",
-                                    Authorization: `Bearer ${token}`
-                                  },
-                                  body: JSON.stringify({
-                                    inspection_id: selectedTask.id,
-                                    inspection_item_id: item.id,
-                                    certificate_no: item.cert_ref_no,
-                                    issue_date: item.cert_test_date || new Date().toISOString(),
-                                    validity_period: "1y",
-                                    metadata
-                                  })
-                                });
-
-                                if (!res.ok) {
-                                  const error = await res.json();
-                                  throw new Error(error.message || "Failed to issue certificate");
-                                }
-
-                                const cert = await res.json();
-                                toast.success("Certificate issued successfully! Starting download...");
-
-                                // 2. Download the certificate PDF
-                                const pdfRes = await fetch(`${API_BASE_URL}/certificates/${cert.id}/pdf`, {
-                                  headers: { Authorization: `Bearer ${token}` }
-                                });
-
-                                if (pdfRes.ok) {
-                                  const blob = await pdfRes.blob();
-                                  const a = document.createElement("a");
-                                  a.href = URL.createObjectURL(blob);
-                                  a.download = `certificate-${item.cert_ref_no}.pdf`;
-                                  a.click();
-                                }
-                              } catch (err: any) {
-                                toast.error(err.message || "Failed to generate certificate");
-                              }
-                            }}
-                            className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold h-11 text-xs rounded-xl flex items-center justify-center gap-2"
-                          >
-                            Generate & Download Certificate
-                          </Button>
-                        </div>
-                      </div>
-
-                      {/* Custom Fields based on selected template */}
-                      {(() => {
-                        const tempId = selectedTemplateIds[item.id];
-                        const activeTemp = templates.find(t => t.id === tempId);
-                        if (!activeTemp) return null;
-                        
-                        let tempFields: any[] = [];
-                        try {
-                          tempFields = JSON.parse(activeTemp.fields);
-                        } catch(e){}
-
-                        if (tempFields.length === 0) return null;
-
-                        return (
-                          <div className="space-y-3 pt-3 border-t border-blue-500/10">
-                            <h5 className="text-[10px] font-bold text-blue-500 uppercase tracking-widest">Template Fields</h5>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                              {tempFields.map((field: any, idx: number) => (
-                                <div key={idx} className="space-y-1">
-                                  <label className="text-[10px] text-slate-400">{field.label}</label>
-                                  <Input
-                                    placeholder={field.default || "Enter value..."}
-                                    className="bg-background h-10 text-xs text-white"
-                                    value={templateFieldValues[item.id]?.[field.key] ?? (getDefaultFieldValue(field.key) || field.default || "")}
-                                    onChange={(e) => {
-                                      const currentVals = templateFieldValues[item.id] || {};
-                                      setTemplateFieldValues({
-                                        ...templateFieldValues,
-                                        [item.id]: {
-                                          ...currentVals,
-                                          [field.key]: e.target.value
-                                        }
-                                      });
-                                    }}
-                                  />
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        );
-                      })()}
-                    </div>
-                  </div>
-
                   {/* Per-item Photo Upload & Preview */}
                   <div className="space-y-2">
                     {item.photo_url && parseItemPhotos(item.photo_url).length > 0 && (
@@ -1168,8 +989,20 @@ export default function FieldTasksPage() {
           </div>
 
           {/* Certificate Generation & Details Form */}
-          {selectedTask.status !== 'COMPLETED' && selectedTask.status !== 'PENDING_REVIEW' && (
-            <div className="bg-card border border-border rounded-3xl p-6 space-y-6 shadow-sm">
+          {(() => {
+            const roleName = user?.roles?.[0]?.role?.name || (() => {
+              const designation = (user?.designation || "").toUpperCase();
+              if (designation.includes("HR")) return "HR_MANAGER";
+              if (designation.includes("FIELD") || designation.includes("ENGINEER")) return "FIELD_ENGINEER";
+              if (designation.includes("SALES")) return "SALES_EXECUTIVE";
+              if (designation.includes("CLIENT")) return "CLIENT";
+              return "STAFF";
+            })();
+
+            if (roleName === "CLIENT") return null;
+
+            return selectedTask.status !== 'COMPLETED' && selectedTask.status !== 'PENDING_REVIEW' && (
+              <div className="bg-card border border-border rounded-3xl p-6 space-y-6 shadow-sm">
               <div className="space-y-1">
                 <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
                   <ClipboardCheck className="w-5 h-5 text-blue-600" /> Prepare Draft Certificate
@@ -1184,7 +1017,8 @@ export default function FieldTasksPage() {
                     value={draftCertType}
                     onChange={(e) => {
                       setDraftCertType(e.target.value);
-                      if (e.target.value === 'FORM_34_STABILITY') {
+                      const t = templates.find(x => x.id === e.target.value);
+                      if (t?.name.toLowerCase().includes("stability")) {
                         setDraftCertValidity("3y");
                         const threeYearsLater = new Date();
                         threeYearsLater.setFullYear(threeYearsLater.getFullYear() + 3);
@@ -1196,15 +1030,12 @@ export default function FieldTasksPage() {
                         setDraftCertExpiry(oneYearLater.toISOString().split("T")[0]);
                       }
                     }}
-                    className="w-full h-11 px-4 bg-muted/30 border border-border rounded-xl text-sm font-medium focus:ring-2 focus:ring-blue-500/20"
+                    className="w-full h-11 px-4 bg-muted/30 border border-border rounded-xl text-sm font-medium focus:ring-2 focus:ring-blue-500/20 text-white"
                   >
-                    <option value="FIRE_SAFETY">🔥 Fire Safety Compliance Certificate</option>
-                    <option value="ELECTRICAL_SAFETY">⚡ Electrical Safety Audit Certificate</option>
-                    <option value="STRUCTURAL_SAFETY">🏗️ Construction & Structural Safety Certificate</option>
-                    <option value="FACTORIES_ACT_28_29">⛓️ Factories Act Sec 28/29: Lifting Tackle / Chain Pulley Block</option>
-                    <option value="FORM_34_STABILITY">🏢 Factories Act Form 34: Certificate of Stability</option>
-                    <option value="FORM_8_PRESSURE_VESSEL">💨 Factories Act Form 8: Pressure Vessel Exam Report</option>
-                    <option value="FORM_8_SAFETY_VALVE">🌡️ Factories Act Form 8: Pressure/Thermal Safety Valve Report</option>
+                    <option value="" className="text-slate-900">Select certificate template...</option>
+                    {templates.map(t => (
+                      <option key={t.id} value={t.id} className="text-slate-900">{t.name}</option>
+                    ))}
                   </select>
                 </div>
 
@@ -1247,323 +1078,65 @@ export default function FieldTasksPage() {
                 </div>
               </div>
 
-              {/* DYNAMIC FORM FIELDS: FACTORIES ACT SECTION 28/29 */}
-              {draftCertType === 'FACTORIES_ACT_28_29' && (
-                <div className="space-y-4 border-t border-border pt-4 animate-in fade-in slide-in-from-top-4 duration-300">
-                  <h4 className="text-sm font-black text-blue-600 uppercase tracking-widest">Factories Act Sec 28/29 Equipment Specifications</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2 col-span-full">
-                      <label className="text-xs font-bold text-muted-foreground uppercase">Name of the Occupier of the Factory</label>
-                      <IsolatedInput value={eqptOccupierName} onChange={setEqptOccupierName} className="h-11 bg-muted/30 border-border rounded-xl" />
-                    </div>
-                    <div className="space-y-2 col-span-full">
-                      <label className="text-xs font-bold text-muted-foreground uppercase">Address of the Factory</label>
-                      <IsolatedTextarea value={eqptFactoryAddress} onChange={setEqptFactoryAddress} className="w-full p-3 bg-muted/30 border border-border rounded-xl text-sm min-h-[60px]" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-muted-foreground uppercase">Equipment Name / Description</label>
-                      <IsolatedInput value={eqptName} onChange={setEqptName} className="h-11 bg-muted/30 border-border rounded-xl" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-muted-foreground uppercase">Safe Working Load (Cap/S.W.L)</label>
-                      <IsolatedInput value={eqptSwl} onChange={setEqptSwl} className="h-11 bg-muted/30 border-border rounded-xl" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-muted-foreground uppercase">Lift Capacity (Meters)</label>
-                      <IsolatedInput value={eqptLift} onChange={setEqptLift} className="h-11 bg-muted/30 border-border rounded-xl" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-muted-foreground uppercase">Serial / Distinguishing ID No</label>
-                      <IsolatedInput value={eqptSerialNo} onChange={setEqptSerialNo} className="h-11 bg-muted/30 border-border rounded-xl" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-muted-foreground uppercase">Mfg Month/Year (e.g. 11/2023)</label>
-                      <IsolatedInput value={eqptMfg} onChange={setEqptMfg} className="h-11 bg-muted/30 border-border rounded-xl" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-muted-foreground uppercase">Load Chain Diameter (dia)</label>
-                      <IsolatedInput value={eqptChainDia} onChange={setEqptChainDia} className="h-11 bg-muted/30 border-border rounded-xl" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-muted-foreground uppercase">Hand Chain Diameter (dia)</label>
-                      <IsolatedInput value={eqptHchainDia} onChange={setEqptHchainDia} className="h-11 bg-muted/30 border-border rounded-xl" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-muted-foreground uppercase">Manufactured By</label>
-                      <IsolatedInput value={eqptMfdBy} onChange={setEqptMfdBy} className="h-11 bg-muted/30 border-border rounded-xl" />
-                    </div>
-                    <div className="space-y-2 col-span-full">
-                      <label className="text-xs font-bold text-muted-foreground uppercase">Equipment Location Inside Factory</label>
-                      <IsolatedInput value={eqptLocation} onChange={setEqptLocation} className="h-11 bg-muted/30 border-border rounded-xl" />
-                    </div>
-                  </div>
-                </div>
-              )}
+              {/* Custom Fields based on selected template */}
+              {(() => {
+                const activeTemp = templates.find(t => t.id === draftCertType);
+                if (!activeTemp) return null;
+                
+                let tempFields: any[] = [];
+                try {
+                  tempFields = JSON.parse(activeTemp.fields);
+                } catch(e){}
 
-              {/* DYNAMIC FORM FIELDS: FORM 34 STABILITY CERTIFICATE */}
-              {draftCertType === 'FORM_34_STABILITY' && (
-                <div className="space-y-4 border-t border-border pt-4 animate-in fade-in slide-in-from-top-4 duration-300">
-                  <h4 className="text-sm font-black text-blue-600 uppercase tracking-widest">Form 34 Certificate of Stability Specifications</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2 col-span-full">
-                      <label className="text-xs font-bold text-muted-foreground uppercase">Name of the Factory</label>
-                      <IsolatedInput value={stabFactoryName} onChange={setStabFactoryName} className="h-11 bg-muted/30 border-border rounded-xl" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-muted-foreground uppercase">Village, Town and District situated</label>
-                      <IsolatedInput value={stabLocation} onChange={setStabLocation} className="h-11 bg-muted/30 border-border rounded-xl" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-muted-foreground uppercase">Name of the Occupier</label>
-                      <IsolatedInput value={stabOccupierName} onChange={setStabOccupierName} className="h-11 bg-muted/30 border-border rounded-xl" />
-                    </div>
-                    <div className="space-y-2 col-span-full">
-                      <label className="text-xs font-bold text-muted-foreground uppercase">Full Postal Address of Factory</label>
-                      <IsolatedTextarea value={stabPostalAddress} onChange={setStabPostalAddress} className="w-full p-3 bg-muted/30 border border-border rounded-xl text-sm min-h-[60px]" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-muted-foreground uppercase">Nature of manufacturing process</label>
-                      <IsolatedInput value={stabMfgProcess} onChange={setStabMfgProcess} className="h-11 bg-muted/30 border-border rounded-xl" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-muted-foreground uppercase">No of Floors / Worker Layout Ref</label>
-                      <IsolatedInput value={stabWorkerLayoutRef} onChange={setStabWorkerLayoutRef} className="h-11 bg-muted/30 border-border rounded-xl" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-muted-foreground uppercase">Chief Inspector Plan Approval Letter No</label>
-                      <IsolatedInput value={stabPlanLetterNo} onChange={setStabPlanLetterNo} className="h-11 bg-muted/30 border-border rounded-xl" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-muted-foreground uppercase">Chief Inspector Plan Date</label>
-                      <IsolatedInput value={stabPlanLetterDate} onChange={setStabPlanLetterDate} className="h-11 bg-muted/30 border-border rounded-xl" />
-                    </div>
-                  </div>
-                </div>
-              )}
+                if (tempFields.length === 0) return null;
 
-              {/* DYNAMIC FORM FIELDS: FORM 8 PRESSURE VESSEL */}
-              {draftCertType === 'FORM_8_PRESSURE_VESSEL' && (
-                <div className="space-y-4 border-t border-border pt-4 animate-in fade-in slide-in-from-top-4 duration-300">
-                  <h4 className="text-sm font-black text-blue-600 uppercase tracking-widest">Form 8 Pressure Vessel Exam Specifications</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2 col-span-full">
-                      <label className="text-xs font-bold text-muted-foreground uppercase">Name of Occupier of Factory</label>
-                      <IsolatedInput value={pvOccupierName} onChange={setPvOccupierName} className="h-11 bg-muted/30 border-border rounded-xl" />
-                    </div>
-                    <div className="space-y-2 col-span-full">
-                      <label className="text-xs font-bold text-muted-foreground uppercase">Location and Address of Factory</label>
-                      <IsolatedTextarea value={pvFactoryAddress} onChange={setPvFactoryAddress} className="w-full p-3 bg-muted/30 border border-border rounded-xl text-sm min-h-[60px]" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-muted-foreground uppercase">Pressure Vessel Description / Distinct Name</label>
-                      <IsolatedInput value={pvVesselDesc} onChange={setPvVesselDesc} className="h-11 bg-muted/30 border-border rounded-xl" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-muted-foreground uppercase">Capacity, Serial & Room Location Specs</label>
-                      <IsolatedInput value={pvVesselCapNo} onChange={setPvVesselCapNo} className="h-11 bg-muted/30 border-border rounded-xl" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-muted-foreground uppercase">Name and Address of Manufacturer</label>
-                      <IsolatedInput value={pvManufacturer} onChange={setPvManufacturer} className="h-11 bg-muted/30 border-border rounded-xl" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-muted-foreground uppercase">Nature of process in which it is used</label>
-                      <IsolatedInput value={pvProcess} onChange={setPvProcess} className="h-11 bg-muted/30 border-border rounded-xl" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-muted-foreground uppercase">Year of Manufacture</label>
-                      <IsolatedInput value={pvMfgYear} onChange={setPvMfgYear} className="h-11 bg-muted/30 border-border rounded-xl" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-muted-foreground uppercase">Date first taken into use in factory</label>
-                      <IsolatedInput value={pvFirstUseDate} onChange={setPvFirstUseDate} className="h-11 bg-muted/30 border-border rounded-xl" />
-                    </div>
-                    <div className="space-y-2 col-span-full">
-                      <label className="text-xs font-bold text-muted-foreground uppercase">Thickness of walls (Shell, T.Disc, B.Disc)</label>
-                      <IsolatedTextarea value={pvWallThickness} onChange={setPvWallThickness} className="w-full p-3 bg-muted/30 border border-border rounded-xl text-xs min-h-[60px]" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-muted-foreground uppercase">Safe working pressure recommended (mfg)</label>
-                      <IsolatedInput value={pvSafePressure} onChange={setPvSafePressure} className="h-11 bg-muted/30 border-border rounded-xl" />
-                    </div>
-                    <div className="space-y-2 col-span-full">
-                      <label className="text-xs font-bold text-muted-foreground uppercase">Vessel History (order since inspection)</label>
-                      <IsolatedInput value={pvVesselHistory} onChange={setPvVesselHistory} className="h-11 bg-muted/30 border-border rounded-xl" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-muted-foreground uppercase">Hydraulic Test conducted by Manufacturer</label>
-                      <IsolatedInput value={pvHydTestByMfg} onChange={setPvHydTestByMfg} className="h-11 bg-muted/30 border-border rounded-xl" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-muted-foreground uppercase">Is vessel open or exposed to weather?</label>
-                      <IsolatedInput value={pvExposedWeather} onChange={setPvExposedWeather} className="h-11 bg-muted/30 border-border rounded-xl" />
-                    </div>
-                    <div className="space-y-2 col-span-full">
-                      <label className="text-xs font-bold text-muted-foreground uppercase">Details of exam & tests conducted (Ultrasonic)</label>
-                      <IsolatedInput value={pvExamDetails} onChange={setPvExamDetails} className="h-11 bg-muted/30 border-border rounded-xl" />
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 col-span-full">
-                      <div className="space-y-2">
-                        <label className="text-xs font-bold text-muted-foreground uppercase">Hydraulic test pressure applied</label>
-                        <IsolatedInput value={pvHydTestPressure} onChange={setPvHydTestPressure} className="h-11 bg-muted/30 border-border rounded-xl" />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-xs font-bold text-muted-foreground uppercase">What parts, if any, were inaccessible?</label>
-                        <IsolatedInput value={pvInaccessibleParts} onChange={setPvInaccessibleParts} className="h-11 bg-muted/30 border-border rounded-xl" />
-                      </div>
-                    </div>
-                    <div className="space-y-2 col-span-full">
-                      <label className="text-xs font-bold text-muted-foreground uppercase">Vessel Condition (External & Internal)</label>
-                      <IsolatedInput value={pvVesselCondition} onChange={setPvVesselCondition} className="h-11 bg-muted/30 border-border rounded-xl" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-muted-foreground uppercase">Are fittings provided in rules?</label>
-                      <IsolatedInput value={pvFittingsProvided} onChange={setPvFittingsProvided} className="h-11 bg-muted/30 border-border rounded-xl" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-muted-foreground uppercase">Are fittings properly maintained?</label>
-                      <IsolatedInput value={pvFittingsMaintained} onChange={setPvFittingsMaintained} className="h-11 bg-muted/30 border-border rounded-xl" />
-                    </div>
-                    <div className="space-y-2 col-span-full">
-                      <label className="text-xs font-bold text-muted-foreground uppercase">Repairs, if any required, & execute period</label>
-                      <IsolatedTextarea value={pvRepairsRequired} onChange={setPvRepairsRequired} className="w-full p-3 bg-muted/30 border border-border rounded-xl text-xs min-h-[60px]" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-muted-foreground uppercase">Safe working pressure calculated (thickness)</label>
-                      <IsolatedInput value={pvCalculatedSafePressure} onChange={setPvCalculatedSafePressure} className="h-11 bg-muted/30 border-border rounded-xl" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-muted-foreground uppercase">Where repairs affecting pressure are required</label>
-                      <IsolatedInput value={pvRepairsSafePressure} onChange={setPvRepairsSafePressure} className="h-11 bg-muted/30 border-border rounded-xl" />
-                    </div>
-                    <div className="space-y-2 col-span-full">
-                      <label className="text-xs font-bold text-muted-foreground uppercase">Other Observations</label>
-                      <IsolatedInput value={pvOtherObservations} onChange={setPvOtherObservations} className="h-11 bg-muted/30 border-border rounded-xl" />
+                return (
+                  <div className="space-y-4 pt-4 border-t border-border mt-4 animate-in fade-in slide-in-from-top-4 duration-300">
+                    <h4 className="text-sm font-black text-blue-600 uppercase tracking-widest">Template Specifications</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {tempFields.map((field: any, idx: number) => (
+                        <div key={idx} className="space-y-1">
+                          <label className="text-xs font-bold text-muted-foreground uppercase">{field.label}</label>
+                          <Input
+                            placeholder={field.default || "Enter value..."}
+                            className="bg-background h-10 text-xs text-white"
+                            value={templateFieldValues["draft"]?.[field.key] ?? (getDefaultFieldValue(field.key) || field.default || "")}
+                            onChange={(e) => {
+                              const currentVals = templateFieldValues["draft"] || {};
+                              setTemplateFieldValues({
+                                ...templateFieldValues,
+                                "draft": {
+                                  ...currentVals,
+                                  [field.key]: e.target.value
+                                }
+                              });
+                            }}
+                          />
+                        </div>
+                      ))}
                     </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
 
-              {/* DYNAMIC FORM FIELDS: FORM 8 SAFETY VALVE */}
-              {draftCertType === 'FORM_8_SAFETY_VALVE' && (
-                <div className="space-y-4 border-t border-border pt-4 animate-in fade-in slide-in-from-top-4 duration-300">
-                  <h4 className="text-sm font-black text-blue-600 uppercase tracking-widest">Form 8 Pressure/Thermal Safety Valve Specifications</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2 col-span-full">
-                      <label className="text-xs font-bold text-muted-foreground uppercase">Name of occupier (or Factory)</label>
-                      <IsolatedInput value={svOccupierName} onChange={setSvOccupierName} className="h-11 bg-muted/30 border-border rounded-xl" />
-                    </div>
-                    <div className="space-y-2 col-span-full">
-                      <label className="text-xs font-bold text-muted-foreground uppercase">Situation and Address of Factory</label>
-                      <IsolatedTextarea value={svFactoryAddress} onChange={setSvFactoryAddress} className="w-full p-3 bg-muted/30 border border-border rounded-xl text-sm min-h-[60px]" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-muted-foreground uppercase">Thermal/Pressure Safety Valve Description</label>
-                      <IsolatedInput value={svValveDesc} onChange={setSvValveDesc} className="h-11 bg-muted/30 border-border rounded-xl" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-muted-foreground uppercase">Capacity, Serial & Loc Specs</label>
-                      <IsolatedInput value={svValveCapNo} onChange={setSvValveCapNo} className="h-11 bg-muted/30 border-border rounded-xl" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-muted-foreground uppercase">Name and Address of Manufacturer</label>
-                      <IsolatedInput value={svManufacturer} onChange={setSvManufacturer} className="h-11 bg-muted/30 border-border rounded-xl" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-muted-foreground uppercase">Nature of process in which it is used</label>
-                      <IsolatedInput value={svProcess} onChange={setSvProcess} className="h-11 bg-muted/30 border-border rounded-xl" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-muted-foreground uppercase">Year of Manufacture</label>
-                      <IsolatedInput value={svMfgYear} onChange={setSvMfgYear} className="h-11 bg-muted/30 border-border rounded-xl" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-muted-foreground uppercase">Date of commissioning in service</label>
-                      <IsolatedInput value={svCommissionDate} onChange={setSvCommissionDate} className="h-11 bg-muted/30 border-border rounded-xl" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-muted-foreground uppercase">Set pressure recommended by Manufacturer</label>
-                      <IsolatedInput value={svSetPressure} onChange={setSvSetPressure} className="h-11 bg-muted/30 border-border rounded-xl" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-muted-foreground uppercase">Valve History (working in order since...)</label>
-                      <IsolatedInput value={svValveHistory} onChange={setSvValveHistory} className="h-11 bg-muted/30 border-border rounded-xl" />
-                    </div>
-                    <div className="space-y-2 col-span-full">
-                      <label className="text-xs font-bold text-muted-foreground uppercase">Date of last Hyd. test & pressure applied</label>
-                      <IsolatedInput value={svLastHydTest} onChange={setSvLastHydTest} className="h-11 bg-muted/30 border-border rounded-xl" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-muted-foreground uppercase">Is TSV exposed to weather or damp?</label>
-                      <IsolatedInput value={svExposedWeather} onChange={setSvExposedWeather} className="h-11 bg-muted/30 border-border rounded-xl" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-muted-foreground uppercase">What parts, if any, were inaccessible?</label>
-                      <IsolatedInput value={svInaccessibleParts} onChange={setSvInaccessibleParts} className="h-11 bg-muted/30 border-border rounded-xl" />
-                    </div>
-                    <div className="space-y-2 col-span-full">
-                      <label className="text-xs font-bold text-muted-foreground uppercase">What examination and were made? (Hydro test)</label>
-                      <IsolatedInput value={svExamDetails} onChange={setSvExamDetails} className="h-11 bg-muted/30 border-border rounded-xl" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-muted-foreground uppercase">Are fittings properly maintained?</label>
-                      <IsolatedInput value={svFittingsMaintained} onChange={setSvFittingsMaintained} className="h-11 bg-muted/30 border-border rounded-xl" />
-                    </div>
-                    <div className="space-y-2 col-span-full">
-                      <label className="text-xs font-bold text-muted-foreground uppercase">Repairs, if any required, & execute period</label>
-                      <IsolatedTextarea value={svRepairsRequired} onChange={setSvRepairsRequired} className="w-full p-3 bg-muted/30 border border-border rounded-xl text-sm min-h-[60px]" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-muted-foreground uppercase">Where repairs affecting set pressure are required</label>
-                      <IsolatedInput value={svRepairsSetPressure} onChange={setSvRepairsSetPressure} className="h-11 bg-muted/30 border-border rounded-xl" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-muted-foreground uppercase">Other Observations</label>
-                      <IsolatedInput value={svOtherObservations} onChange={setSvOtherObservations} className="h-11 bg-muted/30 border-border rounded-xl" />
-                    </div>
-                  </div>
-                </div>
-              )}
+              <div className="space-y-2 pt-4 border-t border-border mt-4">
+                <label className="text-xs font-bold text-muted-foreground uppercase">Scope of Inspection</label>
+                <IsolatedTextarea placeholder="Describe the scope of safety inspection conducted..."
+                  value={draftCertScope} onChange={setDraftCertScope}
+                  className="w-full p-4 bg-muted/30 border border-border rounded-xl text-sm min-h-[80px] focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-white"
+                />
+              </div>
 
-              {/* SHARED COMPETENCY INFORMATION */}
-              {(draftCertType === 'FACTORIES_ACT_28_29' || draftCertType === 'FORM_34_STABILITY' || draftCertType === 'FORM_8_PRESSURE_VESSEL' || draftCertType === 'FORM_8_SAFETY_VALVE') && (
-                <div className="space-y-4 border-t border-border pt-4 animate-in fade-in slide-in-from-top-4 duration-300">
-                  <h4 className="text-sm font-black text-blue-600 uppercase tracking-widest">Competent Person & Govt License Verification</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-muted-foreground uppercase">Competency Certificate & Govt Memo No</label>
-                      <IsolatedInput value={certCompetencyNo} onChange={setCertCompetencyNo} className="h-11 bg-muted/30 border-border rounded-xl" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-muted-foreground uppercase">Name of Competent Person</label>
-                      <IsolatedInput value={certCompetentPerson} onChange={setCertCompetentPerson} className="h-11 bg-muted/30 border-border rounded-xl" />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* STANDARD FIELDS (For Fire, Elec, Struct, or General notes) */}
-              {(draftCertType === 'FIRE_SAFETY' || draftCertType === 'ELECTRICAL_SAFETY' || draftCertType === 'STRUCTURAL_SAFETY') && (
-                <>
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-muted-foreground uppercase">Scope of Inspection</label>
-                    <IsolatedTextarea placeholder="Describe the scope of safety inspection conducted..."
-                      value={draftCertScope} onChange={setDraftCertScope}
-                      className="w-full p-4 bg-muted/30 border border-border rounded-xl text-sm min-h-[80px] focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-muted-foreground uppercase">Observations & Recommendations</label>
-                    <IsolatedTextarea placeholder="Enter field observations, recommendations, and corrective actions..."
-                      value={draftCertNotes} onChange={setDraftCertNotes}
-                      className="w-full p-4 bg-muted/30 border border-border rounded-xl text-sm min-h-[80px] focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                    />
-                  </div>
-                </>
-              )}
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-muted-foreground uppercase">Observations & Recommendations</label>
+                <IsolatedTextarea placeholder="Enter field observations, recommendations, and corrective actions..."
+                  value={draftCertNotes} onChange={setDraftCertNotes}
+                  className="w-full p-4 bg-muted/30 border border-border rounded-xl text-sm min-h-[80px] focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-white"
+                />
+              </div>
             </div>
-          )}
+          );
+          })()}
         </div>
 
         <div className="fixed bottom-6 left-6 right-6 lg:static lg:mt-8">
