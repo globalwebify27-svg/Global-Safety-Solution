@@ -148,17 +148,17 @@ export class InspectionsService {
 
     // If status is changed away from COMPLETED, clean up existing certificate & compliance
     if (rest.status && rest.status !== 'COMPLETED') {
-      const cert = await this.prisma.certificate.findUnique({
+      const certs = await this.prisma.certificate.findMany({
         where: { inspection_id: id }
       });
-      if (cert) {
+      for (const cert of certs) {
         await this.prisma.compliance.deleteMany({
           where: { reference_number: cert.certificate_no }
         });
-        await this.prisma.certificate.delete({
-          where: { id: cert.id }
-        });
       }
+      await this.prisma.certificate.deleteMany({
+        where: { inspection_id: id }
+      });
     }
 
     const inspection = await this.prisma.inspection.update({
@@ -184,7 +184,7 @@ export class InspectionsService {
     // If completed, trigger email and notification
     if (data.status === 'COMPLETED') {
       // Create Certificate entry if it doesn't exist
-      const existingCert = await this.prisma.certificate.findUnique({
+      const existingCert = await this.prisma.certificate.findFirst({
         where: { inspection_id: id },
       });
 
@@ -450,6 +450,10 @@ export class InspectionsService {
         recommendations: data.recommendations || null,
         expenditure: data.expenditure || 0,
         photo_url: data.photo_url || null,
+        cert_ref_no: data.cert_ref_no || null,
+        cert_test_date: data.cert_test_date ? new Date(data.cert_test_date) : null,
+        cert_expiry_date: data.cert_expiry_date ? new Date(data.cert_expiry_date) : null,
+        cert_competency_no: data.cert_competency_no || null,
       },
     });
 
@@ -582,7 +586,7 @@ export class InspectionsService {
       include: {
         client: true,
         engineer: true,
-        certificate: true,
+        certificates: true,
         items: true,
         work_order: { include: { service_product: true } },
       },
@@ -593,7 +597,7 @@ export class InspectionsService {
     // 1. Download/Generate QR Code image linking to public verification page
     let qrCodeBuffer: Buffer | null = null;
     try {
-      const qrUrl = `https://globalsafetysolution.in/verify/certificate/${inspection.certificate?.id || inspection.id}`;
+      const qrUrl = `https://globalsafetysolution.in/verify/certificate/${inspection.certificates?.[0]?.id || inspection.id}`;
       const response = await fetch(`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(qrUrl)}`);
       if (response.ok) {
         qrCodeBuffer = Buffer.from(await response.arrayBuffer());
@@ -850,7 +854,7 @@ export class InspectionsService {
         doc.fontSize(10).font('Helvetica-Bold').fillColor(goldColor).text('Report of Examination of Pressure Vessel', { align: 'center' });
         doc.moveDown(0.3);
 
-        const certNoPV = inspection.certificate?.certificate_no || `GSS/OIL-D/PV/H-TEST/${inspection.id.substring(0, 4).toUpperCase()}/${new Date().getFullYear()}`;
+        const certNoPV = inspection.certificates?.[0]?.certificate_no || `GSS/OIL-D/PV/H-TEST/${inspection.id.substring(0, 4).toUpperCase()}/${new Date().getFullYear()}`;
         const issueDatePV = new Date(inspection.completed_date || new Date()).toLocaleDateString('en-IN');
         const expiryDatePV = draftData.expiry_date ? new Date(draftData.expiry_date).toLocaleDateString('en-IN') : new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toLocaleDateString('en-IN');
 
@@ -948,7 +952,7 @@ export class InspectionsService {
         doc.fontSize(10).font('Helvetica-Bold').fillColor(goldColor).text('Report of Examination of Pressure safety Valve', { align: 'center' });
         doc.moveDown(0.3);
 
-        const certNoSV = inspection.certificate?.certificate_no || `GSS/OIL-D/PSV/H-TEST/${inspection.id.substring(0, 4).toUpperCase()}/${new Date().getFullYear()}`;
+        const certNoSV = inspection.certificates?.[0]?.certificate_no || `GSS/OIL-D/PSV/H-TEST/${inspection.id.substring(0, 4).toUpperCase()}/${new Date().getFullYear()}`;
         const issueDateSV = new Date(inspection.completed_date || new Date()).toLocaleDateString('en-IN');
         const expiryDateSV = draftData.expiry_date ? new Date(draftData.expiry_date).toLocaleDateString('en-IN') : new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toLocaleDateString('en-IN');
 
@@ -1040,7 +1044,7 @@ export class InspectionsService {
         drawEnterpriseHeader();
         const certScope = draftData.scope || inspection.work_order?.service_product?.name || 'Safety Audit';
         const certRemarks = draftData.remarks || '';
-        const certNo = inspection.certificate?.certificate_no || 'PENDING';
+        const certNo = inspection.certificates?.[0]?.certificate_no || 'PENDING';
 
         // Title block
         doc.fillColor(primaryColor);
@@ -1050,7 +1054,7 @@ export class InspectionsService {
 
         // Cert No + Date
         const stdIssueDate = new Date(inspection.completed_date || new Date()).toLocaleDateString('en-IN');
-        const stdExpiryDate = inspection.certificate?.expiry_date ? new Date(inspection.certificate.expiry_date).toLocaleDateString('en-IN') : 'N/A';
+        const stdExpiryDate = inspection.certificates?.[0]?.expiry_date ? new Date(inspection.certificates[0].expiry_date).toLocaleDateString('en-IN') : 'N/A';
         doc.fontSize(8).font('Helvetica-Bold').fillColor(primaryColor);
         doc.text(`Certificate No.: ${certNo}`, 38, 130);
         doc.text(`DATE: ${stdIssueDate}`, 430, 130);
@@ -1081,7 +1085,7 @@ export class InspectionsService {
           if (v === 'One-Time' || v === '1 time') return '1 Time';
           return v;
         };
-        doc.font('Helvetica-Bold').text('Validity:', 350, stdGridY + 22); doc.font('Helvetica').text(getValPeriodText(inspection.certificate?.validity_period), 395, stdGridY + 22);
+        doc.font('Helvetica-Bold').text('Validity:', 350, stdGridY + 22); doc.font('Helvetica').text(getValPeriodText(inspection.certificates?.[0]?.validity_period), 395, stdGridY + 22);
 
         doc.moveTo(28, stdGridY + 40).lineTo(567, stdGridY + 40).lineWidth(0.3).stroke('#e2e8f0');
         doc.font('Helvetica-Bold').text('Expiry Date:', 38, stdGridY + 44); doc.font('Helvetica').fillColor(goldColor).text(stdExpiryDate, 145, stdGridY + 44);

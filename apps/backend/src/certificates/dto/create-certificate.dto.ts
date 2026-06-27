@@ -11,6 +11,10 @@ export class CreateCertificateDto {
   @IsUUID()
   inspection_id: string;
 
+  @IsOptional()
+  @IsUUID()
+  inspection_item_id?: string;
+
   @IsString()
   certificate_no: string;
 

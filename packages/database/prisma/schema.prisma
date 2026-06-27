@@ -659,7 +659,7 @@ model Inspection {
   created_at     DateTime          @default(now()) @db.DateTime(6)
   updated_at     DateTime          @updatedAt @db.DateTime(6)
   work_order_id  String?           @db.VarChar(36)
-  certificate    Certificate?
+  certificates   Certificate[]
   items          InspectionItem[]
   report         InspectionReport?
   client         Client            @relation(fields: [client_id], references: [id], onDelete: Cascade)
@@ -685,6 +685,13 @@ model InspectionItem {
   recommendations String?    @db.Text
   expenditure     Decimal?   @default(0.00) @db.Decimal(15, 2)
   inspection      Inspection @relation(fields: [inspection_id], references: [id], onDelete: Cascade)
+  certificate     Certificate?
+
+  // 4 dynamic fields for section certificates
+  cert_ref_no       String?    @db.VarChar(100)
+  cert_test_date    DateTime?  @db.Date
+  cert_expiry_date  DateTime?  @db.Date
+  cert_competency_no String?   @db.VarChar(100)
 
   @@index([inspection_id], map: "inspection_items_inspection_id_fkey")
   @@map("inspection_items")
@@ -806,19 +813,22 @@ model ChecklistItem {
 }
 
 model Certificate {
-  id              String     @id @default(uuid()) @db.VarChar(36)
-  inspection_id   String     @unique @db.VarChar(36)
-  certificate_no  String     @unique @db.VarChar(100)
-  issue_date      DateTime   @db.Date
-  expiry_date     DateTime   @db.Date
-  validity_period String     @db.VarChar(50)
-  status          String     @default("ACTIVE") @db.VarChar(50)
-  pdf_url         String?
-  metadata        String?    @db.LongText
-  created_at      DateTime   @default(now()) @db.DateTime(6)
-  updated_at      DateTime   @updatedAt @db.DateTime(6)
-  inspection      Inspection @relation(fields: [inspection_id], references: [id], onDelete: Cascade)
+  id                 String          @id @default(uuid()) @db.VarChar(36)
+  inspection_id      String          @db.VarChar(36)
+  inspection_item_id String?         @unique @db.VarChar(36)
+  certificate_no     String          @unique @db.VarChar(100)
+  issue_date         DateTime        @db.Date
+  expiry_date        DateTime        @db.Date
+  validity_period    String          @db.VarChar(50)
+  status             String          @default("ACTIVE") @db.VarChar(50)
+  pdf_url            String?
+  metadata           String?         @db.LongText
+  created_at         DateTime        @default(now()) @db.DateTime(6)
+  updated_at         DateTime        @updatedAt @db.DateTime(6)
+  inspection         Inspection      @relation(fields: [inspection_id], references: [id], onDelete: Cascade)
+  inspection_item    InspectionItem? @relation(fields: [inspection_item_id], references: [id], onDelete: Cascade)
 
+  @@index([inspection_id], map: "certificates_inspection_id_fkey")
   @@map("certificates")
 }
 
@@ -998,3 +1008,16 @@ model LedgerEntry {
   @@index([credit_account_id], map: "ledger_entries_credit_account_id_fkey")
   @@map("ledger_entries")
 }
+
+model CertificateTemplate {
+  id           String   @id @default(uuid()) @db.VarChar(36)
+  name         String   @db.VarChar(255)
+  description  String?  @db.Text
+  html_content String   @db.LongText
+  fields       String   @db.LongText // JSON array string of dynamic template fields / inputs
+  created_at   DateTime @default(now()) @db.DateTime(6)
+  updated_at   DateTime @updatedAt @db.DateTime(6)
+
+  @@map("certificate_templates")
+}
+

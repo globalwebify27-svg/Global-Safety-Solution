@@ -15,7 +15,8 @@ import {
   Save, 
   KeyRound, 
   Globe,
-  ArrowRight
+  ArrowRight,
+  FileText
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ProfileForm } from "./ProfileForm";
@@ -162,7 +163,10 @@ export default function SettingsPage() {
     { id: "security", label: "Security", icon: Lock },
     { id: "organization", label: "Organization", icon: Building2 },
     { id: "notifications", label: "Notifications", icon: Bell },
-    ...(isSuperAdmin ? [{ id: "roles", label: "Roles & Permissions", icon: ShieldCheck }] : []),
+    ...(isSuperAdmin ? [
+      { id: "roles", label: "Roles & Permissions", icon: ShieldCheck },
+      { id: "templates", label: "Certificate Templates", icon: FileText }
+    ] : []),
   ];
 
   const handleUpdatePassword = async (e: React.FormEvent) => {
@@ -415,6 +419,33 @@ export default function SettingsPage() {
                   <p className="text-2xl font-black text-primary">22 Keys</p>
                   <p className="text-[10px] text-muted-foreground font-medium">Granular module-level control permissions.</p>
                 </div>
+              </div>
+            </div>
+          )}
+          {activeTab === "templates" && (
+            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div className="space-y-1">
+                <h3 className="text-lg font-bold flex items-center gap-2 text-foreground uppercase tracking-tight">
+                  <FileText className="w-5 h-5 text-blue-600 dark:text-blue-400" /> Certificate Template Engine
+                </h3>
+                <p className="text-sm text-muted-foreground font-medium">Create and customize layout templates for safety check certificates.</p>
+              </div>
+
+              <div className="p-10 rounded-[2.5rem] bg-gradient-to-br from-blue-500/10 via-accent/5 to-primary/10 border border-border flex flex-col items-center text-center space-y-6">
+                <div className="w-20 h-20 rounded-[2rem] bg-card border border-border flex items-center justify-center shadow-2xl shadow-blue-500/20">
+                  <FileText className="w-10 h-10 text-blue-500" />
+                </div>
+                <div className="space-y-2">
+                  <h4 className="text-2xl font-black text-foreground tracking-tighter uppercase">Dynamic Templates Builder</h4>
+                  <p className="text-sm text-muted-foreground font-medium max-w-sm mx-auto">
+                    Access the interactive form builder to customize certificate headers, dynamic parameters, and PDF layouts for each safety checklist section.
+                  </p>
+                </div>
+                <Link href="/dashboard/settings/templates">
+                  <Button className="bg-blue-600 hover:bg-blue-500 text-white px-10 font-bold h-12 rounded-2xl shadow-xl shadow-blue-500/20 group">
+                    Configure Templates <ArrowRight className="w-4 h-4 ml-2 transition-transform group-hover:translate-x-1" />
+                  </Button>
+                </Link>
               </div>
             </div>
           )}

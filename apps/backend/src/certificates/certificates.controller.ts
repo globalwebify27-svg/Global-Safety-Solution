@@ -7,6 +7,7 @@ import {
   Param,
   Delete,
   UseGuards,
+  Res,
 } from '@nestjs/common';
 import { CertificatesService } from './certificates.service';
 import {
@@ -33,6 +34,17 @@ export class CertificatesController {
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.certificatesService.findOne(id);
+  }
+
+  @Get(':id/pdf')
+  async downloadPdf(@Param('id') id: string, @Res() res: any) {
+    const buffer = await this.certificatesService.generatePdfForCertificate(id);
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename=safety-certificate-${id.substring(0, 8)}.pdf`,
+      'Content-Length': buffer.length,
+    });
+    res.end(buffer);
   }
 
   @Patch(':id')

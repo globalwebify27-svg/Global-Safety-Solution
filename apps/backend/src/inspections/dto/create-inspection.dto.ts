@@ -139,6 +139,22 @@ export class UpdateInspectionItemDto {
   @IsOptional()
   @IsNumber()
   expenditure?: number;
+
+  @IsOptional()
+  @IsString()
+  cert_ref_no?: string;
+
+  @IsOptional()
+  @IsDateString()
+  cert_test_date?: string;
+
+  @IsOptional()
+  @IsDateString()
+  cert_expiry_date?: string;
+
+  @IsOptional()
+  @IsString()
+  cert_competency_no?: string;
 }
 
 export class AddInspectionItemDto {
@@ -171,4 +187,20 @@ export class AddInspectionItemDto {
   @IsOptional()
   @IsString()
   photo_url?: string;
+
+  @IsOptional()
+  @IsString()
+  cert_ref_no?: string;
+
+  @IsOptional()
+  @IsDateString()
+  cert_test_date?: string;
+
+  @IsOptional()
+  @IsDateString()
+  cert_expiry_date?: string;
+
+  @IsOptional()
+  @IsString()
+  cert_competency_no?: string;
 }

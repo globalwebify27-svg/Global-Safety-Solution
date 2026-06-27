@@ -50,6 +50,10 @@ interface InspectionItem {
   recommendations?: string;
   expenditure?: number | string;
   photo_url?: string;
+  cert_ref_no?: string;
+  cert_test_date?: string;
+  cert_expiry_date?: string;
+  cert_competency_no?: string;
 }
 
 interface Inspection {
@@ -89,6 +93,9 @@ export default function InspectionsPage() {
   const [feedbackInput, setFeedbackInput] = useState("");
   const [submittingReview, setSubmittingReview] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [templates, setTemplates] = useState<any[]>([]);
+  const [selectedTemplateIds, setSelectedTemplateIds] = useState<Record<string, string>>({});
+  const [templateFieldValues, setTemplateFieldValues] = useState<Record<string, Record<string, string>>>({});
   
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [uploadedPhotoUrls, setUploadedPhotoUrls] = useState<string[]>([]);
@@ -241,15 +248,17 @@ export default function InspectionsPage() {
     if (!token) return;
     setLoading(true);
     try {
-      const [iRes, cRes, eRes] = await Promise.all([
+      const [iRes, cRes, eRes, tempRes] = await Promise.all([
         fetch(`${API_BASE_URL}/inspections`, { headers: { Authorization: `Bearer ${token}` } }),
         fetch(`${API_BASE_URL}/clients`, { headers: { Authorization: `Bearer ${token}` } }),
-        fetch(`${API_BASE_URL}/users`, { headers: { Authorization: `Bearer ${token}` } }) // Changed from /employees to /users as per schema
+        fetch(`${API_BASE_URL}/users`, { headers: { Authorization: `Bearer ${token}` } }), // Changed from /employees to /users as per schema
+        fetch(`${API_BASE_URL}/certificate-templates`, { headers: { Authorization: `Bearer ${token}` } }),
       ]);
-      const [iData, cData, eData] = await Promise.all([iRes.json(), cRes.json(), eRes.json()]);
+      const [iData, cData, eData, tempData] = await Promise.all([iRes.json(), cRes.json(), eRes.json(), tempRes.json()]);
       
       if (Array.isArray(iData)) setInspections(iData);
       if (Array.isArray(cData)) setClients(cData);
+      if (Array.isArray(tempData)) setTemplates(tempData);
       if (Array.isArray(eData)) {
         setEngineers(eData.filter((u: any) => 
           u.is_active && 
@@ -310,7 +319,19 @@ export default function InspectionsPage() {
     }
   };
 
-  const handleUpdateItem = async (itemId: string, status: string, notes?: string, expenditure?: number | string, photo_url?: string, scope?: string, recommendations?: string) => {
+  const handleUpdateItem = async (
+    itemId: string,
+    status: string,
+    notes?: string,
+    expenditure?: number | string,
+    photo_url?: string,
+    scope?: string,
+    recommendations?: string,
+    cert_ref_no?: string,
+    cert_test_date?: string,
+    cert_expiry_date?: string,
+    cert_competency_no?: string
+  ) => {
     if (!token) return;
     try {
       const body: any = { status };
@@ -319,6 +340,10 @@ export default function InspectionsPage() {
       if (photo_url !== undefined) body.photo_url = photo_url;
       if (scope !== undefined) body.scope = scope;
       if (recommendations !== undefined) body.recommendations = recommendations;
+      if (cert_ref_no !== undefined) body.cert_ref_no = cert_ref_no;
+      if (cert_test_date !== undefined) body.cert_test_date = cert_test_date;
+      if (cert_expiry_date !== undefined) body.cert_expiry_date = cert_expiry_date;
+      if (cert_competency_no !== undefined) body.cert_competency_no = cert_competency_no;
 
       const res = await fetch(`${API_BASE_URL}/inspections/item/${itemId}`, {
         method: 'PATCH',
@@ -335,6 +360,10 @@ export default function InspectionsPage() {
               if (photo_url !== undefined) updatedItem.photo_url = photo_url;
               if (scope !== undefined) updatedItem.scope = scope;
               if (recommendations !== undefined) updatedItem.recommendations = recommendations;
+              if (cert_ref_no !== undefined) updatedItem.cert_ref_no = cert_ref_no;
+              if (cert_test_date !== undefined) updatedItem.cert_test_date = cert_test_date;
+              if (cert_expiry_date !== undefined) updatedItem.cert_expiry_date = cert_expiry_date;
+              if (cert_competency_no !== undefined) updatedItem.cert_competency_no = cert_competency_no;
               return updatedItem;
             }
             return item;
@@ -1473,6 +1502,181 @@ export default function InspectionsPage() {
                               />
                             </div>
                             
+                            {/* Certificate configuration and download for this safety checklist section */}
+                            <div className="pt-4 mt-4 border-t border-border/40 space-y-4">
+                              <h4 className="text-xs font-black text-blue-600 uppercase tracking-wider">Section Certificate Details</h4>
+                              
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                  <Label className="text-[10px] font-bold text-muted-foreground uppercase">Certificate Reference No.</Label>
+                                  <Input 
+                                    placeholder="e.g. GSS/TEST/CPB/01/2026" 
+                                    className="bg-background h-9 text-xs"
+                                    defaultValue={item.cert_ref_no || ""}
+                                    onBlur={(e) => handleUpdateItem(item.id, item.status, item.notes, undefined, undefined, item.scope, item.recommendations, e.target.value)}
+                                  />
+                                </div>
+
+                                <div className="space-y-1">
+                                  <Label className="text-[10px] font-bold text-muted-foreground uppercase">License / Competency No.</Label>
+                                  <Input 
+                                    placeholder="e.g. 663, valid upto 10.11.2026" 
+                                    className="bg-background h-9 text-xs"
+                                    defaultValue={item.cert_competency_no || ""}
+                                    onBlur={(e) => handleUpdateItem(item.id, item.status, item.notes, undefined, undefined, item.scope, item.recommendations, item.cert_ref_no, undefined, undefined, e.target.value)}
+                                  />
+                                </div>
+
+                                <div className="space-y-1">
+                                  <Label className="text-[10px] font-bold text-muted-foreground uppercase">Test Date</Label>
+                                  <input 
+                                    type="date"
+                                    className="w-full h-9 px-3 bg-background border border-border rounded-xl text-xs text-white"
+                                    defaultValue={item.cert_test_date ? item.cert_test_date.split('T')[0] : ""}
+                                    onBlur={(e) => handleUpdateItem(item.id, item.status, item.notes, undefined, undefined, item.scope, item.recommendations, item.cert_ref_no, e.target.value)}
+                                  />
+                                </div>
+
+                                <div className="space-y-1">
+                                  <Label className="text-[10px] font-bold text-muted-foreground uppercase">Expiry Date</Label>
+                                  <input 
+                                    type="date"
+                                    className="w-full h-9 px-3 bg-background border border-border rounded-xl text-xs text-white"
+                                    defaultValue={item.cert_expiry_date ? item.cert_expiry_date.split('T')[0] : ""}
+                                    onBlur={(e) => handleUpdateItem(item.id, item.status, item.notes, undefined, undefined, item.scope, item.recommendations, item.cert_ref_no, item.cert_test_date, e.target.value)}
+                                  />
+                                </div>
+                              </div>
+
+                              <div className="space-y-3 p-4 bg-blue-500/5 rounded-xl border border-blue-500/10">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  <div className="space-y-1">
+                                    <Label className="text-[10px] font-bold text-muted-foreground uppercase">Select Certificate Template</Label>
+                                    <select
+                                      value={selectedTemplateIds[item.id] || ""}
+                                      onChange={(e) => setSelectedTemplateIds({ ...selectedTemplateIds, [item.id]: e.target.value })}
+                                      className="w-full h-9 px-3 bg-background border border-border rounded-xl text-xs focus:outline-none text-white"
+                                    >
+                                      <option value="" className="text-slate-900">Select a template...</option>
+                                      {templates.map(t => (
+                                        <option key={t.id} value={t.id} className="text-slate-900">{t.name}</option>
+                                      ))}
+                                    </select>
+                                  </div>
+
+                                  <div className="flex items-end">
+                                    <Button
+                                      type="button"
+                                      onClick={async () => {
+                                        const templateId = selectedTemplateIds[item.id];
+                                        if (!templateId) {
+                                          toast.error("Please select a template first");
+                                          return;
+                                        }
+                                        if (!item.cert_ref_no) {
+                                          toast.error("Certificate Reference Number is required");
+                                          return;
+                                        }
+                                        
+                                        try {
+                                          const fieldVals = templateFieldValues[item.id] || {};
+                                          const metadata = {
+                                            template_id: templateId,
+                                            field_values: fieldVals
+                                          };
+
+                                          // 1. Create the certificate
+                                          const res = await fetch(`${API_BASE_URL}/certificates`, {
+                                            method: "POST",
+                                            headers: {
+                                              "Content-Type": "application/json",
+                                              Authorization: `Bearer ${token}`
+                                            },
+                                            body: JSON.stringify({
+                                              inspection_id: selectedInspection.id,
+                                              inspection_item_id: item.id,
+                                              certificate_no: item.cert_ref_no,
+                                              issue_date: item.cert_test_date || new Date().toISOString(),
+                                              validity_period: "1y",
+                                              metadata
+                                            })
+                                          });
+
+                                          if (!res.ok) {
+                                            const error = await res.json();
+                                            throw new Error(error.message || "Failed to issue certificate");
+                                          }
+
+                                          const cert = await res.json();
+                                          toast.success("Certificate issued successfully! Starting download...");
+
+                                          // 2. Download the certificate PDF
+                                          const pdfRes = await fetch(`${API_BASE_URL}/certificates/${cert.id}/pdf`, {
+                                            headers: { Authorization: `Bearer ${token}` }
+                                          });
+
+                                          if (pdfRes.ok) {
+                                            const blob = await pdfRes.blob();
+                                            const a = document.createElement("a");
+                                            a.href = URL.createObjectURL(blob);
+                                            a.download = `certificate-${item.cert_ref_no}.pdf`;
+                                            a.click();
+                                          }
+                                        } catch (err: any) {
+                                          toast.error(err.message || "Failed to generate certificate");
+                                        }
+                                      }}
+                                      className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold h-9 text-xs rounded-xl flex items-center justify-center gap-2"
+                                    >
+                                      Generate & Download Certificate
+                                    </Button>
+                                  </div>
+                                </div>
+
+                                {/* Custom Fields based on selected template */}
+                                {(() => {
+                                  const tempId = selectedTemplateIds[item.id];
+                                  const activeTemp = templates.find(t => t.id === tempId);
+                                  if (!activeTemp) return null;
+                                  
+                                  let tempFields: any[] = [];
+                                  try {
+                                    tempFields = JSON.parse(activeTemp.fields);
+                                  } catch(e){}
+
+                                  if (tempFields.length === 0) return null;
+
+                                  return (
+                                    <div className="space-y-3 pt-3 border-t border-blue-500/10">
+                                      <h5 className="text-[10px] font-bold text-blue-500 uppercase tracking-widest">Template Fields</h5>
+                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        {tempFields.map((field: any, idx: number) => (
+                                          <div key={idx} className="space-y-1">
+                                            <Label className="text-[10px] text-slate-400">{field.label}</Label>
+                                            <Input
+                                              placeholder={field.default || "Enter value..."}
+                                              className="bg-background h-8 text-xs text-white"
+                                              value={templateFieldValues[item.id]?.[field.key] || ""}
+                                              onChange={(e) => {
+                                                const currentVals = templateFieldValues[item.id] || {};
+                                                setTemplateFieldValues({
+                                                  ...templateFieldValues,
+                                                  [item.id]: {
+                                                    ...currentVals,
+                                                    [field.key]: e.target.value
+                                                  }
+                                                });
+                                              }}
+                                            />
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  );
+                                })()}
+                              </div>
+                            </div>
+
                             {/* Per-item Photo Upload & Preview */}
                             <div className="space-y-2">
                               {item.photo_url && parseItemPhotos(item.photo_url).length > 0 && (
