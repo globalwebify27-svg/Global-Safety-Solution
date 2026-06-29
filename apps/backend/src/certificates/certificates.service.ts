@@ -334,12 +334,26 @@ export class CertificatesService {
       let yRef = { val: 165 };
       const drawRow = (num: string, label: string, val: string, labelWidth = 220) => {
         const y = yRef.val;
+        
+        // Calculate dynamic heights based on text content and widths
+        doc.font('Helvetica-Bold').fontSize(8);
+        const labelHeight = doc.heightOfString(label, { width: labelWidth });
+        
+        doc.font('Helvetica').fontSize(8);
+        const valHeight = doc.heightOfString(`:  ${val || 'N/A'}`, { width: 560 - 56 - labelWidth - 4 });
+        
+        const rowHeight = Math.max(labelHeight, valHeight);
+        const rowPadding = 8; // Padding between content and bottom border line
+        
+        // Render texts using calculated layouts
         doc.font('Helvetica-Bold').fontSize(8).fillColor(primaryColor).text(`${num}.`, 38, y, { width: 16 });
         doc.font('Helvetica-Bold').text(label, 56, y, { width: labelWidth });
         doc.font('Helvetica').text(`:  ${val || 'N/A'}`, 56 + labelWidth + 4, y, { width: 560 - 56 - labelWidth - 4 });
-        yRef.val += 22;
-        doc.moveTo(35, yRef.val - 2).lineTo(560, yRef.val - 2).lineWidth(0.3).stroke('#e2e8f0');
+        
+        yRef.val += rowHeight + rowPadding;
+        doc.moveTo(35, yRef.val - 3).lineTo(560, yRef.val - 3).lineWidth(0.3).stroke('#e2e8f0');
       };
+
 
       // Draw Standard defaults
       drawRow('1', 'Name of the occupier of the Factory', certificate.inspection?.client?.name || 'N/A');

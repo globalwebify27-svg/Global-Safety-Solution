@@ -1791,70 +1791,8 @@ export default function InspectionsPage() {
     
                     {/* Removed main site verification photos section as per requirements */}
     
-                    {/* Safety Officer Certificate Preparation section */}
-                    {selectedInspection.status !== 'COMPLETED' && (
-                      <div className="p-6 bg-blue-600/5 border border-blue-600/10 rounded-2xl space-y-4 mt-6">
-                        <div className="flex items-center gap-2 border-b border-blue-600/10 pb-3">
-                          <ClipboardCheck className="w-5 h-5 text-blue-600" />
-                          <h4 className="font-black text-blue-600 uppercase text-xs tracking-wider">Prepare Draft Certificate</h4>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-1">
-                            <Label className="text-xs font-semibold">Certificate Template</Label>
-                            <select
-                              value={draftCertType}
-                              onChange={(e) => setDraftCertType(e.target.value)}
-                              className="w-full h-10 px-3 bg-background border border-border rounded-xl text-xs font-bold focus:outline-none"
-                            >
-                              <option value="FIRE_SAFETY">🔥 Fire Safety Compliance Certificate</option>
-                              <option value="ELECTRICAL_SAFETY">⚡ Electrical Safety Audit Certificate</option>
-                              <option value="STRUCTURAL_SAFETY">🏗️ Construction & Structural Safety Certificate</option>
-                            </select>
-                          </div>
-                          <div className="space-y-1">
-                            <Label className="text-xs font-semibold">Validity Period</Label>
-                            <select
-                              value={draftCertValidity}
-                              onChange={(e) => setDraftCertValidity(e.target.value)}
-                              className="w-full h-10 px-3 bg-background border border-border rounded-xl text-xs font-bold focus:outline-none"
-                            >
-                              <option value="1y">1 Year</option>
-                              <option value="2y">2 Years</option>
-                              <option value="3y">3 Years</option>
-                              <option value="1/2y">1/2 Year</option>
-                              <option value="One-Time">1 Time</option>
-                            </select>
-                          </div>
-                          <div className="space-y-1 col-span-2">
-                            <Label className="text-xs font-semibold">Expiry Date</Label>
-                            <Input
-                              type="date"
-                              value={draftCertExpiry}
-                              onChange={(e) => setDraftCertExpiry(e.target.value)}
-                              className="bg-background text-xs h-10"
-                            />
-                          </div>
-                          <div className="space-y-1 col-span-2">
-                            <Label className="text-xs font-semibold">Scope of Inspection</Label>
-                            <Input
-                              placeholder="e.g., Annual Fire Alarm, Extinguisher & Hydrant compliance check"
-                              value={draftCertScope}
-                              onChange={(e) => setDraftCertScope(e.target.value)}
-                              className="bg-background text-xs h-10"
-                            />
-                          </div>
-                          <div className="space-y-1 col-span-2">
-                            <Label className="text-xs font-semibold">Remarks & Recommendations</Label>
-                            <Input
-                              placeholder="e.g., All devices tested; replacement of 2 expired fire extinguishers recommended"
-                              value={draftCertNotes}
-                              onChange={(e) => setDraftCertNotes(e.target.value)}
-                              className="bg-background text-xs h-10"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    )}
+                    {/* Safety Officer Certificate Preparation section has been removed as clients only want item-specific certificates. */}
+
 
                     {/* Direct Office Review Actions for Administrators */}
                     {isOfficeUser && selectedInspection.status === 'IN_PROGRESS' && (
