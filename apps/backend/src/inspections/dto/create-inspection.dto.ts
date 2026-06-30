@@ -60,6 +60,10 @@ export class CreateInspectionDto {
   scheduled_date: string;
 
   @IsOptional()
+  @IsString()
+  pdf_url?: string;
+
+  @IsOptional()
   @IsNumber()
   expenditure?: number;
 
@@ -94,6 +98,10 @@ export class UpdateInspectionDto {
   @IsOptional()
   @IsString()
   remarks?: string;
+
+  @IsOptional()
+  @IsString()
+  pdf_url?: string;
 
   @IsOptional()
   @IsString()

@@ -659,6 +659,7 @@ model Inspection {
   created_at     DateTime          @default(now()) @db.DateTime(6)
   updated_at     DateTime          @updatedAt @db.DateTime(6)
   work_order_id  String?           @db.VarChar(36)
+  pdf_url        String?           @db.LongText
   certificates   Certificate[]
   items          InspectionItem[]
   report         InspectionReport?

@@ -15,7 +15,8 @@ import {
   Clock,
   CheckCircle2,
   ArrowLeft,
-  Upload
+  Upload,
+  Download
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -114,6 +115,7 @@ interface Task {
   };
   items: any[];
   remarks?: string | null;
+  pdf_url?: string | null;
   expenditure?: number | string;
 }
 
@@ -764,6 +766,22 @@ export default function FieldTasksPage() {
             </div>
           </div>
 
+          {selectedTask.pdf_url && (
+            <div className="bg-card border border-border rounded-3xl p-6 flex items-center justify-between shadow-sm">
+              <div className="space-y-1">
+                <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground block">Attached Inspection PDF</span>
+                <span className="text-sm text-foreground/80 font-semibold">Reference document for visit</span>
+              </div>
+              <a 
+                href={selectedTask.pdf_url} 
+                download={`inspection-${selectedTask.id}.pdf`}
+                className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600/10 text-blue-600 border border-blue-600/20 rounded-xl text-xs font-bold hover:bg-blue-600 hover:text-white transition-all active:scale-95"
+              >
+                <Download className="w-4 h-4" /> Download PDF
+              </a>
+            </div>
+          )}
+
           <div className="bg-card border border-border rounded-3xl p-6 space-y-4 shadow-sm">
             <div className="space-y-1">
               <label className="text-[10px] font-bold text-muted-foreground uppercase">Total Expenditure (₹)</label>
@@ -830,21 +848,21 @@ export default function FieldTasksPage() {
                 
                 <div className="flex flex-col gap-3">
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-muted-foreground uppercase">Observations / Notes</label>
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase">Inspections Name</label>
                     <IsolatedInput 
-                      placeholder="Observations / Notes..." 
-                      className="bg-muted/30 border-none rounded-xl h-12"
-                      value={item.notes || ""}
-                      onChange={(value) => handleUpdateItem(item.id, item.status, value, undefined, item.scope, item.recommendations)}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-muted-foreground uppercase">Scope of Inspection</label>
-                    <IsolatedInput 
-                      placeholder="Scope of Inspection..." 
+                      placeholder="Inspections Name..." 
                       className="bg-muted/30 border-none rounded-xl h-12"
                       value={item.scope || ""}
                       onChange={(value) => handleUpdateItem(item.id, item.status, item.notes, undefined, value, item.recommendations)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase">Observations / Notes</label>
+                    <IsolatedTextarea 
+                      placeholder="Observations / Notes..." 
+                      className="w-full bg-muted/30 border-none rounded-xl p-3 min-h-[100px] text-sm focus:outline-none text-foreground font-medium"
+                      value={item.notes || ""}
+                      onChange={(value) => handleUpdateItem(item.id, item.status, value, undefined, item.scope, item.recommendations)}
                     />
                   </div>
                   <div className="space-y-1">

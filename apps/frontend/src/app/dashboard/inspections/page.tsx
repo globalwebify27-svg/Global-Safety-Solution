@@ -73,6 +73,7 @@ interface Inspection {
   draft_cert_type?: string;
   draft_cert_data?: any;
   expenditure?: number | string;
+  pdf_url?: string;
 }
 
 export default function InspectionsPage() {
@@ -197,6 +198,7 @@ export default function InspectionsPage() {
     scheduled_date: new Date().toISOString().split('T')[0],
     items: [{ description: "General Safety Check" }]
   });
+  const [schedulePdf, setSchedulePdf] = useState<File | null>(null);
 
   const { token, user } = useAuthStore();
   const roleName = user?.roles?.[0]?.role?.name || "";
@@ -299,16 +301,35 @@ export default function InspectionsPage() {
     }
   };
 
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = error => reject(error);
+    });
+  };
+
   const handleSchedule = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token) return;
     try {
-      const payload = {
+      let pdfBase64 = "";
+      if (schedulePdf) {
+        pdfBase64 = await fileToBase64(schedulePdf);
+      }
+
+      const payload: any = {
         client_id: scheduleForm.client_id,
         engineer_id: scheduleForm.engineer_id,
         scheduled_date: scheduleForm.scheduled_date,
         items: [{ description: "General Safety Check" }]
       };
+
+      if (pdfBase64) {
+        payload.pdf_url = pdfBase64;
+      }
+
       const res = await fetch(`${API_BASE_URL}/inspections`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -317,6 +338,7 @@ export default function InspectionsPage() {
       if (res.ok) {
         const createdInspection = await res.json();
         setOpenSchedule(false);
+        setSchedulePdf(null);
         toast.success("Inspection scheduled successfully! Opening site visit checklist...");
         
         setSelectedInspection(createdInspection);
@@ -795,6 +817,18 @@ export default function InspectionsPage() {
                       className="h-11 bg-background border-border"
                     />
                   </div>
+                  <div className="space-y-2">
+                    <Label>Inspection PDF (Optional)</Label>
+                    <Input 
+                      type="file" 
+                      accept="application/pdf"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0] || null;
+                        setSchedulePdf(file);
+                      }}
+                      className="h-11 bg-background border-border pt-2"
+                    />
+                  </div>
                 </div>
                 <DialogFooter>
                   <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold h-12 rounded-xl shadow-lg shadow-blue-500/20">
@@ -1029,6 +1063,20 @@ export default function InspectionsPage() {
                     <span className="text-[10px] font-bold text-muted-foreground uppercase">Assigned Field Engineer</span>
                     <p className="font-bold mt-0.5">{selectedInspection.engineer?.name || "Unassigned"}</p>
                   </div>
+                  {selectedInspection.pdf_url && (
+                    <div className="col-span-2">
+                      <span className="text-[10px] font-bold text-muted-foreground uppercase">Inspection PDF</span>
+                      <p className="mt-1">
+                        <a 
+                          href={selectedInspection.pdf_url} 
+                          download={`inspection-${selectedInspection.id}.pdf`}
+                          className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-600/10 text-blue-600 border border-blue-600/20 rounded-lg text-xs font-bold hover:bg-blue-600 hover:text-white transition-all"
+                        >
+                          <Download className="w-3.5 h-3.5" /> Download Attached PDF
+                        </a>
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Prepared Certificate details card (if completed or pending review) */}
@@ -1085,18 +1133,18 @@ export default function InspectionsPage() {
                           </span>
                         </div>
                         {item.notes && (
-                          <p className="text-[11px] text-muted-foreground italic bg-muted/50 p-2 rounded border border-border/10">
-                            <span className="font-semibold text-foreground/75">Observations:</span> {item.notes}
+                          <p className="text-[11px] text-muted-foreground italic bg-muted/50 p-2 rounded border border-border/10 whitespace-pre-line">
+                            <span className="font-semibold text-foreground/75 block mb-1">Observations:</span>{item.notes}
                           </p>
                         )}
                         {item.scope && (
-                          <p className="text-[11px] text-muted-foreground italic bg-muted/50 p-2 rounded border border-border/10">
-                            <span className="font-semibold text-foreground/75">Scope:</span> {item.scope}
+                          <p className="text-[11px] text-muted-foreground italic bg-muted/50 p-2 rounded border border-border/10 whitespace-pre-line">
+                            <span className="font-semibold text-foreground/75 block mb-1">Scope:</span>{item.scope}
                           </p>
                         )}
                         {item.recommendations && (
-                          <p className="text-[11px] text-muted-foreground italic bg-muted/50 p-2 rounded border border-border/10">
-                            <span className="font-semibold text-foreground/75">Remarks & Recommendations:</span> {item.recommendations}
+                          <p className="text-[11px] text-muted-foreground italic bg-muted/50 p-2 rounded border border-border/10 whitespace-pre-line">
+                            <span className="font-semibold text-foreground/75 block mb-1">Remarks & Recommendations:</span>{item.recommendations}
                           </p>
                         )}
                       </div>
@@ -1301,6 +1349,22 @@ export default function InspectionsPage() {
                     </div>
                   </div>
                 )}
+
+                {selectedInspection.pdf_url && (
+                  <div className="p-4 bg-muted/20 border border-border rounded-2xl flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] font-bold text-muted-foreground uppercase block">Attached Inspection PDF</span>
+                      <span className="text-xs text-foreground/80 font-medium">Provided at scheduling</span>
+                    </div>
+                    <a 
+                      href={selectedInspection.pdf_url} 
+                      download={`inspection-${selectedInspection.id}.pdf`}
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600/10 text-blue-600 border border-blue-600/20 rounded-xl text-xs font-bold hover:bg-blue-600 hover:text-white transition-all shadow-sm active:scale-95"
+                    >
+                      <Download className="w-4 h-4" /> Download PDF
+                    </a>
+                  </div>
+                )}
   
                 {selectedInspection.status === 'PENDING_REVIEW' || selectedInspection.status === 'IN_PROGRESS' ? (
                   <div className="space-y-6">
@@ -1350,13 +1414,19 @@ export default function InspectionsPage() {
                               </span>
                             </div>
                             {item.notes && (
-                              <p className="text-[11px] text-muted-foreground italic">Observations: {item.notes}</p>
+                              <p className="text-[11px] text-muted-foreground italic whitespace-pre-line">
+                                <span className="font-semibold text-foreground/75 block mb-1">Observations:</span>{item.notes}
+                              </p>
                             )}
                             {item.scope && (
-                              <p className="text-[11px] text-muted-foreground italic">Scope: {item.scope}</p>
+                              <p className="text-[11px] text-muted-foreground italic whitespace-pre-line">
+                                <span className="font-semibold text-foreground/75 block mb-1">Scope:</span>{item.scope}
+                              </p>
                             )}
                             {item.recommendations && (
-                              <p className="text-[11px] text-muted-foreground italic">Remarks & Recommendations: {item.recommendations}</p>
+                              <p className="text-[11px] text-muted-foreground italic whitespace-pre-line">
+                                <span className="font-semibold text-foreground/75 block mb-1">Remarks & Recommendations:</span>{item.recommendations}
+                              </p>
                             )}
                             {item.photo_url && parseItemPhotos(item.photo_url).length > 0 && (
                               <div className="flex gap-2 flex-wrap pt-1">
@@ -1474,27 +1544,27 @@ export default function InspectionsPage() {
                           </div>
                           <div className="flex flex-col gap-3">
                             <div className="space-y-1">
-                              <Label className="text-[10px] font-bold text-muted-foreground uppercase">Observations / Notes</Label>
+                              <Label className="text-[10px] font-bold text-muted-foreground uppercase">Inspections Name</Label>
                               <Input 
-                                placeholder="Add observations..." 
-                                className="bg-background h-10 text-sm flex-1"
-                                defaultValue={item.notes || ""}
-                                onBlur={(e) => {
-                                  if (e.target.value !== (item.notes || "")) {
-                                    handleUpdateItem(item.id, item.status, e.target.value, undefined, undefined, item.scope, item.recommendations);
-                                  }
-                                }}
-                              />
-                            </div>
-                            <div className="space-y-1">
-                              <Label className="text-[10px] font-bold text-muted-foreground uppercase">Scope of Inspection</Label>
-                              <Input 
-                                placeholder="Scope of Inspection..." 
+                                placeholder="Inspections Name..." 
                                 className="bg-background h-10 text-sm flex-1"
                                 defaultValue={item.scope || ""}
                                 onBlur={(e) => {
                                   if (e.target.value !== (item.scope || "")) {
                                     handleUpdateItem(item.id, item.status, item.notes, undefined, undefined, e.target.value, item.recommendations);
+                                  }
+                                }}
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-[10px] font-bold text-muted-foreground uppercase">Observations / Notes</Label>
+                              <textarea 
+                                placeholder="Add observations..." 
+                                className="w-full bg-background border border-border rounded-xl p-3 min-h-[100px] text-sm focus:outline-none text-foreground font-medium"
+                                defaultValue={item.notes || ""}
+                                onBlur={(e) => {
+                                  if (e.target.value !== (item.notes || "")) {
+                                    handleUpdateItem(item.id, item.status, e.target.value, undefined, undefined, item.scope, item.recommendations);
                                   }
                                 }}
                               />
