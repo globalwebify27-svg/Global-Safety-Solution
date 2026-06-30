@@ -875,6 +875,193 @@ export default function FieldTasksPage() {
                     />
                   </div>
 
+                  {/* Certificate configuration and download for this safety checklist section */}
+                  <div className="pt-4 mt-4 border-t border-border/40 space-y-4">
+                    <h4 className="text-xs font-black text-blue-600 uppercase tracking-wider">Section Certificate Details</h4>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-muted-foreground uppercase">Certificate Reference No.</label>
+                        <Input 
+                          placeholder="e.g. GSS/TEST/CPB/01/2026" 
+                          className="bg-background h-10 rounded-xl text-sm text-foreground"
+                          defaultValue={item.cert_ref_no || ""}
+                          onBlur={(e) => handleUpdateItem(item.id, item.status, item.notes, undefined, item.scope, item.recommendations, e.target.value)}
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-muted-foreground uppercase">License / Competency No.</label>
+                        <Input 
+                          placeholder="e.g. 663, valid upto 10.11.2026" 
+                          className="bg-background h-10 rounded-xl text-sm text-foreground"
+                          defaultValue={item.cert_competency_no || ""}
+                          onBlur={(e) => handleUpdateItem(item.id, item.status, item.notes, undefined, item.scope, item.recommendations, item.cert_ref_no, undefined, undefined, e.target.value)}
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-muted-foreground uppercase">Test Date</label>
+                        <input 
+                          type="date"
+                          className="w-full h-10 px-3 bg-background border border-border rounded-xl text-sm text-foreground"
+                          defaultValue={item.cert_test_date ? item.cert_test_date.split('T')[0] : ""}
+                          onBlur={(e) => handleUpdateItem(item.id, item.status, item.notes, undefined, item.scope, item.recommendations, item.cert_ref_no, e.target.value)}
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-muted-foreground uppercase">Expiry Date</label>
+                        <input 
+                          type="date"
+                          className="w-full h-10 px-3 bg-background border border-border rounded-xl text-sm text-foreground"
+                          defaultValue={item.cert_expiry_date ? item.cert_expiry_date.split('T')[0] : ""}
+                          onBlur={(e) => handleUpdateItem(item.id, item.status, item.notes, undefined, item.scope, item.recommendations, item.cert_ref_no, item.cert_test_date, e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-3 p-4 bg-blue-500/5 rounded-xl border border-blue-500/10">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-muted-foreground uppercase">Select Certificate Template</label>
+                          <select
+                            value={selectedTemplateIds[item.id] || ""}
+                            onChange={(e) => setSelectedTemplateIds({ ...selectedTemplateIds, [item.id]: e.target.value })}
+                            className="w-full h-10 px-3 bg-background border border-border rounded-xl text-sm focus:outline-none text-foreground"
+                          >
+                            <option value="" className="text-slate-900">Select a template...</option>
+                            {templates.map(t => (
+                              <option key={t.id} value={t.id} className="text-slate-900">{t.name}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div className="flex items-end">
+                          <Button
+                            type="button"
+                            onClick={async () => {
+                              const templateId = selectedTemplateIds[item.id];
+                              if (!templateId) {
+                                toast.error("Please select a template first");
+                                return;
+                              }
+                              if (!item.cert_ref_no) {
+                                toast.error("Certificate Reference Number is required");
+                                return;
+                              }
+                              
+                              const activeTemp = templates.find(t => t.id === templateId);
+                              let tempFields: any[] = [];
+                              try {
+                                tempFields = JSON.parse(activeTemp.fields);
+                              } catch(e){}
+
+                              const fieldVals = { ...templateFieldValues[item.id] };
+                              for (const f of tempFields) {
+                                if (!fieldVals[f.key]) {
+                                  fieldVals[f.key] = getDefaultFieldValue(f.key) || f.default || "";
+                                }
+                              }
+
+                              const metadata = {
+                                template_id: templateId,
+                                field_values: fieldVals
+                              };
+                              
+                              try {
+                                // 1. Create the certificate
+                                const res = await fetch(`${API_BASE_URL}/certificates`, {
+                                  method: "POST",
+                                  headers: {
+                                    "Content-Type": "application/json",
+                                    Authorization: `Bearer ${token}`
+                                  },
+                                  body: JSON.stringify({
+                                    inspection_id: selectedTask.id,
+                                    inspection_item_id: item.id,
+                                    certificate_no: item.cert_ref_no,
+                                    issue_date: item.cert_test_date || new Date().toISOString(),
+                                    validity_period: "1y",
+                                    metadata
+                                  })
+                                });
+
+                                if (!res.ok) {
+                                  const error = await res.json();
+                                  throw new Error(error.message || "Failed to issue certificate");
+                                }
+
+                                const cert = await res.json();
+                                toast.success("Certificate issued successfully! Starting download...");
+
+                                // 2. Download the certificate PDF
+                                const pdfRes = await fetch(`${API_BASE_URL}/certificates/${cert.id}/pdf`, {
+                                  headers: { Authorization: `Bearer ${token}` }
+                                });
+
+                                if (pdfRes.ok) {
+                                  const blob = await pdfRes.blob();
+                                  const a = document.createElement("a");
+                                  a.href = URL.createObjectURL(blob);
+                                  a.download = `certificate-${item.cert_ref_no}.pdf`;
+                                  a.click();
+                                }
+                              } catch (err: any) {
+                                toast.error(err.message || "Failed to generate certificate");
+                              }
+                            }}
+                            className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold h-10 text-sm rounded-xl flex items-center justify-center gap-2"
+                          >
+                            Generate & Download Certificate
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Custom Fields based on selected template */}
+                      {(() => {
+                        const tempId = selectedTemplateIds[item.id];
+                        const activeTemp = templates.find(t => t.id === tempId);
+                        if (!activeTemp) return null;
+                        
+                        let tempFields: any[] = [];
+                        try {
+                          tempFields = JSON.parse(activeTemp.fields);
+                        } catch(e){}
+
+                        if (tempFields.length === 0) return null;
+
+                        return (
+                          <div className="space-y-3 pt-3 border-t border-blue-500/10">
+                            <h5 className="text-[10px] font-bold text-blue-500 uppercase tracking-widest">Template Fields</h5>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              {tempFields.map((field: any, idx: number) => (
+                                <div key={idx} className="space-y-1">
+                                  <label className="text-[10px] text-slate-400">{field.label}</label>
+                                  <Input
+                                    placeholder={field.default || "Enter value..."}
+                                    className="bg-background h-9 rounded-xl text-sm text-foreground"
+                                    value={templateFieldValues[item.id]?.[field.key] ?? (getDefaultFieldValue(field.key) || field.default || "")}
+                                    onChange={(e) => {
+                                      const currentVals = templateFieldValues[item.id] || {};
+                                      setTemplateFieldValues({
+                                        ...templateFieldValues,
+                                        [item.id]: {
+                                          ...currentVals,
+                                          [field.key]: e.target.value
+                                        }
+                                      });
+                                    }}
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  </div>
+
                   {/* Per-item Photo Upload & Preview */}
                   <div className="space-y-2">
                     {item.photo_url && parseItemPhotos(item.photo_url).length > 0 && (
@@ -993,18 +1180,6 @@ export default function FieldTasksPage() {
             </div>
           </div>
 
-          <div className="bg-blue-600/5 border border-blue-600/10 rounded-2xl p-4 flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-blue-600/10 flex items-center justify-center text-blue-600">
-              <Camera className="w-6 h-6" />
-            </div>
-            <div className="flex-1">
-              <p className="text-sm font-bold italic">Capture Site Evidence</p>
-              <p className="text-[10px] text-muted-foreground uppercase tracking-tight">Geo-tagged photos required for certification</p>
-            </div>
-            <Button variant="outline" className="rounded-xl border-blue-600/20 text-blue-600 font-bold">
-              Snap
-            </Button>
-          </div>
 
           {/* Certificate Generation & Details Form */}
           {(() => {

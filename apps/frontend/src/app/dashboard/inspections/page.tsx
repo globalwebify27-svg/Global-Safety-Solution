@@ -1079,42 +1079,6 @@ export default function InspectionsPage() {
                   )}
                 </div>
 
-                {/* Prepared Certificate details card (if completed or pending review) */}
-                {(selectedInspection.status === 'COMPLETED' || selectedInspection.status === 'PENDING_REVIEW') && selectedInspection.draft_cert_type && (
-                  <div className="p-6 bg-blue-600/5 border border-blue-600/10 rounded-2xl space-y-4">
-                    <div className="flex items-center justify-between border-b border-blue-600/10 pb-3">
-                      <h4 className="font-black text-blue-600 uppercase text-xs tracking-wider">Compliance Certificate</h4>
-                      <span className="text-[10px] font-bold bg-blue-600/10 text-blue-600 px-2.5 py-1 rounded-full uppercase">
-                        {selectedInspection.draft_cert_type === 'FIRE_SAFETY' ? '🔥 Fire Safety' :
-                         selectedInspection.draft_cert_type === 'ELECTRICAL_SAFETY' ? '⚡ Electrical Safety' :
-                         '🏗️ Structural Safety'}
-                      </span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4 text-sm">
-                      <div>
-                        <span className="text-[10px] font-bold text-muted-foreground uppercase">Validity Period</span>
-                        <p className="font-bold mt-0.5">{getValidityLabel(draftCertValidity)}</p>
-                      </div>
-                      <div>
-                        <span className="text-[10px] font-bold text-muted-foreground uppercase">Expiry Date</span>
-                        <p className="font-bold mt-0.5">{draftCertExpiry ? new Date(draftCertExpiry).toLocaleDateString() : 'N/A'}</p>
-                      </div>
-                      {draftCertScope && (
-                        <div className="col-span-2">
-                          <span className="text-[10px] font-bold text-muted-foreground uppercase">Scope of Inspection</span>
-                          <p className="font-semibold mt-0.5 text-foreground/80">{draftCertScope}</p>
-                        </div>
-                      )}
-                      {draftCertNotes && (
-                        <div className="col-span-2">
-                          <span className="text-[10px] font-bold text-muted-foreground uppercase">Remarks & Recommendations</span>
-                          <p className="font-semibold mt-0.5 text-foreground/80">{draftCertNotes}</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
                 {/* Checklist Results */}
                 <div className="space-y-3">
                   <h4 className="font-black text-xs uppercase tracking-widest text-muted-foreground">Audit Checklist</h4>
@@ -1368,36 +1332,6 @@ export default function InspectionsPage() {
   
                 {selectedInspection.status === 'PENDING_REVIEW' || selectedInspection.status === 'IN_PROGRESS' ? (
                   <div className="space-y-6">
-                    {/* Draft Certificate details card */}
-                    <div className="p-6 bg-blue-600/5 border border-blue-600/10 rounded-2xl space-y-4">
-                      <div className="flex items-center justify-between border-b border-blue-600/10 pb-3">
-                        <h4 className="font-black text-blue-600 uppercase text-xs tracking-wider">Prepared Draft Certificate</h4>
-                        <span className="text-[10px] font-bold bg-blue-600/10 text-blue-600 px-2.5 py-1 rounded-full uppercase">
-                          {draftCertType === 'FIRE_SAFETY' ? '🔥 Fire Safety' :
-                           draftCertType === 'ELECTRICAL_SAFETY' ? '⚡ Electrical Safety' :
-                           '🏗️ Structural Safety'}
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4 text-sm">
-                        <div>
-                          <span className="text-[10px] font-bold text-muted-foreground uppercase">Validity Period</span>
-                          <p className="font-bold mt-0.5">{getValidityLabel(draftCertValidity)}</p>
-                        </div>
-                        <div>
-                          <span className="text-[10px] font-bold text-muted-foreground uppercase">Expiry Date</span>
-                          <p className="font-bold mt-0.5">{draftCertExpiry ? new Date(draftCertExpiry).toLocaleDateString() : 'N/A'}</p>
-                        </div>
-                        <div className="col-span-2">
-                          <span className="text-[10px] font-bold text-muted-foreground uppercase">Scope of Inspection</span>
-                          <p className="font-semibold mt-0.5 text-foreground/80">{draftCertScope || 'N/A'}</p>
-                        </div>
-                        <div className="col-span-2">
-                          <span className="text-[10px] font-bold text-muted-foreground uppercase">Remarks & Recommendations</span>
-                          <p className="font-semibold mt-0.5 text-foreground/80">{draftCertNotes || 'N/A'}</p>
-                        </div>
-                      </div>
-                    </div>
-  
                     {/* Checklist Summary */}
                     <div className="space-y-3">
                       <h4 className="font-black text-xs uppercase tracking-widest text-muted-foreground">Checklist Results</h4>
@@ -1612,7 +1546,7 @@ export default function InspectionsPage() {
                                   <Label className="text-[10px] font-bold text-muted-foreground uppercase">Test Date</Label>
                                   <input 
                                     type="date"
-                                    className="w-full h-9 px-3 bg-background border border-border rounded-xl text-xs text-white"
+                                    className="w-full h-9 px-3 bg-background border border-border rounded-xl text-xs text-foreground"
                                     defaultValue={item.cert_test_date ? item.cert_test_date.split('T')[0] : ""}
                                     onBlur={(e) => handleUpdateItem(item.id, item.status, item.notes, undefined, undefined, item.scope, item.recommendations, item.cert_ref_no, e.target.value)}
                                   />
@@ -1622,7 +1556,7 @@ export default function InspectionsPage() {
                                   <Label className="text-[10px] font-bold text-muted-foreground uppercase">Expiry Date</Label>
                                   <input 
                                     type="date"
-                                    className="w-full h-9 px-3 bg-background border border-border rounded-xl text-xs text-white"
+                                    className="w-full h-9 px-3 bg-background border border-border rounded-xl text-xs text-foreground"
                                     defaultValue={item.cert_expiry_date ? item.cert_expiry_date.split('T')[0] : ""}
                                     onBlur={(e) => handleUpdateItem(item.id, item.status, item.notes, undefined, undefined, item.scope, item.recommendations, item.cert_ref_no, item.cert_test_date, e.target.value)}
                                   />
@@ -1636,7 +1570,7 @@ export default function InspectionsPage() {
                                     <select
                                       value={selectedTemplateIds[item.id] || ""}
                                       onChange={(e) => setSelectedTemplateIds({ ...selectedTemplateIds, [item.id]: e.target.value })}
-                                      className="w-full h-9 px-3 bg-background border border-border rounded-xl text-xs focus:outline-none text-white"
+                                      className="w-full h-9 px-3 bg-background border border-border rounded-xl text-xs focus:outline-none text-foreground"
                                     >
                                       <option value="" className="text-slate-900">Select a template...</option>
                                       {templates.map(t => (
@@ -1748,7 +1682,7 @@ export default function InspectionsPage() {
                                             <Label className="text-[10px] text-slate-400">{field.label}</Label>
                                             <Input
                                               placeholder={field.default || "Enter value..."}
-                                              className="bg-background h-8 text-xs text-white"
+                                              className="bg-background h-8 text-xs text-foreground"
                                               value={templateFieldValues[item.id]?.[field.key] ?? (getDefaultFieldValue(field.key) || field.default || "")}
                                               onChange={(e) => {
                                                 const currentVals = templateFieldValues[item.id] || {};
