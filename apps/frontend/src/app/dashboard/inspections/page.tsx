@@ -54,6 +54,8 @@ interface InspectionItem {
   cert_test_date?: string;
   cert_expiry_date?: string;
   cert_competency_no?: string;
+  cert_template_id?: string;
+  cert_template_fields?: string;
 }
 
 interface Inspection {
@@ -251,6 +253,25 @@ export default function InspectionsPage() {
         setDraftCertNotes("");
         setDraftCertScope("");
       }
+      // Populate selected template IDs and field values for items
+      const tempIds: Record<string, string> = {};
+      const fieldVals: Record<string, Record<string, string>> = {};
+      (selectedInspection.items || []).forEach((item: any) => {
+        if (item.cert_template_id) {
+          tempIds[item.id] = item.cert_template_id;
+        }
+        if (item.cert_template_fields) {
+          try {
+            fieldVals[item.id] = typeof item.cert_template_fields === 'string'
+              ? JSON.parse(item.cert_template_fields)
+              : item.cert_template_fields;
+          } catch (e) {
+            console.error("Error parsing cert_template_fields", e);
+          }
+        }
+      });
+      setSelectedTemplateIds(tempIds);
+      setTemplateFieldValues(fieldVals);
     }
   }, [selectedInspection?.id]);
 
@@ -364,7 +385,9 @@ export default function InspectionsPage() {
     cert_ref_no?: string,
     cert_test_date?: string,
     cert_expiry_date?: string,
-    cert_competency_no?: string
+    cert_competency_no?: string,
+    cert_template_id?: string,
+    cert_template_fields?: string
   ) => {
     if (!token) return;
     try {
@@ -378,6 +401,8 @@ export default function InspectionsPage() {
       if (cert_test_date !== undefined) body.cert_test_date = cert_test_date;
       if (cert_expiry_date !== undefined) body.cert_expiry_date = cert_expiry_date;
       if (cert_competency_no !== undefined) body.cert_competency_no = cert_competency_no;
+      if (cert_template_id !== undefined) body.cert_template_id = cert_template_id;
+      if (cert_template_fields !== undefined) body.cert_template_fields = cert_template_fields;
 
       const res = await fetch(`${API_BASE_URL}/inspections/item/${itemId}`, {
         method: 'PATCH',
@@ -398,6 +423,8 @@ export default function InspectionsPage() {
               if (cert_test_date !== undefined) updatedItem.cert_test_date = cert_test_date;
               if (cert_expiry_date !== undefined) updatedItem.cert_expiry_date = cert_expiry_date;
               if (cert_competency_no !== undefined) updatedItem.cert_competency_no = cert_competency_no;
+              if (cert_template_id !== undefined) updatedItem.cert_template_id = cert_template_id;
+              if (cert_template_fields !== undefined) updatedItem.cert_template_fields = cert_template_fields;
               return updatedItem;
             }
             return item;
@@ -1610,7 +1637,11 @@ export default function InspectionsPage() {
                                     <Label className="text-[10px] font-bold text-muted-foreground uppercase">Select Certificate Template</Label>
                                     <select
                                       value={selectedTemplateIds[item.id] || ""}
-                                      onChange={(e) => setSelectedTemplateIds({ ...selectedTemplateIds, [item.id]: e.target.value })}
+                                      onChange={(e) => {
+                                        const newTempId = e.target.value;
+                                        setSelectedTemplateIds({ ...selectedTemplateIds, [item.id]: newTempId });
+                                        handleUpdateItem(item.id, item.status, item.notes, undefined, undefined, item.scope, item.recommendations, item.cert_ref_no, item.cert_test_date, item.cert_expiry_date, item.cert_competency_no, newTempId);
+                                      }}
                                       className="w-full h-9 px-3 bg-background border border-border rounded-xl text-xs focus:outline-none text-foreground"
                                     >
                                       <option value="" className="text-slate-900">Select a template...</option>
@@ -1734,6 +1765,14 @@ export default function InspectionsPage() {
                                                     [field.key]: e.target.value
                                                   }
                                                 });
+                                              }}
+                                              onBlur={(e) => {
+                                                const currentVals = templateFieldValues[item.id] || {};
+                                                const updatedVals = {
+                                                  ...currentVals,
+                                                  [field.key]: e.target.value
+                                                };
+                                                handleUpdateItem(item.id, item.status, item.notes, undefined, undefined, item.scope, item.recommendations, item.cert_ref_no, item.cert_test_date, item.cert_expiry_date, item.cert_competency_no, selectedTemplateIds[item.id], JSON.stringify(updatedVals));
                                               }}
                                             />
                                           </div>

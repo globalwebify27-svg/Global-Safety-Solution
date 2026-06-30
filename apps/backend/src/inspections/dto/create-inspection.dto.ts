@@ -163,6 +163,14 @@ export class UpdateInspectionItemDto {
   @IsOptional()
   @IsString()
   cert_competency_no?: string;
+
+  @IsOptional()
+  @IsString()
+  cert_template_id?: string;
+
+  @IsOptional()
+  @IsString()
+  cert_template_fields?: string;
 }
 
 export class AddInspectionItemDto {

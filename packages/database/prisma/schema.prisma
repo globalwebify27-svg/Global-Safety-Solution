@@ -693,6 +693,8 @@ model InspectionItem {
   cert_test_date    DateTime?  @db.Date
   cert_expiry_date  DateTime?  @db.Date
   cert_competency_no String?   @db.VarChar(100)
+  cert_template_id   String?   @db.VarChar(36)
+  cert_template_fields String? @db.LongText
 
   @@index([inspection_id], map: "inspection_items_inspection_id_fkey")
   @@map("inspection_items")
