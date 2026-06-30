@@ -597,7 +597,8 @@ export class InspectionsService {
     // 1. Download/Generate QR Code image linking to public verification page
     let qrCodeBuffer: Buffer | null = null;
     try {
-      const qrUrl = `https://globalsafetysolution.in/verify/certificate/${inspection.certificates?.[0]?.id || inspection.id}`;
+      const frontendUrl = process.env.FRONTEND_URL || 'https://globalsafetysolution.in';
+      const qrUrl = `${frontendUrl}/verify/certificate/${inspection.certificates?.[0]?.id || inspection.id}`;
       const response = await fetch(`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(qrUrl)}`);
       if (response.ok) {
         qrCodeBuffer = Buffer.from(await response.arrayBuffer());

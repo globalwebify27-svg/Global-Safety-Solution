@@ -216,7 +216,8 @@ export class CertificatesService {
     // 3. QR code generation
     let qrCodeBuffer: Buffer | null = null;
     try {
-      const qrUrl = `https://globalsafetysolution.in/verify/certificate/${certificate.id}`;
+      const frontendUrl = process.env.FRONTEND_URL || 'https://globalsafetysolution.in';
+      const qrUrl = `${frontendUrl}/verify/certificate/${certificate.id}`;
       const response = await fetch(`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(qrUrl)}`);
       if (response.ok) {
         qrCodeBuffer = Buffer.from(await response.arrayBuffer());
