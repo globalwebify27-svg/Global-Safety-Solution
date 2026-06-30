@@ -199,6 +199,7 @@ export default function InspectionsPage() {
     items: [{ description: "General Safety Check" }]
   });
   const [schedulePdf, setSchedulePdf] = useState<File | null>(null);
+  const [itemValidityPeriods, setItemValidityPeriods] = useState<Record<string, string>>({});
 
   const { token, user } = useAuthStore();
   const roleName = user?.roles?.[0]?.role?.name || "";
@@ -426,6 +427,52 @@ export default function InspectionsPage() {
     } catch (err) {
       toast.error("Failed to remove observation section");
     }
+  };
+
+  const calculateInitialValidity = (testDateStr?: string | null, expiryDateStr?: string | null) => {
+    if (!testDateStr || !expiryDateStr) return "1y";
+    const testDate = new Date(testDateStr);
+    const expiryDate = new Date(expiryDateStr);
+    const diffTime = Math.abs(expiryDate.getTime() - testDate.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays >= 1000) return "3y";
+    if (diffDays >= 700) return "2y";
+    if (diffDays >= 340) return "1y";
+    if (diffDays >= 160) return "1/2y";
+    return "1y";
+  };
+
+  const handleValidityChange = (itemId: string, item: any, validity: string) => {
+    const today = new Date();
+    const testDateStr = today.toISOString();
+    const expiry = new Date(today);
+    
+    if (validity === "1y") {
+      expiry.setFullYear(expiry.getFullYear() + 1);
+    } else if (validity === "2y") {
+      expiry.setFullYear(expiry.getFullYear() + 2);
+    } else if (validity === "3y") {
+      expiry.setFullYear(expiry.getFullYear() + 3);
+    } else if (validity === "1/2y") {
+      expiry.setMonth(expiry.getMonth() + 6);
+    }
+    
+    const expiryDateStr = expiry.toISOString();
+    setItemValidityPeriods(prev => ({ ...prev, [itemId]: validity }));
+    
+    handleUpdateItem(
+      itemId,
+      item.status,
+      item.notes,
+      undefined,
+      undefined,
+      item.scope,
+      item.recommendations,
+      item.cert_ref_no,
+      testDateStr,
+      expiryDateStr
+    );
   };
 
   const compressImage = (file: File, maxWidth = 1024, maxHeight = 1024, quality = 0.7): Promise<Blob> => {
@@ -1542,25 +1589,19 @@ export default function InspectionsPage() {
                                   />
                                 </div>
 
-                                <div className="space-y-1">
-                                  <Label className="text-[10px] font-bold text-muted-foreground uppercase">Test Date</Label>
-                                  <input 
-                                    type="date"
-                                    className="w-full h-9 px-3 bg-background border border-border rounded-xl text-xs text-foreground"
-                                    defaultValue={item.cert_test_date ? item.cert_test_date.split('T')[0] : ""}
-                                    onBlur={(e) => handleUpdateItem(item.id, item.status, item.notes, undefined, undefined, item.scope, item.recommendations, item.cert_ref_no, e.target.value)}
-                                  />
-                                </div>
-
-                                <div className="space-y-1">
-                                  <Label className="text-[10px] font-bold text-muted-foreground uppercase">Expiry Date</Label>
-                                  <input 
-                                    type="date"
-                                    className="w-full h-9 px-3 bg-background border border-border rounded-xl text-xs text-foreground"
-                                    defaultValue={item.cert_expiry_date ? item.cert_expiry_date.split('T')[0] : ""}
-                                    onBlur={(e) => handleUpdateItem(item.id, item.status, item.notes, undefined, undefined, item.scope, item.recommendations, item.cert_ref_no, item.cert_test_date, e.target.value)}
-                                  />
-                                </div>
+                                <div className="space-y-1 md:col-span-2">
+                                   <Label className="text-[10px] font-bold text-muted-foreground uppercase">Validity Period</Label>
+                                   <select 
+                                     value={itemValidityPeriods[item.id] || calculateInitialValidity(item.cert_test_date, item.cert_expiry_date)}
+                                     onChange={(e) => handleValidityChange(item.id, item, e.target.value)}
+                                     className="w-full h-9 px-3 bg-background border border-border rounded-xl text-xs focus:outline-none text-foreground"
+                                   >
+                                     <option value="1y" className="text-slate-900">1 Year</option>
+                                     <option value="2y" className="text-slate-900">2 Years</option>
+                                     <option value="3y" className="text-slate-900">3 Years</option>
+                                     <option value="1/2y" className="text-slate-900">6 Months</option>
+                                   </select>
+                                 </div>
                               </div>
 
                               <div className="space-y-3 p-4 bg-blue-500/5 rounded-xl border border-blue-500/10">
@@ -1624,7 +1665,7 @@ export default function InspectionsPage() {
                                               inspection_item_id: item.id,
                                               certificate_no: item.cert_ref_no,
                                               issue_date: item.cert_test_date || new Date().toISOString(),
-                                              validity_period: "1y",
+                                              validity_period: itemValidityPeriods[item.id] || calculateInitialValidity(item.cert_test_date, item.cert_expiry_date),
                                               metadata
                                             })
                                           });
@@ -1680,9 +1721,9 @@ export default function InspectionsPage() {
                                         {tempFields.map((field: any, idx: number) => (
                                           <div key={idx} className="space-y-1">
                                             <Label className="text-[10px] text-slate-400">{field.label}</Label>
-                                            <Input
+                                            <textarea
                                               placeholder={field.default || "Enter value..."}
-                                              className="bg-background h-8 text-xs text-foreground"
+                                              className="w-full bg-background border border-border rounded-xl p-2.5 text-xs text-foreground focus:outline-none min-h-[80px] resize-y"
                                               value={templateFieldValues[item.id]?.[field.key] ?? (getDefaultFieldValue(field.key) || field.default || "")}
                                               onChange={(e) => {
                                                 const currentVals = templateFieldValues[item.id] || {};

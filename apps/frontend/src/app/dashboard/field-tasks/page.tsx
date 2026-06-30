@@ -127,7 +127,53 @@ export default function FieldTasksPage() {
   const [templates, setTemplates] = useState<any[]>([]);
   const [selectedTemplateIds, setSelectedTemplateIds] = useState<Record<string, string>>({});
   const [templateFieldValues, setTemplateFieldValues] = useState<Record<string, Record<string, string>>>({});
-  
+  const [itemValidityPeriods, setItemValidityPeriods] = useState<Record<string, string>>({});
+
+  const calculateInitialValidity = (testDateStr?: string | null, expiryDateStr?: string | null) => {
+    if (!testDateStr || !expiryDateStr) return "1y";
+    const testDate = new Date(testDateStr);
+    const expiryDate = new Date(expiryDateStr);
+    const diffTime = Math.abs(expiryDate.getTime() - testDate.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays >= 1000) return "3y";
+    if (diffDays >= 700) return "2y";
+    if (diffDays >= 340) return "1y";
+    if (diffDays >= 160) return "1/2y";
+    return "1y";
+  };
+
+  const handleValidityChange = (itemId: string, item: any, validity: string) => {
+    const today = new Date();
+    const testDateStr = today.toISOString();
+    const expiry = new Date(today);
+    
+    if (validity === "1y") {
+      expiry.setFullYear(expiry.getFullYear() + 1);
+    } else if (validity === "2y") {
+      expiry.setFullYear(expiry.getFullYear() + 2);
+    } else if (validity === "3y") {
+      expiry.setFullYear(expiry.getFullYear() + 3);
+    } else if (validity === "1/2y") {
+      expiry.setMonth(expiry.getMonth() + 6);
+    }
+    
+    const expiryDateStr = expiry.toISOString();
+    setItemValidityPeriods(prev => ({ ...prev, [itemId]: validity }));
+    
+    handleUpdateItem(
+      itemId,
+      item.status,
+      item.notes,
+      undefined,
+      item.scope,
+      item.recommendations,
+      item.cert_ref_no,
+      testDateStr,
+      expiryDateStr
+    );
+  };
+
   const getDefaultFieldValue = (fieldKey: string) => {
     const key = fieldKey.toLowerCase();
     if (key.includes("occupier") || key.includes("client_name") || key.includes("factory_name")) {
@@ -900,24 +946,18 @@ export default function FieldTasksPage() {
                         />
                       </div>
 
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-muted-foreground uppercase">Test Date</label>
-                        <input 
-                          type="date"
-                          className="w-full h-10 px-3 bg-background border border-border rounded-xl text-sm text-foreground"
-                          defaultValue={item.cert_test_date ? item.cert_test_date.split('T')[0] : ""}
-                          onBlur={(e) => handleUpdateItem(item.id, item.status, item.notes, undefined, item.scope, item.recommendations, item.cert_ref_no, e.target.value)}
-                        />
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-muted-foreground uppercase">Expiry Date</label>
-                        <input 
-                          type="date"
-                          className="w-full h-10 px-3 bg-background border border-border rounded-xl text-sm text-foreground"
-                          defaultValue={item.cert_expiry_date ? item.cert_expiry_date.split('T')[0] : ""}
-                          onBlur={(e) => handleUpdateItem(item.id, item.status, item.notes, undefined, item.scope, item.recommendations, item.cert_ref_no, item.cert_test_date, e.target.value)}
-                        />
+                      <div className="space-y-1 md:col-span-2">
+                        <label className="text-[10px] font-bold text-muted-foreground uppercase">Validity Period</label>
+                        <select 
+                          value={itemValidityPeriods[item.id] || calculateInitialValidity(item.cert_test_date, item.cert_expiry_date)}
+                          onChange={(e) => handleValidityChange(item.id, item, e.target.value)}
+                          className="w-full h-10 px-3 bg-background border border-border rounded-xl text-sm focus:outline-none text-foreground"
+                        >
+                          <option value="1y" className="text-slate-900">1 Year</option>
+                          <option value="2y" className="text-slate-900">2 Years</option>
+                          <option value="3y" className="text-slate-900">3 Years</option>
+                          <option value="1/2y" className="text-slate-900">6 Months</option>
+                        </select>
                       </div>
                     </div>
 
@@ -982,7 +1022,7 @@ export default function FieldTasksPage() {
                                     inspection_item_id: item.id,
                                     certificate_no: item.cert_ref_no,
                                     issue_date: item.cert_test_date || new Date().toISOString(),
-                                    validity_period: "1y",
+                                    validity_period: itemValidityPeriods[item.id] || calculateInitialValidity(item.cert_test_date, item.cert_expiry_date),
                                     metadata
                                   })
                                 });
@@ -1038,9 +1078,9 @@ export default function FieldTasksPage() {
                               {tempFields.map((field: any, idx: number) => (
                                 <div key={idx} className="space-y-1">
                                   <label className="text-[10px] text-slate-400">{field.label}</label>
-                                  <Input
+                                  <textarea
                                     placeholder={field.default || "Enter value..."}
-                                    className="bg-background h-9 rounded-xl text-sm text-foreground"
+                                    className="w-full bg-background border border-border rounded-xl p-2.5 text-sm text-foreground focus:outline-none min-h-[80px] resize-y"
                                     value={templateFieldValues[item.id]?.[field.key] ?? (getDefaultFieldValue(field.key) || field.default || "")}
                                     onChange={(e) => {
                                       const currentVals = templateFieldValues[item.id] || {};
