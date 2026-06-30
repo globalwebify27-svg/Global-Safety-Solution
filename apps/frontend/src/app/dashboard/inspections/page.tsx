@@ -783,7 +783,7 @@ export default function InspectionsPage() {
                       className="w-full h-11 px-4 bg-background border border-border rounded-xl text-sm"
                     >
                       <option value="">Select engineer...</option>
-                      {engineers.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+                      {engineers.map(e => <option key={e.id} value={e.id}>{e.name} ({e.employee_id || e.designation || 'Field Engineer'})</option>)}
                     </select>
                   </div>
                   <div className="space-y-2">
@@ -1199,7 +1199,7 @@ export default function InspectionsPage() {
                         >
                           <option value="">Unassigned</option>
                           {engineers.map(eng => (
-                            <option key={eng.id} value={eng.id}>{eng.name}</option>
+                            <option key={eng.id} value={eng.id}>{eng.name} ({eng.employee_id || eng.designation || 'Field Engineer'})</option>
                           ))}
                         </select>
                       </div>

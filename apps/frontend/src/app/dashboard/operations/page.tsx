@@ -437,7 +437,7 @@ export default function OperationsPage() {
                                   <select required value={taskForm.assigned_to} onChange={(e) => setTaskForm({...taskForm, assigned_to: e.target.value})} className="w-full h-10 px-3 bg-background border border-border rounded-md text-foreground text-sm font-medium">
                                     <option value="">Select Engineer</option>
                                     {users.map((u: any) => (
-                                      <option key={u.id} value={u.id}>{u.name}</option>
+                                      <option key={u.id} value={u.id}>{u.name} ({u.employee_id || u.designation || 'Staff'})</option>
                                     ))}
                                   </select>
                                 </div>
