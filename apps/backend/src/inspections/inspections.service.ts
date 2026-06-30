@@ -260,7 +260,7 @@ export class InspectionsService {
         await this.prisma.document.create({
           data: {
             name: `${inspection.client.name} - ${serviceName} Certificate`,
-            file_url: `/api/inspections/${inspection.id}/certificate`,
+            file_url: `/inspections/${inspection.id}/certificate`,
             file_type: 'PDF',
             file_size: 102400,
             category: 'CERTIFICATE',

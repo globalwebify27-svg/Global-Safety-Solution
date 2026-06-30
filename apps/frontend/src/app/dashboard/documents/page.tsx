@@ -199,9 +199,66 @@ export default function DocumentVaultPage() {
     }
   };
 
+  const resolveFileUrl = (url: string) => {
+    if (!url) return "";
+    if (url.startsWith("data:") || url.startsWith("http://") || url.startsWith("https://")) {
+      return url;
+    }
+    // Remove the /api prefix if present because NestJS backend runs on root routes (e.g. /inspections/...)
+    const cleanUrl = url.startsWith("/api") ? url.substring(4) : url;
+    return `${API_BASE_URL}${cleanUrl}`;
+  };
+
+  const handleView = async (fileUrl: string) => {
+    try {
+      const resolvedUrl = resolveFileUrl(fileUrl);
+      if (resolvedUrl.startsWith('data:')) {
+        const response = await fetch(resolvedUrl);
+        const blob = await response.blob();
+        const blobUrl = window.URL.createObjectURL(blob);
+        window.open(blobUrl, '_blank');
+        return;
+      }
+
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const response = await fetch(resolvedUrl, { headers });
+      if (!response.ok) throw new Error("Failed to fetch file");
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      window.open(blobUrl, '_blank');
+    } catch (error) {
+      console.error("Failed to view document:", error);
+      window.open(fileUrl, '_blank');
+    }
+  };
+
   const handleDownload = async (fileUrl: string, name: string) => {
     try {
-      const response = await fetch(fileUrl);
+      const resolvedUrl = resolveFileUrl(fileUrl);
+      if (resolvedUrl.startsWith('data:')) {
+        const response = await fetch(resolvedUrl);
+        const blob = await response.blob();
+        const blobUrl = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = name;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => window.URL.revokeObjectURL(blobUrl), 100);
+        return;
+      }
+
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const response = await fetch(resolvedUrl, { headers });
       if (!response.ok) throw new Error("Failed to fetch file");
       const blob = await response.blob();
       const blobUrl = window.URL.createObjectURL(blob);
@@ -214,8 +271,9 @@ export default function DocumentVaultPage() {
       setTimeout(() => window.URL.revokeObjectURL(blobUrl), 100);
     } catch (error) {
       console.error("Failed to force download, falling back to new tab:", error);
+      const resolvedUrl = resolveFileUrl(fileUrl);
       const a = document.createElement('a');
-      a.href = fileUrl;
+      a.href = resolvedUrl;
       a.download = name;
       a.target = '_blank';
       document.body.appendChild(a);
@@ -487,7 +545,7 @@ export default function DocumentVaultPage() {
                       <Button 
                         variant="ghost" 
                         size="sm" 
-                        onClick={() => window.open(doc.file_url, '_blank')} 
+                        onClick={() => handleView(doc.file_url)} 
                         className="h-8 w-8 p-0 transition-all rounded-lg text-blue-500 hover:text-blue-400 hover:bg-blue-500/10"
                         title="View Document"
                       >
@@ -569,7 +627,7 @@ export default function DocumentVaultPage() {
                       <span>Uploader: {selectedDoc.uploader?.name || "System Core"}</span>
                     </div>
                     <div className="flex items-center gap-2 pt-1">
-                      <Button variant="outline" size="sm" className="h-8 rounded-lg text-xs font-bold gap-1.5 bg-background hover:bg-accent border-border" onClick={() => window.open(selectedDoc.file_url, '_blank')}>
+                      <Button variant="outline" size="sm" className="h-8 rounded-lg text-xs font-bold gap-1.5 bg-background hover:bg-accent border-border" onClick={() => handleView(selectedDoc.file_url)}>
                         <Eye className="w-3.5 h-3.5" /> View Active File
                       </Button>
                     </div>
@@ -806,7 +864,11 @@ export default function DocumentVaultPage() {
               <div className="w-[220px] h-[220px] bg-white p-3 rounded-2xl flex items-center justify-center shadow-lg border border-border relative group">
                 <div className="absolute inset-0 border-2 border-emerald-500/20 rounded-2xl animate-pulse" />
                 <img 
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(activeQrDoc.file_url)}`} 
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(
+                    activeQrDoc.category === 'CERTIFICATE'
+                      ? `${window.location.origin}/verify/certificate/${activeQrDoc.id}`
+                      : resolveFileUrl(activeQrDoc.file_url)
+                  )}`} 
                   alt="Document QR Code"
                   className="w-[196px] h-[196px]"
                 />

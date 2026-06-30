@@ -124,7 +124,30 @@ export default function LeadDetailsPage() {
 
   const handleDownloadDocument = async (fileUrl: string, name: string) => {
     try {
-      const response = await fetch(fileUrl);
+      const resolvedUrl = fileUrl.startsWith('/') && !fileUrl.startsWith('data:') 
+        ? `${API_BASE_URL}${fileUrl.startsWith('/api') ? fileUrl.substring(4) : fileUrl}` 
+        : fileUrl;
+
+      if (resolvedUrl.startsWith('data:')) {
+        const response = await fetch(resolvedUrl);
+        const blob = await response.blob();
+        const blobUrl = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = name;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => window.URL.revokeObjectURL(blobUrl), 100);
+        return;
+      }
+
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const response = await fetch(resolvedUrl, { headers });
       if (!response.ok) throw new Error("Failed to fetch file");
       const blob = await response.blob();
       const blobUrl = window.URL.createObjectURL(blob);
@@ -136,6 +159,7 @@ export default function LeadDetailsPage() {
       document.body.removeChild(a);
       setTimeout(() => window.URL.revokeObjectURL(blobUrl), 100);
     } catch (e) {
+      console.error(e);
       toast.error("Failed to download file");
     }
   };
