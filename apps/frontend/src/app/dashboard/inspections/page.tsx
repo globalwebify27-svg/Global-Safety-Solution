@@ -336,9 +336,29 @@ export default function InspectionsPage() {
     e.preventDefault();
     if (!token) return;
     try {
-      let pdfBase64 = "";
+      let uploadedPdfUrl = "";
       if (schedulePdf) {
-        pdfBase64 = await fileToBase64(schedulePdf);
+        const formData = new FormData();
+        formData.append('file', schedulePdf);
+        formData.append('name', `Inspection PDF - ${scheduleForm.client_id}`);
+        formData.append('category', 'OTHER');
+        if (scheduleForm.client_id) {
+          formData.append('client_id', scheduleForm.client_id);
+        }
+
+        const uploadRes = await fetch(`${API_BASE_URL}/documents`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+          body: formData
+        });
+
+        if (uploadRes.ok) {
+          const uploadData = await uploadRes.json();
+          uploadedPdfUrl = uploadData.file_url;
+        } else {
+          toast.error("Failed to upload PDF report");
+          return;
+        }
       }
 
       const payload: any = {
@@ -348,8 +368,8 @@ export default function InspectionsPage() {
         items: [{ description: "General Safety Check" }]
       };
 
-      if (pdfBase64) {
-        payload.pdf_url = pdfBase64;
+      if (uploadedPdfUrl) {
+        payload.pdf_url = uploadedPdfUrl;
       }
 
       const res = await fetch(`${API_BASE_URL}/inspections`, {
