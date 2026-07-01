@@ -172,9 +172,23 @@ export class ClientsService {
       }
     }
 
+    const { contacts, ...rest } = data;
+    const updateData: any = { ...rest };
+    if (contacts && Array.isArray(contacts)) {
+      updateData.contacts = {
+        deleteMany: {},
+        create: contacts.filter((c: any) => c.name || c.email || c.phone).map(c => ({
+          name: c.name || undefined,
+          designation: c.designation || undefined,
+          email: c.email || undefined,
+          phone: c.phone || undefined,
+        }))
+      };
+    }
+
     return this.prisma.client.update({
       where: { id },
-      data,
+      data: updateData,
     });
   }
 

@@ -149,6 +149,23 @@ export default function ClientsPage() {
   const [activeTab, setActiveTab] = useState("basic");
   const [submitting, setSubmitting] = useState(false);
 
+  const [editOpen, setEditOpen] = useState(false);
+  const [editingClient, setEditingClient] = useState<Client | null>(null);
+  const [editFormData, setEditFormData] = useState({ 
+    name: '', 
+    email: '', 
+    phone: '', 
+    gst_number: '', 
+    pan_number: '', 
+    industry: '', 
+    city: '',
+    state: '',
+    billing_address: '',
+    assigned_staff_id: '',
+    contacts: [{ name: '', designation: '', email: '', phone: '' }]
+  });
+  const [editActiveTab, setEditActiveTab] = useState("basic");
+
   useEffect(() => {
     fetchClients();
   }, [token]);
@@ -244,6 +261,59 @@ export default function ClientsPage() {
           ? (Array.isArray(errData.message) ? errData.message.join(", ") : errData.message)
           : "Failed to create client";
         alert(`Failed to create client: ${errMsg}`);
+      }
+    } catch(err) {
+      alert("Network error");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleUpdateClient = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!token || !editingClient) return;
+    setSubmitting(true);
+    try {
+      const cleanFormData = {
+        name: editFormData.name.trim(),
+        email: editFormData.email.trim() || null,
+        phone: editFormData.phone.trim() || null,
+        gst_number: editFormData.gst_number.trim() || null,
+        pan_number: editFormData.pan_number.trim() || null,
+        industry: editFormData.industry.trim() || null,
+        city: editFormData.city.trim() || null,
+        state: editFormData.state.trim() || null,
+        billing_address: editFormData.billing_address.trim() || null,
+        assigned_staff_id: editFormData.assigned_staff_id || null,
+        contacts: editFormData.contacts
+          .map(c => ({
+            name: c.name.trim() || undefined,
+            designation: c.designation.trim() || undefined,
+            email: c.email.trim() || undefined,
+            phone: c.phone.trim() || undefined,
+          }))
+          .filter(c => c.name || c.email || c.phone)
+      };
+
+      const res = await fetch(`${API_BASE_URL}/clients/${editingClient.id}`, {
+        method: 'PATCH',
+        headers: { 
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}` 
+        },
+        body: JSON.stringify(cleanFormData)
+      });
+      if (res.ok) {
+        setEditOpen(false);
+        setEditingClient(null);
+        setEditActiveTab("basic");
+        fetchClients();
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        const errMsg = errData.message 
+          ? (Array.isArray(errData.message) ? errData.message.join(", ") : errData.message)
+          : "Failed to update client";
+        alert(`Failed to update client: ${errMsg}`);
       }
     } catch(err) {
       alert("Network error");
@@ -591,6 +661,272 @@ export default function ClientsPage() {
           </DialogContent>
         </Dialog>
         )}
+
+        {canManageClients && editOpen && editingClient && (
+          <Dialog open={editOpen} onOpenChange={setEditOpen}>
+            <DialogContent className="sm:max-w-[700px] bg-card border-border text-foreground shadow-2xl">
+              <DialogHeader>
+                <DialogTitle className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-teal-500">
+                  Edit Enterprise Client
+                </DialogTitle>
+                <DialogDescription className="text-muted-foreground">
+                  Update KYC, compliance, or contact details for the organization.
+                </DialogDescription>
+              </DialogHeader>
+              <form onSubmit={handleUpdateClient} className="mt-4">
+                {/* Tab Navigation */}
+                <div className="flex space-x-1 rounded-xl bg-muted p-1 mb-6">
+                  <button
+                    type="button"
+                    onClick={() => setEditActiveTab('basic')}
+                    className={`w-full rounded-lg py-2.5 text-sm font-medium leading-5 ${editActiveTab === 'basic' ? 'bg-background shadow text-foreground' : 'text-muted-foreground hover:bg-white/[0.12] hover:text-foreground'}`}
+                  >
+                    Basic Info
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditActiveTab('address')}
+                    className={`w-full rounded-lg py-2.5 text-sm font-medium leading-5 ${editActiveTab === 'address' ? 'bg-background shadow text-foreground' : 'text-muted-foreground hover:bg-white/[0.12] hover:text-foreground'}`}
+                  >
+                    Address
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditActiveTab('contacts')}
+                    className={`w-full rounded-lg py-2.5 text-sm font-medium leading-5 ${editActiveTab === 'contacts' ? 'bg-background shadow text-foreground' : 'text-muted-foreground hover:bg-white/[0.12] hover:text-foreground'}`}
+                  >
+                    Contacts
+                  </button>
+                </div>
+
+                {/* Basic Tab */}
+                {editActiveTab === 'basic' && (
+                  <div className="grid grid-cols-2 gap-6">
+                    {/* Left Column */}
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="edit_org_name" className="text-foreground/80">Organization Name *</Label>
+                        <div className="relative">
+                          <Building2 className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
+                          <Input 
+                            id="edit_org_name" 
+                            value={editFormData.name} 
+                            onChange={(e) => setEditFormData({...editFormData, name: e.target.value})} 
+                            className="pl-9 bg-background border-border text-foreground placeholder:text-muted-foreground/50" 
+                            placeholder="Acme Global Inc." 
+                            required 
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="edit_assigned_staff" className="text-foreground/80">Assigned Safety Officer</Label>
+                        <div className="relative">
+                          <Briefcase className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
+                          <select 
+                            id="edit_assigned_staff"
+                            value={editFormData.assigned_staff_id || ""}
+                            onChange={(e) => setEditFormData({...editFormData, assigned_staff_id: e.target.value})}
+                            className="w-full pl-9 h-10 bg-background border border-border rounded-md text-foreground focus:ring-2 focus:ring-primary focus:outline-none appearance-none"
+                          >
+                            <option value="">Select Safety Officer (Optional)</option>
+                            {staff.map((s: any) => (
+                              <option key={s.id} value={s.id}>{s.name} ({s.designation || 'Safety Officer'})</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="edit_industry" className="text-foreground/80">Industry</Label>
+                        <div className="relative">
+                          <Building2 className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
+                          <Input id="edit_industry" value={editFormData.industry} onChange={(e) => setEditFormData({...editFormData, industry: e.target.value})} className="pl-9 bg-background border-border text-foreground placeholder:text-muted-foreground/50" placeholder="Manufacturing" />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Right Column */}
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="edit_email" className="text-foreground/80">Primary Org Email</Label>
+                        <div className="relative">
+                          <Mail className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
+                          <Input id="edit_email" type="email" value={editFormData.email || ""} onChange={(e) => setEditFormData({...editFormData, email: e.target.value})} className="pl-9 bg-background border-border text-foreground placeholder:text-muted-foreground/50" placeholder="contact@acme.com" />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="edit_phone" className="text-foreground/80">Primary Org Phone</Label>
+                        <div className="relative">
+                          <Phone className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
+                          <Input id="edit_phone" type="tel" value={editFormData.phone || ""} onChange={(e) => setEditFormData({...editFormData, phone: e.target.value})} className="pl-9 bg-background border-border text-foreground placeholder:text-muted-foreground/50" placeholder="+91 98765 43210" />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="edit_gst" className="text-foreground/80">GST Number</Label>
+                        <div className="relative">
+                          <FileText className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
+                          <Input id="edit_gst" value={editFormData.gst_number || ""} onChange={(e) => setEditFormData({...editFormData, gst_number: e.target.value})} className="pl-9 bg-background border-border text-foreground uppercase placeholder:text-muted-foreground/50" placeholder="22AAAAA0000A1Z5" />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="edit_pan" className="text-foreground/80">PAN Number</Label>
+                        <div className="relative">
+                          <FileText className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
+                          <Input id="edit_pan" value={editFormData.pan_number || ""} onChange={(e) => setEditFormData({...editFormData, pan_number: e.target.value})} className="pl-9 bg-background border-border text-foreground uppercase placeholder:text-muted-foreground/50" placeholder="ABCDE1234F" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Address Tab */}
+                {editActiveTab === 'address' && (
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="edit_billing_address" className="text-foreground/80">Organization Address</Label>
+                      <div className="relative">
+                        <MapPin className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
+                        <Input id="edit_billing_address" value={editFormData.billing_address || ""} onChange={(e) => setEditFormData({...editFormData, billing_address: e.target.value})} className="pl-9 bg-background border-border text-foreground placeholder:text-muted-foreground/50" placeholder="123 Corporate Park, Main Street" />
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="edit_city" className="text-foreground/80">City</Label>
+                        <div className="relative">
+                          <MapPin className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
+                          <Input id="edit_city" value={editFormData.city || ""} onChange={(e) => setEditFormData({...editFormData, city: e.target.value})} className="pl-9 bg-background border-border text-foreground placeholder:text-muted-foreground/50" placeholder="Mumbai" />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="edit_state" className="text-foreground/80">State / District</Label>
+                        <div className="relative">
+                          <MapPin className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
+                          <Input id="edit_state" value={editFormData.state || ""} onChange={(e) => setEditFormData({...editFormData, state: e.target.value})} className="pl-9 bg-background border-border text-foreground placeholder:text-muted-foreground/50" placeholder="Maharashtra" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Contacts Tab */}
+                {editActiveTab === 'contacts' && (
+                  <div className="space-y-6">
+                    {editFormData.contacts.map((contact, index) => (
+                      <div key={index} className="p-4 rounded-xl border border-border bg-accent/5 relative space-y-4">
+                        {index > 0 && (
+                          <button 
+                            type="button" 
+                            onClick={() => {
+                              const newContacts = [...editFormData.contacts];
+                              newContacts.splice(index, 1);
+                              setEditFormData({...editFormData, contacts: newContacts});
+                            }}
+                            className="absolute top-4 right-4 text-muted-foreground hover:text-red-500 text-sm font-medium"
+                          >
+                            Remove
+                          </button>
+                        )}
+                        
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label className="text-foreground/80">Contact Person Name</Label>
+                            <div className="relative">
+                              <User className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
+                              <Input 
+                                value={contact.name || ""} 
+                                onChange={(e) => {
+                                  const newContacts = [...editFormData.contacts];
+                                  newContacts[index].name = e.target.value;
+                                  setEditFormData({...editFormData, contacts: newContacts});
+                                }} 
+                                className="pl-9 bg-background border-border text-foreground" placeholder="John Doe" 
+                              />
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-foreground/80">Designation</Label>
+                            <div className="relative">
+                              <Briefcase className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
+                              <Input 
+                                value={contact.designation || ""} 
+                                onChange={(e) => {
+                                  const newContacts = [...editFormData.contacts];
+                                  newContacts[index].designation = e.target.value;
+                                  setEditFormData({...editFormData, contacts: newContacts});
+                                }} 
+                                className="pl-9 bg-background border-border text-foreground" placeholder="Manager" 
+                              />
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-foreground/80">Email</Label>
+                            <div className="relative">
+                              <Mail className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
+                              <Input 
+                                type="email"
+                                value={contact.email || ""} 
+                                onChange={(e) => {
+                                  const newContacts = [...editFormData.contacts];
+                                  newContacts[index].email = e.target.value;
+                                  setEditFormData({...editFormData, contacts: newContacts});
+                                }} 
+                                className="pl-9 bg-background border-border text-foreground" placeholder="john@acme.com" 
+                              />
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-foreground/80">Phone</Label>
+                            <div className="relative">
+                              <Phone className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
+                              <Input 
+                                type="tel"
+                                value={contact.phone || ""} 
+                                onChange={(e) => {
+                                  const newContacts = [...editFormData.contacts];
+                                  newContacts[index].phone = e.target.value;
+                                  setEditFormData({...editFormData, contacts: newContacts});
+                                }} 
+                                className="pl-9 bg-background border-border text-foreground" placeholder="+91..." 
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      onClick={() => {
+                        setEditFormData({
+                          ...editFormData,
+                          contacts: [...editFormData.contacts, { name: '', designation: '', email: '', phone: '' }]
+                        });
+                      }}
+                      className="w-full border-dashed border-2 text-primary hover:text-primary hover:bg-primary/5"
+                    >
+                      <Plus className="w-4 h-4 mr-2" /> Add Another Contact Person
+                    </Button>
+                  </div>
+                )}
+
+                <DialogFooter className="mt-8 border-t border-border pt-6">
+                  <Button variant="ghost" type="button" onClick={() => setEditOpen(false)} className="text-muted-foreground hover:text-foreground hover:bg-accent/10 mr-2">
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={submitting} className="bg-gradient-to-r from-blue-600 to-teal-500 hover:from-blue-500 hover:to-teal-400 text-white min-w-[120px] shadow-lg shadow-blue-500/20 font-semibold border-0">
+                    {submitting ? 'Saving...' : 'Save Changes'}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+        )}
         </div>
       </div>
 
@@ -673,6 +1009,39 @@ export default function ClientsPage() {
                     </span>
                   </td>
                   <td className="px-6 py-4 text-right">
+                    {canManageClients && (
+                      <Button
+                        variant="ghost"
+                        onClick={() => {
+                          setEditingClient(c);
+                          setEditFormData({
+                            name: c.name || "",
+                            email: c.email || "",
+                            phone: c.phone || "",
+                            gst_number: c.gst_number || "",
+                            pan_number: c.pan_number || "",
+                            industry: c.industry || "",
+                            city: c.city || "",
+                            state: (c as any).state || "",
+                            billing_address: (c as any).billing_address || "",
+                            assigned_staff_id: c.assigned_staff?.id || "",
+                            contacts: (c as any).contacts && (c as any).contacts.length > 0
+                              ? (c as any).contacts.map((contact: any) => ({
+                                  name: contact.name || "",
+                                  designation: contact.designation || "",
+                                  email: contact.email || "",
+                                  phone: contact.phone || "",
+                                }))
+                              : [{ name: '', designation: '', email: '', phone: '' }]
+                          });
+                          setEditActiveTab("basic");
+                          setEditOpen(true);
+                        }}
+                        className="inline-flex items-center justify-center rounded-md px-3 py-2 text-sm font-medium text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 mr-2 transition-all"
+                      >
+                        Edit
+                      </Button>
+                    )}
                     <Link
                       href={`/dashboard/clients/${c.id}`}
                       className="inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium text-primary hover:text-primary/80 hover:bg-primary/10 transition-all"
