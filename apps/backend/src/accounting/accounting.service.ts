@@ -91,7 +91,9 @@ export class AccountingService {
       runningBalance += isDebit ? (isNormalDebit ? amt : -amt) : (isNormalDebit ? -amt : amt);
       return { id: e.id, voucher_no: e.voucher_no, transaction_date: e.transaction_date, description: e.description, debit: isDebit ? amt : 0, credit: !isDebit ? amt : 0, balance: runningBalance, created_by: e.created_by, particulars: isDebit ? e.credit_account.name : e.debit_account.name, particulars_code: isDebit ? e.credit_account.code : e.debit_account.code };
     });
-    return { account, entries: rows };
+    // Reverse the rows so that the newest transaction appears at the top of the UI list
+    const newestFirstRows = [...rows].reverse();
+    return { account, entries: newestFirstRows };
   }
 
   async updateOpeningBalance(accountId: string, newAmount: number, updatedBy?: string) {
