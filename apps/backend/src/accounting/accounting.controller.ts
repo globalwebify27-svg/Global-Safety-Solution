@@ -1,59 +1,62 @@
-import { Controller, Get, Post, Body, Query, Req, UseGuards } from '@nestjs/common';
-import { AccountingService } from './accounting.service';
+﻿import { Controller, Get, Post, Put, Body, Query, Param, Req, UseGuards } from "@nestjs/common";
+import { AccountingService } from "./accounting.service";
+import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 
-@Controller('accounting')
+@Controller("accounting")
+@UseGuards(JwtAuthGuard)
 export class AccountingController {
   constructor(private readonly accountingService: AccountingService) {}
 
-  @Get('accounts')
+  @Get("accounts")
   async getAccounts() {
     return this.accountingService.getAccounts();
   }
 
-  @Post('accounts')
-  async createAccount(
-    @Body() body: { name: string; code: string; type: string; parent_id?: string; opening_balance?: number }
-  ) {
-    return this.accountingService.createAccount(body);
+  @Post("accounts")
+  async createAccount(@Body() body: { name: string; code: string; type: string; parent_id?: string; opening_balance?: number }, @Req() req: any) {
+    const user = req.user?.name ? `${req.user.name}${req.user.employee_id ? " (" + req.user.employee_id + ")" : ""}` : req.user?.email || "System";
+    return this.accountingService.createAccount({ ...body, created_by: user });
   }
 
-  @Get('vouchers')
+  @Get("accounts/:id/ledger")
+  async getAccountLedger(@Param("id") id: string, @Query("startDate") startDate?: string, @Query("endDate") endDate?: string) {
+    return this.accountingService.getAccountLedger(id, startDate, endDate);
+  }
+
+  @Put("accounts/:id/opening-balance")
+  async updateOpeningBalance(@Param("id") id: string, @Body() body: { amount: number }, @Req() req: any) {
+    const user = req.user?.name ? `${req.user.name}${req.user.employee_id ? " (" + req.user.employee_id + ")" : ""}` : req.user?.email || "System";
+    return this.accountingService.updateOpeningBalance(id, body.amount, user);
+  }
+
+  @Get("vouchers")
   async getVouchers() {
     return this.accountingService.getVouchers();
   }
 
-  @Post('vouchers')
+  @Post("vouchers")
   async postVoucher(@Body() body: any, @Req() req: any) {
-    const user = req.user?.email || 'Admin';
-    return this.accountingService.postVoucher({
-      ...body,
-      created_by: user,
-    });
+    const user = req.user?.name ? `${req.user.name}${req.user.employee_id ? " (" + req.user.employee_id + ")" : ""}` : req.user?.email || "Admin";
+    return this.accountingService.postVoucher({ ...body, created_by: user });
   }
 
-  @Post('transactions')
+  @Post("transactions")
   async postTransaction(@Body() body: any, @Req() req: any) {
-    const user = req.user?.email || 'Admin';
-    return this.accountingService.postTransaction({
-      ...body,
-      created_by: user,
-    });
+    const user = req.user?.name ? `${req.user.name}${req.user.employee_id ? " (" + req.user.employee_id + ")" : ""}` : req.user?.email || "Admin";
+    return this.accountingService.postTransaction({ ...body, created_by: user });
   }
 
-  @Get('reports')
-  async getReports(
-    @Query('period') period: 'monthly' | 'halfyearly' | 'yearly',
-    @Query('year') year: string,
-    @Query('month') month?: string,
-  ) {
-    return this.accountingService.getFinancialReports({
-      period,
-      year: Number(year),
-      month: month ? Number(month) : undefined,
-    });
+  @Get("reports")
+  async getReports(@Query("period") period: "monthly" | "halfyearly" | "yearly", @Query("year") year: string, @Query("month") month?: string) {
+    return this.accountingService.getFinancialReports({ period, year: Number(year), month: month ? Number(month) : undefined });
   }
 
-  @Get('audit')
+  @Get("reports/cashflow")
+  async getCashFlow(@Query("period") period: "monthly" | "halfyearly" | "yearly", @Query("year") year: string, @Query("month") month?: string) {
+    return this.accountingService.getCashFlowStatement({ period, year: Number(year), month: month ? Number(month) : undefined });
+  }
+
+  @Get("audit")
   async getAuditLog() {
     return this.accountingService.getAuditLog();
   }

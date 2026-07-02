@@ -1,27 +1,15 @@
-"use client";
+﻿"use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useAuthStore } from "@/store/auth";
 import { API_BASE_URL } from "@/lib/config";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
-import { 
-  Plus, 
-  Calculator, 
-  ArrowUpRight, 
-  ArrowDownLeft, 
-  Search, 
-  Filter, 
-  Download, 
-  Calendar, 
-  Clock, 
-  FileText, 
-  TrendingUp, 
-  DollarSign, 
-  ShieldAlert,
-  ChevronDown,
-  ChevronRight
+import {
+  Plus, Calculator, ArrowUpRight, ArrowDownLeft, Search,
+  Download, TrendingUp, DollarSign, ShieldAlert, ChevronDown,
+  ChevronRight, Pencil, X, Activity, Scale, Waves, User
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
@@ -30,28 +18,12 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
-interface Account {
-  id: string;
-  name: string;
-  code: string;
-  type: string;
-  balance: number;
-  parent_id?: string | null;
-}
-
-interface Voucher {
-  id: string;
-  voucher_no: string;
-  description: string;
-  amount: number;
-  transaction_date: string;
-  debit_account: Account;
-  credit_account: Account;
-  created_by: string;
-}
+interface Account { id: string; name: string; code: string; type: string; balance: number; parent_id?: string | null; }
+interface Voucher { id: string; voucher_no: string; description: string; amount: number; transaction_date: string; debit_account: Account; credit_account: Account; created_by: string; }
+type TabType = "ledgers" | "accounts" | "reports" | "trialbalance" | "audit";
 
 export default function AccountingPage() {
-  const [activeTab, setActiveTab] = useState<"ledgers" | "accounts" | "reports">("ledgers");
+  const [activeTab, setActiveTab] = useState<TabType>("ledgers");
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [vouchers, setVouchers] = useState<Voucher[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -59,107 +31,49 @@ export default function AccountingPage() {
   const [openVoucherDialog, setOpenVoucherDialog] = useState(false);
   const [openAccountDialog, setOpenAccountDialog] = useState(false);
   const [openTransactionDialog, setOpenTransactionDialog] = useState(false);
-  
-  // Transaction form state
-  const [transactionForm, setTransactionForm] = useState({
-    type: "EXPENSE" as "EXPENSE" | "REVENUE",
-    category_id: "",
-    bank_account_id: "",
-    amount: "",
-    description: "",
-    transaction_date: new Date().toISOString().split('T')[0]
-  });
-  
-  // Voucher form state
-  const [voucherForm, setVoucherForm] = useState({
-    debit_code: "",
-    credit_code: "",
-    amount: "",
-    description: "",
-    transaction_date: new Date().toISOString().split('T')[0]
-  });
-
-  // Account form state
-  const [accountForm, setAccountForm] = useState({
-    name: "",
-    code: "",
-    type: "ASSET",
-    parent_id: "",
-    opening_balance: ""
-  });
-
-  // Report filters and states
-  const [reportFilter, setReportFilter] = useState({
-    period: "monthly" as "monthly" | "halfyearly" | "yearly",
-    year: new Date().getFullYear(),
-    month: new Date().getMonth() // 0-indexed
-  });
+  const [editOBAccount, setEditOBAccount] = useState<Account | null>(null);
+  const [editOBAmount, setEditOBAmount] = useState("");
+  const [editOBLoading, setEditOBLoading] = useState(false);
+  const [drillAccount, setDrillAccount] = useState<Account | null>(null);
+  const [drillEntries, setDrillEntries] = useState<any[]>([]);
+  const [drillLoading, setDrillLoading] = useState(false);
+  const [drillStart, setDrillStart] = useState("");
+  const [drillEnd, setDrillEnd] = useState("");
+  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [cashFlowData, setCashFlowData] = useState<any>(null);
+  const [cashFlowLoading, setCashFlowLoading] = useState(false);
+  const [transactionForm, setTransactionForm] = useState({ type: "EXPENSE" as "EXPENSE" | "REVENUE", category_id: "", bank_account_id: "", amount: "", description: "", transaction_date: new Date().toISOString().split("T")[0] });
+  const [voucherForm, setVoucherForm] = useState({ debit_code: "", credit_code: "", amount: "", description: "", transaction_date: new Date().toISOString().split("T")[0] });
+  const [accountForm, setAccountForm] = useState({ name: "", code: "", type: "ASSET", parent_id: "", opening_balance: "" });
+  const [reportFilter, setReportFilter] = useState({ period: "monthly" as "monthly" | "halfyearly" | "yearly", year: new Date().getFullYear(), month: new Date().getMonth() });
   const [reportData, setReportData] = useState<any>(null);
   const [loadingReport, setLoadingReport] = useState(false);
   const [expandedAccounts, setExpandedAccounts] = useState<Record<string, boolean>>({});
-  
-  const toggleAccountExpand = (accountId: string) => {
-    setExpandedAccounts(prev => ({
-      ...prev,
-      [accountId]: !prev[accountId]
-    }));
-  };
+  const token = useAuthStore((state) => state.token);
 
-  const renderCollapsibleAccountRows = (
-    accountsList: any[],
-    type: string,
-    colorClass: string
-  ) => {
+  const toggleAccountExpand = (id: string) => setExpandedAccounts(prev => ({ ...prev, [id]: !prev[id] }));
+  const accountTypeColor = (type: string) => { if (type === "ASSET") return "bg-blue-500/10 text-blue-500"; if (type === "LIABILITY") return "bg-amber-500/10 text-amber-500"; if (type === "EQUITY") return "bg-purple-500/10 text-purple-500"; if (type === "REVENUE") return "bg-emerald-500/10 text-emerald-500"; return "bg-rose-500/10 text-rose-500"; };
+
+  const renderCollapsibleAccountRows = (accountsList: any[], type: string, colorClass: string) => {
     if (!accountsList) return null;
-
-    const topLevel = accountsList.filter(
-      (a: any) => a.type === type && (!a.parent_id || !accountsList.some((p: any) => p.id === a.parent_id))
-    );
-
+    const topLevel = accountsList.filter((a: any) => a.type === type && (!a.parent_id || !accountsList.some((p: any) => p.id === a.parent_id)));
     return topLevel.map((parent: any) => {
       const children = accountsList.filter((a: any) => a.parent_id === parent.id);
       const hasChildren = children.length > 0;
       const isExpanded = !!expandedAccounts[parent.id];
-
       return (
         <div key={parent.id} className="space-y-1">
-          <div 
-            onClick={() => hasChildren && toggleAccountExpand(parent.id)}
-            className={cn(
-              "flex justify-between items-center py-2.5 text-sm border-b border-border/40 font-semibold select-none",
-              hasChildren ? "cursor-pointer hover:bg-accent/5 px-2 -mx-2 rounded-lg transition-colors" : ""
-            )}
-          >
+          <div onClick={() => hasChildren && toggleAccountExpand(parent.id)} className={cn("flex justify-between items-center py-2.5 text-sm border-b border-border/40 font-semibold select-none", hasChildren ? "cursor-pointer hover:bg-accent/5 px-2 -mx-2 rounded-lg transition-colors" : "")}>
             <div className="flex items-center gap-1.5">
-              {hasChildren ? (
-                isExpanded ? (
-                  <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
-                ) : (
-                  <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
-                )
-              ) : (
-                <div className="w-4 h-4 shrink-0" />
-              )}
+              {hasChildren ? (isExpanded ? <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" /> : <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />) : <div className="w-4 h-4 shrink-0" />}
               <span>{parent.name} ({parent.code})</span>
             </div>
-            <span className={cn("font-bold shrink-0", colorClass)}>
-              ₹{Number(parent.periodBalance).toLocaleString()}
-            </span>
+            <span className={cn("font-bold shrink-0", colorClass)}>₹{Number(parent.periodBalance).toLocaleString()}</span>
           </div>
-
           {hasChildren && isExpanded && (
-            <div className="pl-6 border-l border-border/60 ml-2 space-y-1 mt-1 transition-all duration-300">
-              {children.map((child: any) => (
-                <div
-                  key={child.id}
-                  className="flex justify-between items-center py-1.5 text-xs text-muted-foreground border-b border-border/20"
-                >
-                  <span>{child.name} ({child.code})</span>
-                  <span className="font-semibold">
-                    ₹{Number(child.periodBalance).toLocaleString()}
-                  </span>
-                </div>
-              ))}
+            <div className="pl-6 border-l border-border/60 ml-2 space-y-1 mt-1">
+              {children.map((child: any) => (<div key={child.id} className="flex justify-between items-center py-1.5 text-xs text-muted-foreground border-b border-border/20"><span>{child.name} ({child.code})</span><span className="font-semibold">₹{Number(child.periodBalance).toLocaleString()}</span></div>))}
             </div>
           )}
         </div>
@@ -167,416 +81,136 @@ export default function AccountingPage() {
     });
   };
 
-  const token = useAuthStore((state) => state.token);
-
-  const filteredVouchers = vouchers.filter(v => 
-    v.voucher_no.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    v.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    v.debit_account.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    v.debit_account.code.includes(searchQuery) ||
-    v.credit_account.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    v.credit_account.code.includes(searchQuery) ||
-    v.created_by.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredVouchers = vouchers.filter(v => v.voucher_no.toLowerCase().includes(searchQuery.toLowerCase()) || v.description.toLowerCase().includes(searchQuery.toLowerCase()) || v.debit_account.name.toLowerCase().includes(searchQuery.toLowerCase()) || v.credit_account.name.toLowerCase().includes(searchQuery.toLowerCase()) || v.created_by.toLowerCase().includes(searchQuery.toLowerCase()));
 
   const fetchAccountsAndVouchers = async () => {
-    if (!token) return;
-    setLoading(true);
+    if (!token) return; setLoading(true);
     try {
-      const [accRes, vRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/accounting/accounts`, { headers: { Authorization: `Bearer ${token}` } }),
-        fetch(`${API_BASE_URL}/accounting/vouchers`, { headers: { Authorization: `Bearer ${token}` } })
-      ]);
-      const accData = await accRes.json();
-      const vData = await vRes.json();
-      if (Array.isArray(accData)) setAccounts(accData);
-      if (Array.isArray(vData)) setVouchers(vData);
-    } catch (e) {
-      toast.error("Failed to load ledger data.");
-    } finally {
-      setLoading(false);
-    }
+      const [accRes, vRes] = await Promise.all([fetch(`${API_BASE_URL}/accounting/accounts`, { headers: { Authorization: `Bearer ${token}` } }), fetch(`${API_BASE_URL}/accounting/vouchers`, { headers: { Authorization: `Bearer ${token}` } })]);
+      const accData = await accRes.json(); const vData = await vRes.json();
+      if (Array.isArray(accData)) setAccounts(accData); if (Array.isArray(vData)) setVouchers(vData);
+    } catch { toast.error("Failed to load ledger data."); } finally { setLoading(false); }
   };
 
-  const fetchReport = async () => {
-    if (!token) return;
-    setLoadingReport(true);
+  const fetchReport = useCallback(async () => {
+    if (!token) return; setLoadingReport(true);
     try {
       const { period, year, month } = reportFilter;
-      const url = `${API_BASE_URL}/accounting/reports?period=${period}&year=${year}${period === 'monthly' ? `&month=${month}` : ''}`;
+      const url = `${API_BASE_URL}/accounting/reports?period=${period}&year=${year}${period === "monthly" ? `&month=${month}` : ""}`;
       const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-      const data = await res.json();
-      setReportData(data);
-    } catch (e) {
-      toast.error("Failed to compile financial statements.");
-    } finally {
-      setLoadingReport(false);
-    }
-  };
+      const data = await res.json(); setReportData(data);
+    } catch { toast.error("Failed to load reports."); } finally { setLoadingReport(false); }
+  }, [token, reportFilter]);
 
-  useEffect(() => {
-    fetchAccountsAndVouchers();
+  const fetchCashFlow = useCallback(async () => {
+    if (!token) return; setCashFlowLoading(true);
+    try {
+      const { period, year, month } = reportFilter;
+      const url = `${API_BASE_URL}/accounting/reports/cashflow?period=${period}&year=${year}${period === "monthly" ? `&month=${month}` : ""}`;
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json(); setCashFlowData(data);
+    } catch { toast.error("Failed to load cash flow."); } finally { setCashFlowLoading(false); }
+  }, [token, reportFilter]);
+
+  const fetchAuditLog = useCallback(async () => {
+    if (!token) return; setAuditLoading(true);
+    try { const res = await fetch(`${API_BASE_URL}/accounting/audit`, { headers: { Authorization: `Bearer ${token}` } }); const data = await res.json(); if (Array.isArray(data)) setAuditLogs(data); }
+    catch { toast.error("Failed to load audit log."); } finally { setAuditLoading(false); }
   }, [token]);
 
-  useEffect(() => {
-    if (activeTab === "reports") {
-      fetchReport();
-    }
-  }, [activeTab, reportFilter]);
+  const fetchAccountLedger = useCallback(async (account: Account) => {
+    if (!token) return; setDrillLoading(true); setDrillEntries([]);
+    try {
+      const params = new URLSearchParams(); if (drillStart) params.append("startDate", drillStart); if (drillEnd) params.append("endDate", drillEnd);
+      const res = await fetch(`${API_BASE_URL}/accounting/accounts/${account.id}/ledger?${params}`, { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json(); if (data.entries) setDrillEntries(data.entries);
+    } catch { toast.error("Failed to load account ledger."); } finally { setDrillLoading(false); }
+  }, [token, drillStart, drillEnd]);
+
+  useEffect(() => { fetchAccountsAndVouchers(); }, [token]);
+  useEffect(() => { if (activeTab === "reports") { fetchReport(); fetchCashFlow(); } }, [activeTab, reportFilter]);
+  useEffect(() => { if (activeTab === "audit") fetchAuditLog(); }, [activeTab]);
+  useEffect(() => { if (drillAccount) fetchAccountLedger(drillAccount); }, [drillAccount, drillStart, drillEnd]);
 
   const handleCreateVoucher = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!token) return;
-
-    if (!voucherForm.debit_code || !voucherForm.credit_code || !voucherForm.amount || !voucherForm.description) {
-      toast.error("Please fill in all voucher details.");
-      return;
-    }
-
+    e.preventDefault(); if (!token || !voucherForm.debit_code || !voucherForm.credit_code || !voucherForm.amount || !voucherForm.description) { toast.error("Fill all fields."); return; }
     try {
-      const res = await fetch(`${API_BASE_URL}/accounting/vouchers`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          debit_code: voucherForm.debit_code,
-          credit_code: voucherForm.credit_code,
-          amount: parseFloat(voucherForm.amount),
-          description: voucherForm.description,
-          transaction_date: voucherForm.transaction_date
-        })
-      });
-
-      if (res.ok) {
-        toast.success("Voucher posted to ledger successfully!");
-        setOpenVoucherDialog(false);
-        setVoucherForm({
-          debit_code: "",
-          credit_code: "",
-          amount: "",
-          description: "",
-          transaction_date: new Date().toISOString().split('T')[0]
-        });
-        fetchAccountsAndVouchers();
-      } else {
-        const err = await res.json();
-        toast.error(err.message || "Failed to post voucher.");
-      }
-    } catch (e) {
-      toast.error("Network error occurred.");
-    }
+      const res = await fetch(`${API_BASE_URL}/accounting/vouchers`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ debit_code: voucherForm.debit_code, credit_code: voucherForm.credit_code, amount: parseFloat(voucherForm.amount), description: voucherForm.description, transaction_date: voucherForm.transaction_date }) });
+      if (res.ok) { toast.success("Voucher posted!"); setOpenVoucherDialog(false); setVoucherForm({ debit_code: "", credit_code: "", amount: "", description: "", transaction_date: new Date().toISOString().split("T")[0] }); fetchAccountsAndVouchers(); }
+      else { const err = await res.json(); toast.error(err.message || "Failed."); }
+    } catch { toast.error("Network error."); }
   };
 
   const handleCreateAccount = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!token) return;
-
-    if (!accountForm.name || !accountForm.code) {
-      toast.error("Please enter account name and code.");
-      return;
-    }
-
+    e.preventDefault(); if (!token || !accountForm.name || !accountForm.code) { toast.error("Fill all fields."); return; }
     try {
-      const res = await fetch(`${API_BASE_URL}/accounting/accounts`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          name: accountForm.name,
-          code: accountForm.code,
-          type: accountForm.type,
-          parent_id: accountForm.parent_id || undefined,
-          opening_balance: accountForm.opening_balance ? parseFloat(accountForm.opening_balance) : undefined
-        })
-      });
-
-      if (res.ok) {
-        toast.success("New account added to Chart of Accounts!");
-        setOpenAccountDialog(false);
-        setAccountForm({ name: "", code: "", type: "ASSET", parent_id: "", opening_balance: "" });
-        fetchAccountsAndVouchers();
-      } else {
-        const err = await res.json();
-        toast.error(err.message || "Failed to create account.");
-      }
-    } catch (e) {
-      toast.error("Network error.");
-    }
+      const res = await fetch(`${API_BASE_URL}/accounting/accounts`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ name: accountForm.name, code: accountForm.code, type: accountForm.type, parent_id: accountForm.parent_id || undefined, opening_balance: accountForm.opening_balance ? parseFloat(accountForm.opening_balance) : undefined }) });
+      if (res.ok) { toast.success("Account created!"); setOpenAccountDialog(false); setAccountForm({ name: "", code: "", type: "ASSET", parent_id: "", opening_balance: "" }); fetchAccountsAndVouchers(); }
+      else { const err = await res.json(); toast.error(err.message || "Failed."); }
+    } catch { toast.error("Network error."); }
   };
 
   const handleCreateTransaction = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!token) return;
-
-    if (!transactionForm.category_id || !transactionForm.bank_account_id || !transactionForm.amount || !transactionForm.description) {
-      toast.error("Please fill in all transaction details.");
-      return;
-    }
-
+    e.preventDefault(); if (!token || !transactionForm.category_id || !transactionForm.bank_account_id || !transactionForm.amount || !transactionForm.description) { toast.error("Fill all fields."); return; }
     try {
-      const res = await fetch(`${API_BASE_URL}/accounting/transactions`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          type: transactionForm.type,
-          category_id: transactionForm.category_id,
-          bank_account_id: transactionForm.bank_account_id,
-          amount: parseFloat(transactionForm.amount),
-          description: transactionForm.description,
-          transaction_date: transactionForm.transaction_date
-        })
-      });
+      const res = await fetch(`${API_BASE_URL}/accounting/transactions`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ type: transactionForm.type, category_id: transactionForm.category_id, bank_account_id: transactionForm.bank_account_id, amount: parseFloat(transactionForm.amount), description: transactionForm.description, transaction_date: transactionForm.transaction_date }) });
+      if (res.ok) { toast.success("Transaction saved!"); setOpenTransactionDialog(false); setTransactionForm({ type: "EXPENSE", category_id: "", bank_account_id: "", amount: "", description: "", transaction_date: new Date().toISOString().split("T")[0] }); fetchAccountsAndVouchers(); if (activeTab === "reports") { fetchReport(); fetchCashFlow(); } }
+      else { const err = await res.json(); toast.error(err.message || "Failed."); }
+    } catch { toast.error("Network error."); }
+  };
 
-      if (res.ok) {
-        toast.success("Transaction recorded and synced successfully!");
-        setOpenTransactionDialog(false);
-        setTransactionForm({
-          type: "EXPENSE",
-          category_id: "",
-          bank_account_id: "",
-          amount: "",
-          description: "",
-          transaction_date: new Date().toISOString().split('T')[0]
-        });
-        fetchAccountsAndVouchers();
-        if (activeTab === "reports") {
-          fetchReport();
-        }
-      } else {
-        const err = await res.json();
-        toast.error(err.message || "Failed to record transaction.");
-      }
-    } catch (e) {
-      toast.error("Network error.");
-    }
+  const handleUpdateOpeningBalance = async (e: React.FormEvent) => {
+    e.preventDefault(); if (!token || !editOBAccount || !editOBAmount) return; setEditOBLoading(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/accounting/accounts/${editOBAccount.id}/opening-balance`, { method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ amount: parseFloat(editOBAmount) }) });
+      if (res.ok) { toast.success(`Opening balance for ${editOBAccount.name} updated!`); setEditOBAccount(null); setEditOBAmount(""); fetchAccountsAndVouchers(); }
+      else { const err = await res.json(); toast.error(err.message || "Failed."); }
+    } catch { toast.error("Network error."); } finally { setEditOBLoading(false); }
   };
 
   const downloadExcelReport = () => {
-    if (!reportData) {
-      toast.error("No report data available to export.");
-      return;
-    }
-
+    if (!reportData) { toast.error("No report data."); return; }
     try {
-      // 1. Prepare Financial Report Sheet Data
-      const plData = [
-        ["Financial Statement Type", "Account", "Code", "Amount (INR)"],
-        ["PROFIT & LOSS STATEMENT", "", "", ""],
-        ["Revenue Stream", "", "", ""],
-        ...reportData.profitAndLoss.revenues.map((r: any) => ["Revenue", r.name, r.code, Number(r.periodBalance)]),
-        ["Total Revenue", "", "", Number(reportData.profitAndLoss.totalRevenue)],
-        [],
-        ["Operating Expense", "", "", ""],
-        ...reportData.profitAndLoss.expenses.map((e: any) => ["Expense", e.name, e.code, Number(e.periodBalance)]),
-        ["Total Expense", "", "", Number(reportData.profitAndLoss.totalExpense)],
-        [],
-        ["Net Business Profit", "", "", Number(reportData.profitAndLoss.netProfit)],
-        [],
-        ["BALANCE SHEET SUMMARY", "", "", ""],
-        ["Assets (Dr.)", "", "", ""],
-        ...reportData.balanceSheet.assets.map((a: any) => ["Asset", a.name, a.code, Number(a.periodBalance)]),
-        ["Total Assets", "", "", Number(reportData.balanceSheet.totalAssets)],
-        [],
-        ["Liabilities & Equity (Cr.)", "", "", ""],
-        ...reportData.balanceSheet.liabilities.map((l: any) => ["Liability", l.name, l.code, Number(l.periodBalance)]),
-        ...reportData.balanceSheet.equity.map((eq: any) => ["Equity", eq.name, eq.code, Number(eq.periodBalance)]),
-        ["Total Liabilities & Equity", "", "", Number(reportData.balanceSheet.totalLiabilities) + Number(reportData.balanceSheet.totalEquity)],
-      ];
-
-      // 2. Prepare Chart of Accounts Sheet Data
-      const coaData = [
-        ["Code", "Account Name", "Type", "Current Balance (INR)"],
-        ...accounts.map(a => [a.code, a.name, a.type, Number(a.balance)])
-      ];
-
-      // 3. Prepare Ledger Board Sheet Data
-      const start = new Date(reportData.period.startDate);
-      const end = new Date(reportData.period.endDate);
-      const periodVouchers = vouchers.filter(v => {
-        const d = new Date(v.transaction_date);
-        return d >= start && d <= end;
-      });
-
-      const ledgerData = [
-        ["Voucher No", "Date", "Debit Account (Dr.)", "Credit Account (Cr.)", "Debit Amount (Dr.)", "Credit Amount (Cr.)", "Narration", "Audited By"],
-        ...periodVouchers.map(v => [
-          v.voucher_no,
-          new Date(v.transaction_date).toLocaleDateString(),
-          `${v.debit_account.name} (${v.debit_account.code})`,
-          `${v.credit_account.name} (${v.credit_account.code})`,
-          Number(v.amount),
-          Number(v.amount),
-          v.description,
-          v.created_by
-        ])
-      ];
-
-      // Create Workbook
+      const plData = [["Type", "Account", "Code", "Amount (INR)"], ["P&L STATEMENT", "", "", ""], ...reportData.profitAndLoss.revenues.map((r: any) => ["Revenue", r.name, r.code, Number(r.periodBalance)]), ["Total Revenue", "", "", Number(reportData.profitAndLoss.totalRevenue)], ...reportData.profitAndLoss.expenses.map((e: any) => ["Expense", e.name, e.code, Number(e.periodBalance)]), ["Total Expense", "", "", Number(reportData.profitAndLoss.totalExpense)], ["Net Profit", "", "", Number(reportData.profitAndLoss.netProfit)]];
+      const coaData = [["Code", "Account Name", "Type", "Balance (INR)"], ...accounts.map(a => [a.code, a.name, a.type, Number(a.balance)])];
+      const trialData = reportData.trialBalance ? [["Code", "Account Name", "Type", "Debit (Dr)", "Credit (Cr)"], ...reportData.trialBalance.map((t: any) => [t.code, t.name, t.type, Number(t.debit), Number(t.credit)])] : [];
+      const start = new Date(reportData.period.startDate), end = new Date(reportData.period.endDate);
+      const pv = vouchers.filter(v => { const d = new Date(v.transaction_date); return d >= start && d <= end; });
+      const ledgerData = [["Voucher No", "Date", "Debit Acc", "Credit Acc", "Debit", "Credit", "Narration", "Audited By"], ...pv.map(v => [v.voucher_no, new Date(v.transaction_date).toLocaleDateString(), `${v.debit_account.name}`, `${v.credit_account.name}`, Number(v.amount), Number(v.amount), v.description, v.created_by])];
       const wb = XLSX.utils.book_new();
-
-      // Convert arrays to sheets
-      const wsFinancials = XLSX.utils.aoa_to_sheet(plData);
-      const wsCOA = XLSX.utils.aoa_to_sheet(coaData);
-      const wsLedger = XLSX.utils.aoa_to_sheet(ledgerData);
-
-      // Append sheets to workbook
-      XLSX.utils.book_append_sheet(wb, wsFinancials, "Financial Reports");
-      XLSX.utils.book_append_sheet(wb, wsCOA, "Chart of Accounts");
-      XLSX.utils.book_append_sheet(wb, wsLedger, "Ledger Board");
-
-      // Generate file name
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(plData), "P&L Report");
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(coaData), "Chart of Accounts");
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(trialData), "Trial Balance");
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ledgerData), "Ledger Board");
       const { period, year, month } = reportFilter;
-      const dateStr = period === 'monthly'
-        ? `${new Date(year, month).toLocaleString('default', { month: 'short' })}-${year}`
-        : period === 'halfyearly' ? `H-${year}` : `Yearly-${year}`;
-
-      XLSX.writeFile(wb, `Consolidated_Financial_Report_${dateStr}.xlsx`);
-      toast.success("Excel audit file downloaded successfully!");
-    } catch (e) {
-      toast.error("Failed to generate Excel file.");
-      console.error(e);
-    }
+      const ds = period === "monthly" ? `${new Date(year, month).toLocaleString("default", { month: "short" })}-${year}` : period === "halfyearly" ? `H-${year}` : `${year}`;
+      XLSX.writeFile(wb, `Financial_Report_${ds}.xlsx`); toast.success("Excel downloaded!");
+    } catch { toast.error("Excel generation failed."); }
   };
 
   const downloadPDFReport = () => {
     if (!reportData) return;
     const doc = new jsPDF();
     const { period, year, month } = reportFilter;
-    const dateStr = period === 'monthly' 
-      ? new Date(year, month).toLocaleString('default', { month: 'long', year: 'numeric' })
-      : period === 'halfyearly' ? `Half Yearly (${year})` : `Yearly (${year})`;
-
-    // Page 1: Financial Performance Summary
-    doc.setFontSize(22);
-    doc.setFont("helvetica", "bold");
-    doc.text("GLOBAL SAFETY SOLUTION", 14, 22);
-    doc.setFontSize(14);
-    doc.setFont("helvetica", "normal");
-    doc.text(`Consolidated Audit Statement - ${dateStr}`, 14, 30);
-    doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 14, 37);
-    doc.line(14, 40, 196, 40);
-
-    let currentY = 48;
-
-    // Profit & Loss Table
-    doc.setFontSize(12);
-    doc.setFont("helvetica", "bold");
-    doc.text("1. Profit & Loss Summary", 14, currentY);
-    currentY += 5;
-
-    const plRows = [
-      ["Total Revenue", `INR ${reportData.profitAndLoss.totalRevenue.toLocaleString()}`],
-      ["Total Operating Expenses", `INR ${reportData.profitAndLoss.totalExpense.toLocaleString()}`],
-      ["Net Business Profit", `INR ${reportData.profitAndLoss.netProfit.toLocaleString()}`]
-    ];
-
-    autoTable(doc, {
-      startY: currentY,
-      head: [["Indicator / Stream", "Balance"]],
-      body: plRows,
-      theme: "striped",
-      styles: { fontSize: 10 },
-      headStyles: { fillColor: [79, 70, 229] }
-    });
-
-    currentY = (doc as any).lastAutoTable.finalY + 15;
-
-    // Balance Sheet Table
-    doc.setFont("helvetica", "bold");
-    doc.text("2. Balance Sheet Summary", 14, currentY);
-    currentY += 5;
-
-    const bsRows = [
-      ["Assets Total", `INR ${reportData.balanceSheet.totalAssets.toLocaleString()}`],
-      ["Liabilities Total", `INR ${reportData.balanceSheet.totalLiabilities.toLocaleString()}`],
-      ["Equity Total", `INR ${reportData.balanceSheet.totalEquity.toLocaleString()}`],
-      ["Total Liabilities & Equity", `INR ${(reportData.balanceSheet.totalLiabilities + reportData.balanceSheet.totalEquity).toLocaleString()}`]
-    ];
-
-    autoTable(doc, {
-      startY: currentY,
-      head: [["Classification", "Balance"]],
-      body: bsRows,
-      theme: "striped",
-      styles: { fontSize: 10 },
-      headStyles: { fillColor: [13, 148, 136] }
-    });
-
-    // Page 2: Chart of Accounts
+    const ds = period === "monthly" ? new Date(year, month).toLocaleString("default", { month: "long", year: "numeric" }) : period === "halfyearly" ? `Half Yearly (${year})` : `Yearly (${year})`;
+    doc.setFontSize(20); doc.setFont("helvetica", "bold"); doc.text("GLOBAL SAFETY SOLUTION", 14, 20);
+    doc.setFontSize(12); doc.setFont("helvetica", "normal"); doc.text(`Consolidated Audit Statement - ${ds}`, 14, 28); doc.text(`Generated: ${new Date().toLocaleDateString()}`, 14, 34); doc.line(14, 38, 196, 38);
+    autoTable(doc, { startY: 42, head: [["Indicator", "Balance"]], body: [["Total Revenue", `INR ${reportData.profitAndLoss.totalRevenue.toLocaleString()}`], ["Total Expenses", `INR ${reportData.profitAndLoss.totalExpense.toLocaleString()}`], ["Net Profit", `INR ${reportData.profitAndLoss.netProfit.toLocaleString()}`]], theme: "striped", styles: { fontSize: 10 }, headStyles: { fillColor: [79, 70, 229] } });
+    let y = (doc as any).lastAutoTable.finalY + 15;
+    autoTable(doc, { startY: y, head: [["Classification", "Balance"]], body: [["Total Assets", `INR ${reportData.balanceSheet.totalAssets.toLocaleString()}`], ["Total Liabilities", `INR ${reportData.balanceSheet.totalLiabilities.toLocaleString()}`], ["Total Equity", `INR ${reportData.balanceSheet.totalEquity.toLocaleString()}`]], theme: "striped", styles: { fontSize: 10 }, headStyles: { fillColor: [13, 148, 136] } });
     doc.addPage();
-    doc.setFontSize(18);
-    doc.setFont("helvetica", "bold");
-    doc.text("3. Chart of Accounts (COA)", 14, 20);
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    doc.text("Active ledger classifications and aggregated current balances", 14, 26);
-    doc.line(14, 29, 196, 29);
-
-    const coaRows = accounts.map(a => [
-      a.code,
-      a.name,
-      a.type,
-      `INR ${Number(a.balance).toLocaleString()}`
-    ]);
-
-    autoTable(doc, {
-      startY: 33,
-      head: [["Code", "Account Name", "Type", "Current Balance"]],
-      body: coaRows,
-      theme: "striped",
-      styles: { fontSize: 9 },
-      headStyles: { fillColor: [147, 51, 234] }
-    });
-
-    // Page 3: Ledger Board / Audit Trail
-    doc.addPage();
-    doc.setFontSize(18);
-    doc.setFont("helvetica", "bold");
-    doc.text("4. Ledger Board (Journal Vouchers)", 14, 20);
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    doc.text(`Transaction ledger audit log for period: ${dateStr}`, 14, 26);
-    doc.line(14, 29, 196, 29);
-
-    const start = new Date(reportData.period.startDate);
-    const end = new Date(reportData.period.endDate);
-    const periodVouchers = vouchers.filter(v => {
-      const d = new Date(v.transaction_date);
-      return d >= start && d <= end;
-    });
-
-    const ledgerRows = periodVouchers.map(v => [
-      v.voucher_no,
-      new Date(v.transaction_date).toLocaleDateString(),
-      `${v.debit_account.name} (Dr) / ${v.credit_account.name} (Cr)`,
-      `INR ${Number(v.amount).toLocaleString()}`,
-      v.description,
-      v.created_by
-    ]);
-
-    autoTable(doc, {
-      startY: 33,
-      head: [["Voucher No", "Date", "Particulars", "Amount", "Narration", "Audited By"]],
-      body: ledgerRows,
-      theme: "striped",
-      styles: { fontSize: 8 },
-      headStyles: { fillColor: [100, 116, 139] }
-    });
-
-    const saveDateStr = period === 'monthly'
-      ? `${new Date(year, month).toLocaleString('default', { month: 'short' })}-${year}`
-      : period === 'halfyearly' ? `H-${year}` : `Yearly-${year}`;
-
-    doc.save(`Consolidated_Financial_Report_${saveDateStr}.pdf`);
-    toast.success("Consolidated PDF audit statement downloaded.");
+    if (reportData.trialBalance) { doc.setFontSize(16); doc.setFont("helvetica", "bold"); doc.text("Trial Balance", 14, 20); autoTable(doc, { startY: 26, head: [["Code", "Account", "Type", "Debit", "Credit"]], body: reportData.trialBalance.map((t: any) => [t.code, t.name, t.type, `INR ${Number(t.debit).toLocaleString()}`, `INR ${Number(t.credit).toLocaleString()}`]), theme: "striped", styles: { fontSize: 9 }, headStyles: { fillColor: [234, 88, 12] } }); }
+    const savDs = period === "monthly" ? `${new Date(year, month).toLocaleString("default", { month: "short" })}-${year}` : `${year}`;
+    doc.save(`Financial_Report_${savDs}.pdf`); toast.success("PDF downloaded!");
   };
+
+  const tabs = [
+    { key: "ledgers" as TabType, label: "Ledger Board", icon: Activity },
+    { key: "accounts" as TabType, label: "Chart of Accounts", icon: Scale },
+    { key: "reports" as TabType, label: "Financial Reports", icon: TrendingUp },
+    { key: "trialbalance" as TabType, label: "Trial Balance", icon: Scale },
+    { key: "audit" as TabType, label: "Audit Trail", icon: ShieldAlert },
+  ];
 
   return (
     <div className="space-y-8">
@@ -587,368 +221,125 @@ export default function AccountingPage() {
           </h1>
           <p className="text-muted-foreground font-medium">Professional double-entry ledger book, chart of accounts, and audit reports.</p>
         </div>
-
         <div className="flex items-center gap-3">
           <Dialog open={openAccountDialog} onOpenChange={setOpenAccountDialog}>
-            <DialogTrigger asChild>
-              <Button variant="outline" className="border-border hover:bg-accent/10 rounded-xl h-11 font-bold">
-                Add Account
-              </Button>
-            </DialogTrigger>
+            <DialogTrigger asChild><Button variant="outline" className="border-border hover:bg-accent/10 rounded-xl h-11 font-bold">Add Account</Button></DialogTrigger>
             <DialogContent className="bg-card border-border text-foreground rounded-2xl max-w-md p-6">
-              <DialogHeader>
-                <DialogTitle className="text-xl font-bold">New Ledger Account</DialogTitle>
-                <DialogDescription>Initialize a new account in your global Chart of Accounts.</DialogDescription>
-              </DialogHeader>
+              <DialogHeader><DialogTitle className="text-xl font-bold">New Ledger Account</DialogTitle><DialogDescription>Initialize a new account in your Chart of Accounts.</DialogDescription></DialogHeader>
               <form onSubmit={handleCreateAccount} className="space-y-4 py-4">
-                <div className="space-y-1">
-                  <Label>Account Name</Label>
-                  <Input 
-                    placeholder="e.g. Petty Cash"
-                    value={accountForm.name}
-                    onChange={(e) => setAccountForm({ ...accountForm, name: e.target.value })}
-                    className="bg-background border-border"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label>Account Code (Unique)</Label>
-                  <Input 
-                    placeholder="e.g. 1020"
-                    value={accountForm.code}
-                    onChange={(e) => setAccountForm({ ...accountForm, code: e.target.value })}
-                    className="bg-background border-border"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label>Classification</Label>
-                  <select 
-                    value={accountForm.type}
-                    onChange={(e) => setAccountForm({ ...accountForm, type: e.target.value, parent_id: "" })}
-                    className="w-full h-10 px-3 rounded-lg border border-border bg-background text-foreground"
-                  >
-                    <option value="ASSET">ASSET</option>
-                    <option value="LIABILITY">LIABILITY</option>
-                    <option value="EQUITY">EQUITY</option>
-                    <option value="REVENUE">REVENUE</option>
-                    <option value="EXPENSE">EXPENSE</option>
+                <div className="space-y-1"><Label>Account Name</Label><Input placeholder="e.g. Petty Cash" value={accountForm.name} onChange={(e) => setAccountForm({ ...accountForm, name: e.target.value })} className="bg-background border-border" /></div>
+                <div className="space-y-1"><Label>Account Code (Unique)</Label><Input placeholder="e.g. 1020" value={accountForm.code} onChange={(e) => setAccountForm({ ...accountForm, code: e.target.value })} className="bg-background border-border" /></div>
+                <div className="space-y-1"><Label>Classification</Label>
+                  <select value={accountForm.type} onChange={(e) => setAccountForm({ ...accountForm, type: e.target.value, parent_id: "" })} className="w-full h-10 px-3 rounded-lg border border-border bg-background text-foreground">
+                    <option value="ASSET">ASSET</option><option value="LIABILITY">LIABILITY</option><option value="EQUITY">EQUITY</option><option value="REVENUE">REVENUE</option><option value="EXPENSE">EXPENSE</option>
                   </select>
                 </div>
-                <div className="space-y-1">
-                  <Label>Parent Account (Optional Sub-category)</Label>
-                  <select 
-                    value={accountForm.parent_id}
-                    onChange={(e) => setAccountForm({ ...accountForm, parent_id: e.target.value })}
-                    className="w-full h-10 px-3 rounded-lg border border-border bg-background text-foreground"
-                  >
+                <div className="space-y-1"><Label>Parent Account (Optional)</Label>
+                  <select value={accountForm.parent_id} onChange={(e) => setAccountForm({ ...accountForm, parent_id: e.target.value })} className="w-full h-10 px-3 rounded-lg border border-border bg-background text-foreground">
                     <option value="">None (Primary Category)</option>
-                    {accounts
-                      .filter(a => a.type === accountForm.type && !a.parent_id)
-                      .map(a => (
-                        <option key={a.id} value={a.id}>{a.name} ({a.code})</option>
-                      ))
-                    }
+                    {accounts.filter(a => a.type === accountForm.type && !a.parent_id).map(a => (<option key={a.id} value={a.id}>{a.name} ({a.code})</option>))}
                   </select>
                 </div>
-                <div className="space-y-1">
-                  <Label>Opening Balance (INR - Optional)</Label>
-                  <Input 
-                    type="number"
-                    step="0.01"
-                    placeholder="0.00"
-                    value={accountForm.opening_balance}
-                    onChange={(e) => setAccountForm({ ...accountForm, opening_balance: e.target.value })}
-                    className="bg-background border-border"
-                  />
-                </div>
-                <DialogFooter className="pt-4">
-                  <Button type="submit" className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold w-full rounded-xl">
-                    Create Account
-                  </Button>
-                </DialogFooter>
+                <div className="space-y-1"><Label>Opening Balance (INR - Optional)</Label><Input type="number" step="0.01" placeholder="0.00" value={accountForm.opening_balance} onChange={(e) => setAccountForm({ ...accountForm, opening_balance: e.target.value })} className="bg-background border-border" /></div>
+                <DialogFooter><Button type="submit" className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold w-full rounded-xl">Create Account</Button></DialogFooter>
               </form>
             </DialogContent>
           </Dialog>
-
           <Dialog open={openTransactionDialog} onOpenChange={setOpenTransactionDialog}>
-            <DialogTrigger asChild>
-              <Button className="bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl h-11 font-bold px-6 shadow-lg shadow-emerald-500/20">
-                <Plus className="w-4 h-4 mr-2" /> Log Transaction
-              </Button>
-            </DialogTrigger>
+            <DialogTrigger asChild><Button className="bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl h-11 font-bold px-6 shadow-lg shadow-emerald-500/20"><Plus className="w-4 h-4 mr-2" /> Log Transaction</Button></DialogTrigger>
             <DialogContent className="bg-card border-border text-foreground rounded-2xl max-w-lg p-6">
-              <DialogHeader>
-                <DialogTitle className="text-xl font-bold">Log Transaction</DialogTitle>
-                <DialogDescription>Quickly record a manual expense payment or income receipt.</DialogDescription>
-              </DialogHeader>
+              <DialogHeader><DialogTitle className="text-xl font-bold">Log Transaction</DialogTitle><DialogDescription>Record a manual expense or income receipt.</DialogDescription></DialogHeader>
               <form onSubmit={handleCreateTransaction} className="space-y-4 py-4">
-                <div className="space-y-1">
-                  <Label>Transaction Type</Label>
-                  <select
-                    value={transactionForm.type}
-                    onChange={(e) => setTransactionForm({ ...transactionForm, type: e.target.value as any, category_id: "" })}
-                    className="w-full h-10 px-3 rounded-lg border border-border bg-background text-foreground"
-                  >
-                    <option value="EXPENSE">Expense (Outflow / Payment)</option>
-                    <option value="REVENUE">Revenue (Inflow / Receipt)</option>
+                <div className="space-y-1"><Label>Transaction Type</Label>
+                  <select value={transactionForm.type} onChange={(e) => setTransactionForm({ ...transactionForm, type: e.target.value as any, category_id: "" })} className="w-full h-10 px-3 rounded-lg border border-border bg-background text-foreground">
+                    <option value="EXPENSE">Expense (Outflow / Payment)</option><option value="REVENUE">Revenue (Inflow / Receipt)</option>
                   </select>
                 </div>
-
-                <div className="space-y-1">
-                  <Label>Category Account</Label>
-                  <select
-                    value={transactionForm.category_id}
-                    onChange={(e) => setTransactionForm({ ...transactionForm, category_id: e.target.value })}
-                    className="w-full h-10 px-3 rounded-lg border border-border bg-background text-foreground"
-                  >
+                <div className="space-y-1"><Label>Category Account</Label>
+                  <select value={transactionForm.category_id} onChange={(e) => setTransactionForm({ ...transactionForm, category_id: e.target.value })} className="w-full h-10 px-3 rounded-lg border border-border bg-background text-foreground">
                     <option value="">Select Category</option>
-                    {accounts
-                      .filter(a => a.type === (transactionForm.type === 'EXPENSE' ? 'EXPENSE' : 'REVENUE'))
-                      .map(a => (
-                        <option key={a.id} value={a.id}>{a.name} ({a.code})</option>
-                      ))
-                    }
+                    {accounts.filter(a => a.type === (transactionForm.type === "EXPENSE" ? "EXPENSE" : "REVENUE")).map(a => (<option key={a.id} value={a.id}>{a.name} ({a.code})</option>))}
                   </select>
                 </div>
-
-                <div className="space-y-1">
-                  <Label>{transactionForm.type === 'EXPENSE' ? 'Paid From (Bank/Cash Account)' : 'Deposit To (Bank/Cash Account)'}</Label>
-                  <select
-                    value={transactionForm.bank_account_id}
-                    onChange={(e) => setTransactionForm({ ...transactionForm, bank_account_id: e.target.value })}
-                    className="w-full h-10 px-3 rounded-lg border border-border bg-background text-foreground"
-                  >
+                <div className="space-y-1"><Label>{transactionForm.type === "EXPENSE" ? "Paid From (Bank/Cash Account)" : "Deposit To (Bank/Cash Account)"}</Label>
+                  <select value={transactionForm.bank_account_id} onChange={(e) => setTransactionForm({ ...transactionForm, bank_account_id: e.target.value })} className="w-full h-10 px-3 rounded-lg border border-border bg-background text-foreground">
                     <option value="">Select Account</option>
-                    {accounts
-                      .filter(a => a.type === 'ASSET')
-                      .map(a => (
-                        <option key={a.id} value={a.id}>{a.name} ({a.code})</option>
-                      ))
-                    }
+                    {accounts.filter(a => a.type === "ASSET").map(a => (<option key={a.id} value={a.id}>{a.name} ({a.code})</option>))}
                   </select>
                 </div>
-
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <Label>Amount (INR)</Label>
-                    <Input 
-                      type="number"
-                      step="0.01"
-                      placeholder="0.00"
-                      value={transactionForm.amount}
-                      onChange={(e) => setTransactionForm({ ...transactionForm, amount: e.target.value })}
-                      className="bg-background border-border"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label>Transaction Date</Label>
-                    <Input 
-                      type="date"
-                      value={transactionForm.transaction_date}
-                      onChange={(e) => setTransactionForm({ ...transactionForm, transaction_date: e.target.value })}
-                      className="bg-background border-border"
-                    />
-                  </div>
+                  <div className="space-y-1"><Label>Amount (INR)</Label><Input type="number" step="0.01" placeholder="0.00" value={transactionForm.amount} onChange={(e) => setTransactionForm({ ...transactionForm, amount: e.target.value })} className="bg-background border-border" /></div>
+                  <div className="space-y-1"><Label>Transaction Date</Label><Input type="date" value={transactionForm.transaction_date} onChange={(e) => setTransactionForm({ ...transactionForm, transaction_date: e.target.value })} className="bg-background border-border" /></div>
                 </div>
-
-                <div className="space-y-1">
-                  <Label>Narration / Description</Label>
-                  <Input 
-                    placeholder="Enter details (e.g. Paid Wi-Fi bill)"
-                    value={transactionForm.description}
-                    onChange={(e) => setTransactionForm({ ...transactionForm, description: e.target.value })}
-                    className="bg-background border-border"
-                  />
-                </div>
-
-                <DialogFooter className="pt-4">
-                  <Button type="submit" className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold w-full rounded-xl">
-                    Save Transaction
-                  </Button>
-                </DialogFooter>
+                <div className="space-y-1"><Label>Narration</Label><Input placeholder="e.g. Paid Wi-Fi bill" value={transactionForm.description} onChange={(e) => setTransactionForm({ ...transactionForm, description: e.target.value })} className="bg-background border-border" /></div>
+                <DialogFooter><Button type="submit" className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold w-full rounded-xl">Save Transaction</Button></DialogFooter>
               </form>
             </DialogContent>
           </Dialog>
-
           <Dialog open={openVoucherDialog} onOpenChange={setOpenVoucherDialog}>
-            <DialogTrigger asChild>
-              <Button className="bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl h-11 font-bold px-6 shadow-lg shadow-indigo-500/20">
-                <Plus className="w-4 h-4 mr-2" /> Post Voucher
-              </Button>
-            </DialogTrigger>
+            <DialogTrigger asChild><Button className="bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl h-11 font-bold px-6 shadow-lg shadow-indigo-500/20"><Plus className="w-4 h-4 mr-2" /> Post Voucher</Button></DialogTrigger>
             <DialogContent className="bg-card border-border text-foreground rounded-2xl max-w-lg p-6">
-              <DialogHeader>
-                <DialogTitle className="text-xl font-bold">New Journal Voucher (JV)</DialogTitle>
-                <DialogDescription>Record a custom double-entry bookkeeping ledger voucher.</DialogDescription>
-              </DialogHeader>
+              <DialogHeader><DialogTitle className="text-xl font-bold">New Journal Voucher (JV)</DialogTitle><DialogDescription>Record a custom double-entry ledger voucher.</DialogDescription></DialogHeader>
               <form onSubmit={handleCreateVoucher} className="space-y-4 py-4">
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <Label>Debit Account (Dr.)</Label>
-                    <select
-                      value={voucherForm.debit_code}
-                      onChange={(e) => setVoucherForm({ ...voucherForm, debit_code: e.target.value })}
-                      className="w-full h-10 px-3 rounded-lg border border-border bg-background text-foreground"
-                    >
+                  <div className="space-y-1"><Label>Debit Account (Dr.)</Label>
+                    <select value={voucherForm.debit_code} onChange={(e) => setVoucherForm({ ...voucherForm, debit_code: e.target.value })} className="w-full h-10 px-3 rounded-lg border border-border bg-background text-foreground">
                       <option value="">Select Account</option>
-                      {accounts.map(a => (
-                        <option key={a.id} value={a.code}>{a.name} ({a.code}) - {a.type}</option>
-                      ))}
+                      {accounts.map(a => (<option key={a.id} value={a.code}>{a.name} ({a.code})</option>))}
                     </select>
                   </div>
-                  <div className="space-y-1">
-                    <Label>Credit Account (Cr.)</Label>
-                    <select
-                      value={voucherForm.credit_code}
-                      onChange={(e) => setVoucherForm({ ...voucherForm, credit_code: e.target.value })}
-                      className="w-full h-10 px-3 rounded-lg border border-border bg-background text-foreground"
-                    >
+                  <div className="space-y-1"><Label>Credit Account (Cr.)</Label>
+                    <select value={voucherForm.credit_code} onChange={(e) => setVoucherForm({ ...voucherForm, credit_code: e.target.value })} className="w-full h-10 px-3 rounded-lg border border-border bg-background text-foreground">
                       <option value="">Select Account</option>
-                      {accounts.map(a => (
-                        <option key={a.id} value={a.code}>{a.name} ({a.code}) - {a.type}</option>
-                      ))}
+                      {accounts.map(a => (<option key={a.id} value={a.code}>{a.name} ({a.code})</option>))}
                     </select>
                   </div>
                 </div>
-
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <Label>Amount (INR)</Label>
-                    <Input 
-                      type="number"
-                      step="0.01"
-                      placeholder="0.00"
-                      value={voucherForm.amount}
-                      onChange={(e) => setVoucherForm({ ...voucherForm, amount: e.target.value })}
-                      className="bg-background border-border"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label>Posting Date</Label>
-                    <Input 
-                      type="date"
-                      value={voucherForm.transaction_date}
-                      onChange={(e) => setVoucherForm({ ...voucherForm, transaction_date: e.target.value })}
-                      className="bg-background border-border"
-                    />
-                  </div>
+                  <div className="space-y-1"><Label>Amount (INR)</Label><Input type="number" step="0.01" placeholder="0.00" value={voucherForm.amount} onChange={(e) => setVoucherForm({ ...voucherForm, amount: e.target.value })} className="bg-background border-border" /></div>
+                  <div className="space-y-1"><Label>Posting Date</Label><Input type="date" value={voucherForm.transaction_date} onChange={(e) => setVoucherForm({ ...voucherForm, transaction_date: e.target.value })} className="bg-background border-border" /></div>
                 </div>
-
-                <div className="space-y-1">
-                  <Label>Narration / Description</Label>
-                  <Input 
-                    placeholder="Enter transactional details"
-                    value={voucherForm.description}
-                    onChange={(e) => setVoucherForm({ ...voucherForm, description: e.target.value })}
-                    className="bg-background border-border"
-                  />
-                </div>
-
-                <DialogFooter className="pt-4">
-                  <Button type="submit" className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold w-full rounded-xl">
-                    Post Journal Voucher
-                  </Button>
-                </DialogFooter>
+                <div className="space-y-1"><Label>Narration</Label><Input placeholder="Enter transactional details" value={voucherForm.description} onChange={(e) => setVoucherForm({ ...voucherForm, description: e.target.value })} className="bg-background border-border" /></div>
+                <DialogFooter><Button type="submit" className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold w-full rounded-xl">Post Journal Voucher</Button></DialogFooter>
               </form>
             </DialogContent>
           </Dialog>
         </div>
       </div>
 
-      {/* Tabs list */}
-      <div className="flex border-b border-border/80">
-        <button
-          onClick={() => setActiveTab("ledgers")}
-          className={cn(
-            "px-6 py-3 font-bold text-sm border-b-2 transition-all",
-            activeTab === "ledgers" ? "border-indigo-500 text-indigo-500" : "border-transparent text-muted-foreground hover:text-foreground"
-          )}
-        >
-          Ledger Board
-        </button>
-        <button
-          onClick={() => setActiveTab("accounts")}
-          className={cn(
-            "px-6 py-3 font-bold text-sm border-b-2 transition-all",
-            activeTab === "accounts" ? "border-indigo-500 text-indigo-500" : "border-transparent text-muted-foreground hover:text-foreground"
-          )}
-        >
-          Chart of Accounts
-        </button>
-        <button
-          onClick={() => setActiveTab("reports")}
-          className={cn(
-            "px-6 py-3 font-bold text-sm border-b-2 transition-all",
-            activeTab === "reports" ? "border-indigo-500 text-indigo-500" : "border-transparent text-muted-foreground hover:text-foreground"
-          )}
-        >
-          Financial Reports
-        </button>
+      <div className="flex flex-wrap border-b border-border/80">
+        {tabs.map(tab => (
+          <button key={tab.key} onClick={() => setActiveTab(tab.key)} className={cn("px-5 py-3 font-bold text-sm border-b-2 transition-all flex items-center gap-2", activeTab === tab.key ? "border-indigo-500 text-indigo-500" : "border-transparent text-muted-foreground hover:text-foreground")}>
+            <tab.icon className="w-4 h-4" />{tab.label}
+          </button>
+        ))}
       </div>
 
-      {loading && activeTab !== "reports" ? (
-        <div className="flex items-center justify-center py-20">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500"></div>
-        </div>
+      {loading && activeTab !== "reports" && activeTab !== "trialbalance" && activeTab !== "audit" ? (
+        <div className="flex items-center justify-center py-20"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500"></div></div>
       ) : (
         <>
           {activeTab === "ledgers" && (
             <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
               <div className="p-6 border-b border-border flex items-center justify-between">
                 <h3 className="font-bold text-lg">Voucher Audit Entries</h3>
-                <div className="flex items-center gap-3">
-                  <div className="relative">
-                    <Search className="w-4 h-4 absolute left-3 top-3.5 text-muted-foreground" />
-                    <Input 
-                      placeholder="Search vouchers..." 
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-9 h-10 w-64 bg-background border-border rounded-xl" 
-                    />
-                  </div>
-                </div>
+                <div className="relative"><Search className="w-4 h-4 absolute left-3 top-3.5 text-muted-foreground" /><Input placeholder="Search vouchers..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9 h-10 w-64 bg-background border-border rounded-xl" /></div>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="bg-accent/5 border-b border-border text-muted-foreground text-xs font-black uppercase tracking-wider">
-                      <th className="py-4 px-6">Voucher No</th>
-                      <th className="py-4 px-6">Date</th>
-                      <th className="py-4 px-6">Particulars (Dr / Cr)</th>
-                      <th className="py-4 px-6 text-right">Debit (Dr)</th>
-                      <th className="py-4 px-6 text-right">Credit (Cr)</th>
-                      <th className="py-4 px-6">Narration</th>
-                      <th className="py-4 px-6">Audited By</th>
-                    </tr>
-                  </thead>
+                  <thead><tr className="bg-accent/5 border-b border-border text-muted-foreground text-xs font-black uppercase tracking-wider"><th className="py-4 px-6">Voucher No</th><th className="py-4 px-6">Date</th><th className="py-4 px-6">Particulars (Dr / Cr)</th><th className="py-4 px-6 text-right">Debit (Dr)</th><th className="py-4 px-6 text-right">Credit (Cr)</th><th className="py-4 px-6">Narration</th><th className="py-4 px-6">Audited By</th></tr></thead>
                   <tbody className="divide-y divide-border/60 text-sm">
-                    {filteredVouchers.length === 0 ? (
-                      <tr>
-                        <td colSpan={7} className="py-10 text-center text-muted-foreground italic">No vouchers found.</td>
+                    {filteredVouchers.length === 0 ? (<tr><td colSpan={7} className="py-10 text-center text-muted-foreground italic">No vouchers found.</td></tr>) : filteredVouchers.map(v => (
+                      <tr key={v.id} className="hover:bg-accent/5 transition-colors">
+                        <td className="py-4 px-6 font-bold text-indigo-500">{v.voucher_no}</td>
+                        <td className="py-4 px-6 text-muted-foreground">{new Date(v.transaction_date).toLocaleDateString()}</td>
+                        <td className="py-4 px-6 font-medium space-y-1"><div className="flex items-center gap-1.5 text-emerald-500"><ArrowUpRight className="w-3.5 h-3.5" />{v.debit_account.name} ({v.debit_account.code})</div><div className="flex items-center gap-1.5 text-rose-500 pl-4"><ArrowDownLeft className="w-3.5 h-3.5" />{v.credit_account.name} ({v.credit_account.code})</div></td>
+                        <td className="py-4 px-6 text-right font-bold text-emerald-500">₹{Number(v.amount).toLocaleString()}</td>
+                        <td className="py-4 px-6 text-right font-bold text-rose-500">₹{Number(v.amount).toLocaleString()}</td>
+                        <td className="py-4 px-6 text-muted-foreground max-w-xs truncate cursor-help" title={v.description}>{v.description}</td>
+                        <td className="py-4 px-6"><div className="flex items-center gap-1.5"><User className="w-3.5 h-3.5 text-indigo-400" /><span className="text-xs font-bold text-indigo-400">{v.created_by}</span></div></td>
                       </tr>
-                    ) : (
-                      filteredVouchers.map(v => (
-                        <tr key={v.id} className="hover:bg-accent/5 transition-colors">
-                          <td className="py-4 px-6 font-bold text-indigo-500">{v.voucher_no}</td>
-                          <td className="py-4 px-6 text-muted-foreground">
-                            {new Date(v.transaction_date).toLocaleDateString()}
-                          </td>
-                          <td className="py-4 px-6 font-medium space-y-1">
-                            <div className="flex items-center gap-1.5 text-emerald-500">
-                              <ArrowUpRight className="w-3.5 h-3.5" />
-                              {v.debit_account.name} ({v.debit_account.code})
-                            </div>
-                            <div className="flex items-center gap-1.5 text-rose-500 pl-4">
-                              <ArrowDownLeft className="w-3.5 h-3.5" />
-                              {v.credit_account.name} ({v.credit_account.code})
-                            </div>
-                          </td>
-                          <td className="py-4 px-6 text-right font-bold text-emerald-500">₹{Number(v.amount).toLocaleString()}</td>
-                          <td className="py-4 px-6 text-right font-bold text-rose-500">₹{Number(v.amount).toLocaleString()}</td>
-                          <td className="py-4 px-6 text-muted-foreground max-w-xs truncate cursor-help" title={v.description}>{v.description}</td>
-                          <td className="py-4 px-6 text-xs font-bold uppercase text-muted-foreground">{v.created_by}</td>
-                        </tr>
-                      ))
-                    )}
+                    ))}
                   </tbody>
                 </table>
               </div>
@@ -956,225 +347,195 @@ export default function AccountingPage() {
           )}
 
           {activeTab === "accounts" && (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              <div className="lg:col-span-2 bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
-                <div className="p-6 border-b border-border">
-                  <h3 className="font-bold text-lg">Chart of Accounts Ledger</h3>
+            <>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div className="lg:col-span-2 bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
+                  <div className="p-6 border-b border-border"><h3 className="font-bold text-lg">Chart of Accounts Ledger</h3></div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead><tr className="bg-accent/5 border-b border-border text-muted-foreground text-xs font-black uppercase tracking-wider"><th className="py-4 px-6">Code</th><th className="py-4 px-6">Account Name</th><th className="py-4 px-6">Type</th><th className="py-4 px-6 text-right">Current Balance</th><th className="py-4 px-6 text-center">Actions</th></tr></thead>
+                      <tbody className="divide-y divide-border/60 text-sm">
+                        {accounts.map(a => (
+                          <tr key={a.id} className="hover:bg-accent/5 transition-colors">
+                            <td className={cn("py-4 px-6 font-mono font-bold text-indigo-500", a.parent_id ? "pl-8 text-indigo-500/70" : "")}>{a.parent_id && <span className="text-muted-foreground mr-1">↳</span>}{a.code}</td>
+                            <td className={cn("py-4 px-6 font-medium", a.parent_id ? "pl-8 text-muted-foreground text-xs" : "")}><button onClick={() => { setDrillAccount(a); setDrillStart(""); setDrillEnd(""); }} className="hover:text-indigo-500 hover:underline transition-colors text-left">{a.name}</button></td>
+                            <td className="py-4 px-6"><span className={cn("text-xs px-2.5 py-1 rounded-full font-bold", accountTypeColor(a.type))}>{a.type}</span></td>
+                            <td className={cn("py-4 px-6 text-right font-black text-base", Number(a.balance) >= 0 ? "text-emerald-500" : "text-rose-500")}>₹{Number(a.balance).toLocaleString()}</td>
+                            <td className="py-4 px-6 text-center"><button onClick={() => { setEditOBAccount(a); setEditOBAmount(String(a.balance)); }} title="Edit Opening Balance" className="p-1.5 rounded-lg hover:bg-indigo-500/10 text-muted-foreground hover:text-indigo-500 transition-colors"><Pencil className="w-3.5 h-3.5" /></button></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="bg-accent/5 border-b border-border text-muted-foreground text-xs font-black uppercase tracking-wider">
-                        <th className="py-4 px-6">Code</th>
-                        <th className="py-4 px-6">Account Name</th>
-                        <th className="py-4 px-6">Type</th>
-                        <th className="py-4 px-6 text-right">Current Balance</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border/60 text-sm">
-                      {accounts.map(a => (
-                        <tr key={a.id} className="hover:bg-accent/5 transition-colors">
-                          <td className={cn("py-4 px-6 font-mono font-bold text-indigo-500", a.parent_id ? "pl-8 text-indigo-500/70" : "")}>
-                            {a.parent_id && <span className="text-muted-foreground mr-1">↳</span>}
-                            {a.code}
-                          </td>
-                          <td className={cn("py-4 px-6 font-medium", a.parent_id ? "pl-8 text-muted-foreground text-xs" : "")}>
-                            {a.name}
-                          </td>
-                          <td className="py-4 px-6">
-                            <span className={cn(
-                              "text-xs px-2.5 py-1 rounded-full font-bold",
-                              a.type === 'ASSET' ? "bg-blue-500/10 text-blue-500" :
-                              a.type === 'LIABILITY' ? "bg-amber-500/10 text-amber-500" :
-                              a.type === 'EQUITY' ? "bg-purple-500/10 text-purple-500" :
-                              a.type === 'REVENUE' ? "bg-emerald-500/10 text-emerald-500" : "bg-rose-500/10 text-rose-500"
-                            )}>
-                              {a.type}
-                            </span>
-                          </td>
-                          <td className={cn(
-                            "py-4 px-6 text-right font-black text-base",
-                            Number(a.balance) >= 0 ? "text-emerald-500" : "text-rose-500"
-                          )}>
-                            ₹{Number(a.balance).toLocaleString()}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Tally Stats Card */}
-              <div className="space-y-6">
-                <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
-                  <h3 className="font-bold text-lg mb-4">Financial Equilibrium</h3>
-                  <div className="space-y-4">
-                    <div className="p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/10 flex justify-between items-center">
-                      <div>
-                        <p className="text-xs text-muted-foreground font-medium uppercase">Total Assets</p>
-                        <p className="text-xl font-bold text-emerald-500 mt-1">
-                          ₹{accounts.filter(a => a.type === 'ASSET').reduce((sum, a) => sum + Number(a.balance), 0).toLocaleString()}
-                        </p>
-                      </div>
-                      <TrendingUp className="w-8 h-8 text-emerald-500 opacity-35" />
-                    </div>
-                    <div className="p-4 rounded-xl bg-rose-500/5 border border-rose-500/10 flex justify-between items-center">
-                      <div>
-                        <p className="text-xs text-muted-foreground font-medium uppercase">Total Liabilities</p>
-                        <p className="text-xl font-bold text-rose-500 mt-1">
-                          ₹{accounts.filter(a => a.type === 'LIABILITY').reduce((sum, a) => sum + Number(a.balance), 0).toLocaleString()}
-                        </p>
-                      </div>
-                      <ShieldAlert className="w-8 h-8 text-rose-500 opacity-35" />
+                <div className="space-y-6">
+                  <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
+                    <h3 className="font-bold text-lg mb-4">Financial Equilibrium</h3>
+                    <div className="space-y-4">
+                      <div className="p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/10 flex justify-between items-center"><div><p className="text-xs text-muted-foreground font-medium uppercase">Total Assets</p><p className="text-xl font-bold text-emerald-500 mt-1">₹{accounts.filter(a => a.type === "ASSET").reduce((sum, a) => sum + Number(a.balance), 0).toLocaleString()}</p></div><TrendingUp className="w-8 h-8 text-emerald-500 opacity-35" /></div>
+                      <div className="p-4 rounded-xl bg-rose-500/5 border border-rose-500/10 flex justify-between items-center"><div><p className="text-xs text-muted-foreground font-medium uppercase">Total Liabilities</p><p className="text-xl font-bold text-rose-500 mt-1">₹{accounts.filter(a => a.type === "LIABILITY").reduce((sum, a) => sum + Number(a.balance), 0).toLocaleString()}</p></div><ShieldAlert className="w-8 h-8 text-rose-500 opacity-35" /></div>
+                      <div className="p-4 rounded-xl bg-purple-500/5 border border-purple-500/10 flex justify-between items-center"><div><p className="text-xs text-muted-foreground font-medium uppercase">Total Equity</p><p className="text-xl font-bold text-purple-500 mt-1">₹{accounts.filter(a => a.type === "EQUITY").reduce((sum, a) => sum + Number(a.balance), 0).toLocaleString()}</p></div><DollarSign className="w-8 h-8 text-purple-500 opacity-35" /></div>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
+              {drillAccount && (
+                <div className="bg-card border border-indigo-500/30 rounded-2xl shadow-lg overflow-hidden">
+                  <div className="p-5 border-b border-border flex items-center justify-between bg-indigo-500/5">
+                    <div><h3 className="font-bold text-base text-indigo-500">{drillAccount.name} ({drillAccount.code})</h3><p className="text-xs text-muted-foreground mt-0.5">Individual account ledger — date-filtered transaction history</p></div>
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2">
+                        <Label className="text-xs text-muted-foreground whitespace-nowrap">From</Label><Input type="date" value={drillStart} onChange={e => setDrillStart(e.target.value)} className="h-8 text-xs bg-background border-border w-36" />
+                        <Label className="text-xs text-muted-foreground whitespace-nowrap">To</Label><Input type="date" value={drillEnd} onChange={e => setDrillEnd(e.target.value)} className="h-8 text-xs bg-background border-border w-36" />
+                      </div>
+                      <button onClick={() => { setDrillAccount(null); setDrillEntries([]); }} className="p-1.5 rounded-lg hover:bg-rose-500/10 text-muted-foreground hover:text-rose-500 transition-colors"><X className="w-4 h-4" /></button>
+                    </div>
+                  </div>
+                  {drillLoading ? (<div className="flex items-center justify-center py-10"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-500"></div></div>) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse">
+                        <thead><tr className="bg-accent/5 border-b border-border text-muted-foreground text-xs font-black uppercase tracking-wider"><th className="py-3 px-5">Voucher No</th><th className="py-3 px-5">Date</th><th className="py-3 px-5">Particulars</th><th className="py-3 px-5 text-right">Debit (Dr)</th><th className="py-3 px-5 text-right">Credit (Cr)</th><th className="py-3 px-5 text-right">Running Balance</th><th className="py-3 px-5">Audited By</th></tr></thead>
+                        <tbody className="divide-y divide-border/60 text-sm">
+                          {drillEntries.length === 0 ? (<tr><td colSpan={7} className="py-8 text-center text-muted-foreground italic">No transactions found for selected range.</td></tr>) : drillEntries.map((e: any) => (
+                            <tr key={e.id} className="hover:bg-accent/5 transition-colors">
+                              <td className="py-3 px-5 font-bold text-indigo-500 text-xs">{e.voucher_no}</td>
+                              <td className="py-3 px-5 text-muted-foreground text-xs">{new Date(e.transaction_date).toLocaleDateString()}</td>
+                              <td className="py-3 px-5 text-xs">{e.particulars} ({e.particulars_code})</td>
+                              <td className="py-3 px-5 text-right text-xs font-bold text-emerald-500">{e.debit > 0 ? `₹${Number(e.debit).toLocaleString()}` : "—"}</td>
+                              <td className="py-3 px-5 text-right text-xs font-bold text-rose-500">{e.credit > 0 ? `₹${Number(e.credit).toLocaleString()}` : "—"}</td>
+                              <td className={cn("py-3 px-5 text-right text-xs font-black", e.balance >= 0 ? "text-emerald-500" : "text-rose-500")}>₹{Number(e.balance).toLocaleString()}</td>
+                              <td className="py-3 px-5 text-xs text-indigo-400 font-semibold">{e.created_by}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
+              {editOBAccount && (
+                <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center backdrop-blur-sm" onClick={() => setEditOBAccount(null)}>
+                  <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-md shadow-2xl" onClick={e => e.stopPropagation()}>
+                    <div className="flex items-center justify-between mb-4"><div><h3 className="font-bold text-lg">Edit Opening Balance</h3><p className="text-xs text-muted-foreground mt-0.5">{editOBAccount.name} ({editOBAccount.code})</p></div><button onClick={() => setEditOBAccount(null)} className="p-1.5 rounded-lg hover:bg-rose-500/10 text-muted-foreground hover:text-rose-500 transition-colors"><X className="w-4 h-4" /></button></div>
+                    <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 mb-4"><p className="text-xs text-amber-500 font-medium">Warning: This will reverse the old opening balance entry and create a new one. Both account balance and the ledger entry will be updated.</p></div>
+                    <form onSubmit={handleUpdateOpeningBalance} className="space-y-4">
+                      <div className="space-y-1"><Label>New Opening Balance (INR)</Label><Input type="number" step="0.01" placeholder="0.00" value={editOBAmount} onChange={e => setEditOBAmount(e.target.value)} className="bg-background border-border" autoFocus /></div>
+                      <Button type="submit" disabled={editOBLoading} className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold w-full rounded-xl">{editOBLoading ? "Updating..." : "Update Opening Balance"}</Button>
+                    </form>
+                  </div>
+                </div>
+              )}
+            </>
           )}
 
           {activeTab === "reports" && (
             <div className="space-y-8">
-              {/* Reports Filter Bar */}
               <div className="bg-card border border-border rounded-2xl p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm">
                 <div className="flex flex-wrap items-center gap-4">
-                  <div className="flex flex-col gap-1">
-                    <Label className="text-xs font-bold text-muted-foreground">Reporting Period</Label>
-                    <select
-                      value={reportFilter.period}
-                      onChange={(e) => setReportFilter({ ...reportFilter, period: e.target.value as any })}
-                      className="h-10 px-3 rounded-xl border border-border bg-background text-sm text-foreground font-medium"
-                    >
-                      <option value="monthly">Monthly Statement</option>
-                      <option value="halfyearly">Half Yearly (H1/H2)</option>
-                      <option value="yearly">Yearly Statement</option>
-                    </select>
-                  </div>
-                  {reportFilter.period === 'monthly' && (
-                    <div className="flex flex-col gap-1">
-                      <Label className="text-xs font-bold text-muted-foreground">Month</Label>
-                      <select
-                        value={reportFilter.month}
-                        onChange={(e) => setReportFilter({ ...reportFilter, month: Number(e.target.value) })}
-                        className="h-10 px-3 rounded-xl border border-border bg-background text-sm text-foreground font-medium"
-                      >
-                        {Array.from({ length: 12 }, (_, i) => (
-                          <option key={i} value={i}>
-                            {new Date(0, i).toLocaleString('default', { month: 'long' })}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-                  <div className="flex flex-col gap-1">
-                    <Label className="text-xs font-bold text-muted-foreground">Year</Label>
-                    <select
-                      value={reportFilter.year}
-                      onChange={(e) => setReportFilter({ ...reportFilter, year: Number(e.target.value) })}
-                      className="h-10 px-3 rounded-xl border border-border bg-background text-sm text-foreground font-medium"
-                    >
-                      {[2025, 2026, 2027].map(y => (
-                        <option key={y} value={y}>{y}</option>
-                      ))}
-                    </select>
-                  </div>
+                  <div className="flex flex-col gap-1"><Label className="text-xs font-bold text-muted-foreground">Reporting Period</Label><select value={reportFilter.period} onChange={(e) => setReportFilter({ ...reportFilter, period: e.target.value as any })} className="h-10 px-3 rounded-xl border border-border bg-background text-sm text-foreground font-medium"><option value="monthly">Monthly Statement</option><option value="halfyearly">Half Yearly (H1/H2)</option><option value="yearly">Yearly Statement</option></select></div>
+                  {reportFilter.period === "monthly" && (<div className="flex flex-col gap-1"><Label className="text-xs font-bold text-muted-foreground">Month</Label><select value={reportFilter.month} onChange={(e) => setReportFilter({ ...reportFilter, month: Number(e.target.value) })} className="h-10 px-3 rounded-xl border border-border bg-background text-sm text-foreground font-medium">{Array.from({ length: 12 }, (_, i) => (<option key={i} value={i}>{new Date(0, i).toLocaleString("default", { month: "long" })}</option>))}</select></div>)}
+                  <div className="flex flex-col gap-1"><Label className="text-xs font-bold text-muted-foreground">Year</Label><select value={reportFilter.year} onChange={(e) => setReportFilter({ ...reportFilter, year: Number(e.target.value) })} className="h-10 px-3 rounded-xl border border-border bg-background text-sm text-foreground font-medium">{[2025, 2026, 2027].map(y => (<option key={y} value={y}>{y}</option>))}</select></div>
                 </div>
-
-                <div className="flex items-center gap-3 self-end">
-                  <Button onClick={downloadExcelReport} className="bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl h-10 font-bold shadow-md shadow-indigo-500/20">
-                    <Download className="w-4 h-4 mr-2" /> Audit Excel
-                  </Button>
-                  <Button onClick={downloadPDFReport} className="bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl h-10 font-bold shadow-md shadow-emerald-500/20">
-                    <Download className="w-4 h-4 mr-2" /> Audit PDF
-                  </Button>
-                </div>
+                <div className="flex items-center gap-3 self-end"><Button onClick={downloadExcelReport} className="bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl h-10 font-bold shadow-md shadow-indigo-500/20"><Download className="w-4 h-4 mr-2" /> Audit Excel</Button><Button onClick={downloadPDFReport} className="bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl h-10 font-bold shadow-md shadow-emerald-500/20"><Download className="w-4 h-4 mr-2" /> Audit PDF</Button></div>
               </div>
-
-              {loadingReport ? (
-                <div className="flex items-center justify-center py-20">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500"></div>
-                </div>
-              ) : reportData ? (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                  {/* Profit & Loss Card */}
-                  <div className="bg-card border border-border rounded-2xl p-6 space-y-6 shadow-sm">
-                    <div className="flex items-center justify-between border-b border-border pb-4">
-                      <h3 className="font-bold text-lg text-indigo-500 uppercase tracking-wider">Profit & Loss Statement</h3>
-                      <TrendingUp className="w-5 h-5 text-indigo-500" />
+              {loadingReport ? (<div className="flex items-center justify-center py-20"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500"></div></div>) : reportData ? (
+                <div className="space-y-8">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div className="bg-card border border-border rounded-2xl p-6 space-y-6 shadow-sm">
+                      <div className="flex items-center justify-between border-b border-border pb-4"><h3 className="font-bold text-lg text-indigo-500 uppercase tracking-wider">Profit & Loss Statement</h3><TrendingUp className="w-5 h-5 text-indigo-500" /></div>
+                      <div className="space-y-4">
+                        <div><h4 className="text-xs font-black text-muted-foreground uppercase mb-2">Revenue Streams</h4><div className="space-y-1">{renderCollapsibleAccountRows(reportData.profitAndLoss.revenues, "REVENUE", "text-emerald-500")}</div><div className="flex justify-between py-3 font-bold text-sm border-b-2 border-border/80 mt-1"><span>Total Revenue</span><span className="text-emerald-500 underline decoration-double">₹{Number(reportData.profitAndLoss.totalRevenue).toLocaleString()}</span></div></div>
+                        <div className="pt-4"><h4 className="text-xs font-black text-muted-foreground uppercase mb-2">Operating Expenses</h4><div className="space-y-1">{renderCollapsibleAccountRows(reportData.profitAndLoss.expenses, "EXPENSE", "text-rose-500")}</div><div className="flex justify-between py-3 font-bold text-sm border-b-2 border-border/80 mt-1"><span>Total Expenses</span><span className="text-rose-500">₹{Number(reportData.profitAndLoss.totalExpense).toLocaleString()}</span></div></div>
+                        <div className="p-4 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex justify-between items-center mt-6"><span className="font-black text-base uppercase text-indigo-500">Net Business Profit</span><span className={cn("font-black text-xl underline decoration-double", Number(reportData.profitAndLoss.netProfit) >= 0 ? "text-emerald-500" : "text-rose-500")}>₹{Number(reportData.profitAndLoss.netProfit).toLocaleString()}</span></div>
+                      </div>
                     </div>
-
-                    <div className="space-y-4">
-                      <div>
-                        <h4 className="text-xs font-black text-muted-foreground uppercase mb-2">Revenue Streams</h4>
-                        <div className="space-y-1">
-                          {renderCollapsibleAccountRows(reportData.profitAndLoss.revenues, 'REVENUE', 'text-emerald-500')}
-                        </div>
-                        <div className="flex justify-between py-3 font-bold text-sm border-b-2 border-border/80 mt-1">
-                          <span>Total Revenue</span>
-                          <span className="text-emerald-500 underline decoration-double">₹{Number(reportData.profitAndLoss.totalRevenue).toLocaleString()}</span>
-                        </div>
-                      </div>
-
-                      <div className="pt-4">
-                        <h4 className="text-xs font-black text-muted-foreground uppercase mb-2">Operating Expenses</h4>
-                        <div className="space-y-1">
-                          {renderCollapsibleAccountRows(reportData.profitAndLoss.expenses, 'EXPENSE', 'text-rose-500')}
-                        </div>
-                        <div className="flex justify-between py-3 font-bold text-sm border-b-2 border-border/80 mt-1">
-                          <span>Total Expenses</span>
-                          <span className="text-rose-500">₹{Number(reportData.profitAndLoss.totalExpense).toLocaleString()}</span>
-                        </div>
-                      </div>
-
-                      <div className="p-4 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex justify-between items-center mt-6">
-                        <span className="font-black text-base uppercase text-indigo-500">Net Business Profit</span>
-                        <span className={cn(
-                          "font-black text-xl underline decoration-double",
-                          Number(reportData.profitAndLoss.netProfit) >= 0 ? "text-emerald-500" : "text-rose-500"
-                        )}>
-                          ₹{Number(reportData.profitAndLoss.netProfit).toLocaleString()}
-                        </span>
+                    <div className="bg-card border border-border rounded-2xl p-6 space-y-6 shadow-sm">
+                      <div className="flex items-center justify-between border-b border-border pb-4"><h3 className="font-bold text-lg text-teal-500 uppercase tracking-wider">Balance Sheet Summary</h3><DollarSign className="w-5 h-5 text-teal-500" /></div>
+                      <div className="space-y-4">
+                        <div><h4 className="text-xs font-black text-muted-foreground uppercase mb-2">Assets (Dr.)</h4><div className="space-y-1">{renderCollapsibleAccountRows(reportData.balanceSheet.assets, "ASSET", "text-emerald-500")}</div><div className="flex justify-between py-3 font-bold text-sm border-b-2 border-border/80 mt-1"><span>Total Assets</span><span className="text-emerald-500 underline decoration-double">₹{Number(reportData.balanceSheet.totalAssets).toLocaleString()}</span></div></div>
+                        <div className="pt-4"><h4 className="text-xs font-black text-muted-foreground uppercase mb-2">Liabilities & Equity (Cr.)</h4><div className="space-y-1">{renderCollapsibleAccountRows(reportData.balanceSheet.liabilities, "LIABILITY", "text-rose-500")}{renderCollapsibleAccountRows(reportData.balanceSheet.equity, "EQUITY", "text-purple-500")}</div><div className="flex justify-between py-3 font-bold text-sm border-b-2 border-border/80 mt-1"><span>Total Liabilities & Equity</span><span className="text-teal-500 underline decoration-double">₹{(Number(reportData.balanceSheet.totalLiabilities) + Number(reportData.balanceSheet.totalEquity)).toLocaleString()}</span></div></div>
                       </div>
                     </div>
                   </div>
-
-                  {/* Balance Sheet Card */}
-                  <div className="bg-card border border-border rounded-2xl p-6 space-y-6 shadow-sm">
-                    <div className="flex items-center justify-between border-b border-border pb-4">
-                      <h3 className="font-bold text-lg text-teal-500 uppercase tracking-wider">Balance Sheet Summary</h3>
-                      <DollarSign className="w-5 h-5 text-teal-500" />
-                    </div>
-
-                    <div className="space-y-4">
-                      <div>
-                        <h4 className="text-xs font-black text-muted-foreground uppercase mb-2">Assets (Dr.)</h4>
-                        <div className="space-y-1">
-                          {renderCollapsibleAccountRows(reportData.balanceSheet.assets, 'ASSET', 'text-emerald-500')}
-                        </div>
-                        <div className="flex justify-between py-3 font-bold text-sm border-b-2 border-border/80 mt-1">
-                          <span>Total Assets</span>
-                          <span className="text-emerald-500 underline decoration-double">₹{Number(reportData.balanceSheet.totalAssets).toLocaleString()}</span>
-                        </div>
+                  <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
+                    <div className="flex items-center justify-between border-b border-border pb-4 mb-6"><h3 className="font-bold text-lg text-cyan-500 uppercase tracking-wider">Cash Flow Statement</h3><Waves className="w-5 h-5 text-cyan-500" /></div>
+                    {cashFlowLoading ? (<div className="flex items-center justify-center py-10"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-cyan-500"></div></div>) : cashFlowData ? (
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        {[{ key: "operating", label: "Operating Activities", color: "text-emerald-500", bg: "bg-emerald-500/5 border-emerald-500/20", data: cashFlowData.operating }, { key: "investing", label: "Investing Activities", color: "text-blue-500", bg: "bg-blue-500/5 border-blue-500/20", data: cashFlowData.investing }, { key: "financing", label: "Financing Activities", color: "text-purple-500", bg: "bg-purple-500/5 border-purple-500/20", data: cashFlowData.financing }].map(section => (
+                          <div key={section.key} className={cn("rounded-xl p-4 border", section.bg)}>
+                            <h4 className={cn("text-xs font-black uppercase mb-3", section.color)}>{section.label}</h4>
+                            <div className="space-y-2">
+                              {section.data.items.length === 0 ? (<p className="text-xs text-muted-foreground italic">No activity.</p>) : section.data.items.map((item: any, i: number) => (<div key={i} className="flex justify-between items-start text-xs py-1.5 border-b border-border/30"><div className="flex-1 pr-2"><p className="font-medium truncate" title={item.description}>{item.description}</p><p className="text-muted-foreground">{item.opposite_account}</p></div><span className={cn("font-bold shrink-0", item.amount >= 0 ? "text-emerald-500" : "text-rose-500")}>₹{Math.abs(item.amount).toLocaleString()}</span></div>))}
+                            </div>
+                            <div className={cn("flex justify-between font-bold text-sm mt-3 pt-2 border-t border-border/60", section.color)}><span>Net</span><span>₹{Number(section.data.total).toLocaleString()}</span></div>
+                          </div>
+                        ))}
+                        <div className="md:col-span-3 p-4 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex justify-between items-center"><span className="font-black text-base uppercase text-cyan-500">Net Cash Flow (Period)</span><span className={cn("font-black text-xl", Number(cashFlowData.netCashFlow) >= 0 ? "text-emerald-500" : "text-rose-500")}>₹{Number(cashFlowData.netCashFlow).toLocaleString()}</span></div>
                       </div>
-
-                      <div className="pt-4">
-                        <h4 className="text-xs font-black text-muted-foreground uppercase mb-2">Liabilities & Equity (Cr.)</h4>
-                        <div className="space-y-1">
-                          {renderCollapsibleAccountRows(reportData.balanceSheet.liabilities, 'LIABILITY', 'text-rose-500')}
-                          {renderCollapsibleAccountRows(reportData.balanceSheet.equity, 'EQUITY', 'text-purple-500')}
-                        </div>
-                        <div className="flex justify-between py-3 font-bold text-sm border-b-2 border-border/80 mt-1">
-                          <span>Total Liabilities & Equity</span>
-                          <span className="text-teal-500 underline decoration-double">
-                            ₹{(Number(reportData.balanceSheet.totalLiabilities) + Number(reportData.balanceSheet.totalEquity)).toLocaleString()}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
+                    ) : null}
                   </div>
                 </div>
               ) : null}
+            </div>
+          )}
+
+          {activeTab === "trialbalance" && (
+            <div className="space-y-6">
+              <div className="bg-card border border-border rounded-2xl p-6 flex flex-wrap items-center gap-4 shadow-sm">
+                <div className="flex flex-col gap-1"><Label className="text-xs font-bold text-muted-foreground">Reporting Period</Label><select value={reportFilter.period} onChange={(e) => setReportFilter({ ...reportFilter, period: e.target.value as any })} className="h-10 px-3 rounded-xl border border-border bg-background text-sm text-foreground font-medium"><option value="monthly">Monthly</option><option value="halfyearly">Half Yearly</option><option value="yearly">Yearly</option></select></div>
+                {reportFilter.period === "monthly" && (<div className="flex flex-col gap-1"><Label className="text-xs font-bold text-muted-foreground">Month</Label><select value={reportFilter.month} onChange={(e) => setReportFilter({ ...reportFilter, month: Number(e.target.value) })} className="h-10 px-3 rounded-xl border border-border bg-background text-sm text-foreground font-medium">{Array.from({ length: 12 }, (_, i) => (<option key={i} value={i}>{new Date(0, i).toLocaleString("default", { month: "long" })}</option>))}</select></div>)}
+                <div className="flex flex-col gap-1"><Label className="text-xs font-bold text-muted-foreground">Year</Label><select value={reportFilter.year} onChange={(e) => setReportFilter({ ...reportFilter, year: Number(e.target.value) })} className="h-10 px-3 rounded-xl border border-border bg-background text-sm text-foreground font-medium">{[2025, 2026, 2027].map(y => (<option key={y} value={y}>{y}</option>))}</select></div>
+                <div className="flex-1 flex justify-end"><Button onClick={fetchReport} className="bg-orange-600 hover:bg-orange-500 text-white rounded-xl h-10 font-bold">Generate Trial Balance</Button></div>
+              </div>
+              {loadingReport ? (<div className="flex items-center justify-center py-20"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div></div>) : reportData?.trialBalance ? (
+                <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
+                  <div className="p-6 border-b border-border flex items-center justify-between"><h3 className="font-bold text-lg">Trial Balance</h3><span className="text-xs text-muted-foreground">In a balanced system, Total Debits = Total Credits</span></div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead><tr className="bg-accent/5 border-b border-border text-muted-foreground text-xs font-black uppercase tracking-wider"><th className="py-4 px-6">Code</th><th className="py-4 px-6">Account Name</th><th className="py-4 px-6">Type</th><th className="py-4 px-6 text-right">Debit (Dr)</th><th className="py-4 px-6 text-right">Credit (Cr)</th></tr></thead>
+                      <tbody className="divide-y divide-border/60 text-sm">
+                        {reportData.trialBalance.map((t: any) => (<tr key={t.id} className="hover:bg-accent/5 transition-colors"><td className="py-3 px-6 font-mono font-bold text-indigo-500">{t.code}</td><td className="py-3 px-6 font-medium">{t.name}</td><td className="py-3 px-6"><span className={cn("text-xs px-2.5 py-1 rounded-full font-bold", accountTypeColor(t.type))}>{t.type}</span></td><td className="py-3 px-6 text-right font-bold text-emerald-500">{t.debit > 0 ? `₹${Number(t.debit).toLocaleString()}` : "—"}</td><td className="py-3 px-6 text-right font-bold text-rose-500">{t.credit > 0 ? `₹${Number(t.credit).toLocaleString()}` : "—"}</td></tr>))}
+                      </tbody>
+                      <tfoot>{(() => { const td = reportData.trialBalance.reduce((s: number, t: any) => s + Number(t.debit), 0); const tc = reportData.trialBalance.reduce((s: number, t: any) => s + Number(t.credit), 0); const bal = Math.abs(td - tc) < 0.01; return (<tr className={cn("border-t-2 font-black text-sm", bal ? "bg-emerald-500/5 border-emerald-500/30" : "bg-rose-500/5 border-rose-500/30")}><td colSpan={3} className="py-4 px-6">{bal ? <span className="text-emerald-500">✓ Balanced — Books are correct</span> : <span className="text-rose-500">✗ Unbalanced — Diff: ₹{Math.abs(td - tc).toLocaleString()}</span>}</td><td className="py-4 px-6 text-right text-emerald-500">₹{td.toLocaleString()}</td><td className="py-4 px-6 text-right text-rose-500">₹{tc.toLocaleString()}</td></tr>); })()}</tfoot>
+                    </table>
+                  </div>
+                </div>
+              ) : (<div className="bg-card border border-border rounded-2xl p-12 text-center text-muted-foreground"><Scale className="w-10 h-10 mx-auto mb-3 opacity-30" /><p className="font-medium">Select a period and click Generate Trial Balance</p></div>)}
+            </div>
+          )}
+
+          {activeTab === "audit" && (
+            <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
+              <div className="p-6 border-b border-border flex items-center justify-between"><div><h3 className="font-bold text-lg">Audit Trail</h3><p className="text-xs text-muted-foreground mt-0.5">Complete log of all financial actions performed by staff</p></div><Button onClick={fetchAuditLog} variant="outline" className="rounded-xl h-9 text-sm font-bold border-border">Refresh</Button></div>
+              {auditLoading ? (<div className="flex items-center justify-center py-20"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500"></div></div>) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead><tr className="bg-accent/5 border-b border-border text-muted-foreground text-xs font-black uppercase tracking-wider"><th className="py-4 px-6">Timestamp</th><th className="py-4 px-6">Action</th><th className="py-4 px-6">Entity</th><th className="py-4 px-6">Staff (Who)</th><th className="py-4 px-6">Details</th></tr></thead>
+                    <tbody className="divide-y divide-border/60 text-sm">
+                      {auditLogs.length === 0 ? (<tr><td colSpan={5} className="py-10 text-center text-muted-foreground italic">No audit logs recorded yet.</td></tr>) : auditLogs.map((log: any) => {
+                        let parsedData: any = {};
+                        try { parsedData = JSON.parse(log.new_data || "{}"); } catch {}
+                        const staffName = parsedData.created_by || parsedData.updated_by || "System";
+                        const actionColors: Record<string, string> = { CREATE_ACCOUNT: "bg-blue-500/10 text-blue-500", POST_VOUCHER: "bg-emerald-500/10 text-emerald-500", EDIT_OPENING_BALANCE: "bg-amber-500/10 text-amber-500" };
+                        return (
+                          <tr key={log.id} className="hover:bg-accent/5 transition-colors">
+                            <td className="py-4 px-6 text-xs text-muted-foreground whitespace-nowrap">{new Date(log.created_at).toLocaleString()}</td>
+                            <td className="py-4 px-6"><span className={cn("text-xs px-2.5 py-1 rounded-full font-bold", actionColors[log.action] || "bg-gray-500/10 text-gray-500")}>{log.action}</span></td>
+                            <td className="py-4 px-6 text-xs font-mono text-muted-foreground">{log.entity_type}</td>
+                            <td className="py-4 px-6"><div className="flex items-center gap-1.5"><User className="w-3.5 h-3.5 text-indigo-400" /><span className="text-xs font-bold text-indigo-400">{staffName}</span></div></td>
+                            <td className="py-4 px-6 text-xs text-muted-foreground max-w-xs">
+                              {parsedData.voucher_no && <span className="font-bold text-foreground mr-1">{parsedData.voucher_no}</span>}
+                              {parsedData.debit && <span>Dr: {parsedData.debit} | Cr: {parsedData.credit}</span>}
+                              {parsedData.name && <span>Account: {parsedData.name} ({parsedData.code})</span>}
+                              {parsedData.opening_balance !== undefined && <span>Opening Balance: ₹{Number(parsedData.opening_balance).toLocaleString()}</span>}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           )}
         </>
@@ -1182,3 +543,4 @@ export default function AccountingPage() {
     </div>
   );
 }
+
