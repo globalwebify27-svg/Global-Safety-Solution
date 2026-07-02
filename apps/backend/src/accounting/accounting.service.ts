@@ -106,25 +106,32 @@ export class AccountingService {
     const newAmt = Number(newAmount);
     if (existingEntry) {
       const oldAmt = Number(existingEntry.amount);
-      const debitMult = isDebitClass ? 1 : -1;
-      const creditMult = isDebitClass ? -1 : 1;
+      const diff = newAmt - oldAmt;
+      const isDebitClass = account.type === "ASSET" || account.type === "EXPENSE";
+      
+      // For ASSETS, debit increases (+diff) and credit decreases (-diff)
+      // For EQUITY/LIABILITY/REVENUE, credit increases (+diff) and debit decreases (-diff)
+      const targetInc = isDebitClass ? diff : -diff;
+      const obeInc = isDebitClass ? -diff : diff;
+
       await this.prisma.$transaction(async (tx) => {
-        if (isDebitClass) {
-          await tx.account.update({ where: { id: accountId }, data: { balance: { increment: -oldAmt * debitMult } } });
-          await tx.account.update({ where: { id: obeAcc.id }, data: { balance: { increment: -oldAmt * creditMult } } });
-        } else {
-          await tx.account.update({ where: { id: obeAcc.id }, data: { balance: { increment: -oldAmt * debitMult } } });
-          await tx.account.update({ where: { id: accountId }, data: { balance: { increment: -oldAmt * creditMult } } });
-        }
+        // Adjust main account balance
+        await tx.account.update({ where: { id: accountId }, data: { balance: { increment: targetInc } } });
+        // Adjust balancing Opening Balance Equity account
+        await tx.account.update({ where: { id: obeAcc.id }, data: { balance: { increment: obeInc } } });
+        // Update the transaction amount in ledger
         await tx.ledgerEntry.update({ where: { id: existingEntry.id }, data: { amount: newAmt, created_by: updatedBy || "System" } });
-        if (isDebitClass) {
-          await tx.account.update({ where: { id: accountId }, data: { balance: { increment: newAmt * debitMult } } });
-          await tx.account.update({ where: { id: obeAcc.id }, data: { balance: { increment: newAmt * creditMult } } });
-        } else {
-          await tx.account.update({ where: { id: obeAcc.id }, data: { balance: { increment: newAmt * debitMult } } });
-          await tx.account.update({ where: { id: accountId }, data: { balance: { increment: newAmt * creditMult } } });
-        }
-        await tx.auditLog.create({ data: { action: "EDIT_OPENING_BALANCE", entity_type: "ACCOUNT", entity_id: accountId, old_data: JSON.stringify({ opening_balance: oldAmt }), new_data: JSON.stringify({ opening_balance: newAmt, updated_by: updatedBy || "System" }), user_id: null } }).catch(() => {});
+        
+        await tx.auditLog.create({ 
+          data: { 
+            action: "EDIT_OPENING_BALANCE", 
+            entity_type: "ACCOUNT", 
+            entity_id: accountId, 
+            old_data: JSON.stringify({ opening_balance: oldAmt }), 
+            new_data: JSON.stringify({ opening_balance: newAmt, updated_by: updatedBy || "System" }), 
+            user_id: null 
+          } 
+        }).catch(() => {});
       });
     } else {
       await this.postVoucher({ description: `Opening Balance for ${account.name}`, amount: newAmt, debit_code: isDebitClass ? account.code : "3999", credit_code: isDebitClass ? "3999" : account.code, created_by: updatedBy || "System" });
