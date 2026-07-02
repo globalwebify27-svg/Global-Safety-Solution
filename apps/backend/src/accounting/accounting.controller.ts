@@ -1,4 +1,4 @@
-﻿import { Controller, Get, Post, Put, Body, Query, Param, Req, UseGuards } from "@nestjs/common";
+import { Controller, Get, Post, Put, Body, Query, Param, Req, UseGuards } from "@nestjs/common";
 import { AccountingService } from "./accounting.service";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 
@@ -14,7 +14,9 @@ export class AccountingController {
 
   @Post("accounts")
   async createAccount(@Body() body: { name: string; code: string; type: string; parent_id?: string; opening_balance?: number }, @Req() req: any) {
-    const user = req.user?.name ? `${req.user.name}${req.user.employee_id ? " (" + req.user.employee_id + ")" : ""}` : req.user?.email || "System";
+    const user = req.user?.name 
+      ? `${req.user.name}${req.user.employee_id ? " (" + req.user.employee_id + ")" : ""}` 
+      : (req.user?.email === "admin@globalsafety.com" || req.user?.email === "amrvbloggers@gmail.com" ? "Super Admin (SYSTEM)" : req.user?.email || "System");
     return this.accountingService.createAccount({ ...body, created_by: user });
   }
 
@@ -25,7 +27,9 @@ export class AccountingController {
 
   @Put("accounts/:id/opening-balance")
   async updateOpeningBalance(@Param("id") id: string, @Body() body: { amount: number }, @Req() req: any) {
-    const user = req.user?.name ? `${req.user.name}${req.user.employee_id ? " (" + req.user.employee_id + ")" : ""}` : req.user?.email || "System";
+    const user = req.user?.name 
+      ? `${req.user.name}${req.user.employee_id ? " (" + req.user.employee_id + ")" : ""}` 
+      : (req.user?.email === "admin@globalsafety.com" || req.user?.email === "amrvbloggers@gmail.com" ? "Super Admin (SYSTEM)" : req.user?.email || "System");
     return this.accountingService.updateOpeningBalance(id, body.amount, user);
   }
 
@@ -36,13 +40,17 @@ export class AccountingController {
 
   @Post("vouchers")
   async postVoucher(@Body() body: any, @Req() req: any) {
-    const user = req.user?.name ? `${req.user.name}${req.user.employee_id ? " (" + req.user.employee_id + ")" : ""}` : req.user?.email || "Admin";
+    const user = req.user?.name 
+      ? `${req.user.name}${req.user.employee_id ? " (" + req.user.employee_id + ")" : ""}` 
+      : (req.user?.email === "admin@globalsafety.com" || req.user?.email === "amrvbloggers@gmail.com" ? "Super Admin (SYSTEM)" : req.user?.email || "System");
     return this.accountingService.postVoucher({ ...body, created_by: user });
   }
 
   @Post("transactions")
   async postTransaction(@Body() body: any, @Req() req: any) {
-    const user = req.user?.name ? `${req.user.name}${req.user.employee_id ? " (" + req.user.employee_id + ")" : ""}` : req.user?.email || "Admin";
+    const user = req.user?.name 
+      ? `${req.user.name}${req.user.employee_id ? " (" + req.user.employee_id + ")" : ""}` 
+      : (req.user?.email === "admin@globalsafety.com" || req.user?.email === "amrvbloggers@gmail.com" ? "Super Admin (SYSTEM)" : req.user?.email || "System");
     return this.accountingService.postTransaction({ ...body, created_by: user });
   }
 
