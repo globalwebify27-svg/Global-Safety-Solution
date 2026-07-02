@@ -1,4 +1,4 @@
-﻿import { Injectable, BadRequestException, NotFoundException } from "@nestjs/common";
+import { Injectable, BadRequestException, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 
 @Injectable()
@@ -196,7 +196,9 @@ export class AccountingService {
     };
     const statementBalances = baseBalances.map(acc => ({ ...acc, periodBalance: getAggregatePeriodBalance(acc.id) }));
     const isLeafAccount = (accId: string) => !accounts.some(a => a.parent_id === accId);
-    const trialBalance = statementBalances.map(acc => ({ id: acc.id, name: acc.name, code: acc.code, type: acc.type, debit: (acc.type === "ASSET" || acc.type === "EXPENSE") ? acc.periodBalance : 0, credit: !(acc.type === "ASSET" || acc.type === "EXPENSE") ? acc.periodBalance : 0 }));
+    const trialBalance = statementBalances
+      .filter(acc => isLeafAccount(acc.id))
+      .map(acc => ({ id: acc.id, name: acc.name, code: acc.code, type: acc.type, debit: (acc.type === "ASSET" || acc.type === "EXPENSE") ? acc.periodBalance : 0, credit: !(acc.type === "ASSET" || acc.type === "EXPENSE") ? acc.periodBalance : 0 }));
     const profitAndLoss = {
       revenues: statementBalances.filter(a => a.type === "REVENUE"),
       expenses: statementBalances.filter(a => a.type === "EXPENSE"),
