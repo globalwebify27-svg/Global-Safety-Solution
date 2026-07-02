@@ -1,4 +1,173 @@
-﻿
+﻿"use client";
+
+import { useEffect, useState, useCallback } from "react";
+import { useAuthStore } from "@/store/auth";
+import { API_BASE_URL } from "@/lib/config";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import * as XLSX from "xlsx";
+import {
+  Plus, Calculator, ArrowUpRight, ArrowDownLeft, Search,
+  Download, TrendingUp, DollarSign, ShieldAlert, ChevronDown,
+  ChevronRight, Pencil, X, Activity, Scale, Waves, User
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
+
+interface Account { id: string; name: string; code: string; type: string; balance: number; parent_id?: string | null; }
+interface Voucher { id: string; voucher_no: string; description: string; amount: number; transaction_date: string; debit_account: Account; credit_account: Account; created_by: string; }
+type TabType = "ledgers" | "accounts" | "reports" | "trialbalance" | "audit";
+
+export default function AccountingPage() {
+  const [activeTab, setActiveTab] = useState<TabType>("ledgers");
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [vouchers, setVouchers] = useState<Voucher[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [openVoucherDialog, setOpenVoucherDialog] = useState(false);
+  const [openAccountDialog, setOpenAccountDialog] = useState(false);
+  const [openTransactionDialog, setOpenTransactionDialog] = useState(false);
+  const [editOBAccount, setEditOBAccount] = useState<Account | null>(null);
+  const [editOBAmount, setEditOBAmount] = useState("");
+  const [editOBLoading, setEditOBLoading] = useState(false);
+  const [drillAccount, setDrillAccount] = useState<Account | null>(null);
+  const [drillEntries, setDrillEntries] = useState<any[]>([]);
+  const [drillLoading, setDrillLoading] = useState(false);
+  const [drillStart, setDrillStart] = useState("");
+  const [drillEnd, setDrillEnd] = useState("");
+  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [cashFlowData, setCashFlowData] = useState<any>(null);
+  const [cashFlowLoading, setCashFlowLoading] = useState(false);
+  const [transactionForm, setTransactionForm] = useState({ type: "EXPENSE" as "EXPENSE" | "REVENUE", category_id: "", bank_account_id: "", amount: "", description: "", transaction_date: new Date().toISOString().split("T")[0] });
+  const [voucherForm, setVoucherForm] = useState({ debit_code: "", credit_code: "", amount: "", description: "", transaction_date: new Date().toISOString().split("T")[0] });
+  const [accountForm, setAccountForm] = useState({ name: "", code: "", type: "ASSET", parent_id: "", opening_balance: "" });
+  const [reportFilter, setReportFilter] = useState({ period: "monthly" as "monthly" | "halfyearly" | "yearly", year: new Date().getFullYear(), month: new Date().getMonth() });
+  const [reportData, setReportData] = useState<any>(null);
+  const [loadingReport, setLoadingReport] = useState(false);
+  const [expandedAccounts, setExpandedAccounts] = useState<Record<string, boolean>>({});
+  const token = useAuthStore((state) => state.token);
+
+  const toggleAccountExpand = (id: string) => setExpandedAccounts(prev => ({ ...prev, [id]: !prev[id] }));
+  const accountTypeColor = (type: string) => { if (type === "ASSET") return "bg-blue-500/10 text-blue-500"; if (type === "LIABILITY") return "bg-amber-500/10 text-amber-500"; if (type === "EQUITY") return "bg-purple-500/10 text-purple-500"; if (type === "REVENUE") return "bg-emerald-500/10 text-emerald-500"; return "bg-rose-500/10 text-rose-500"; };
+
+  const renderCollapsibleAccountRows = (accountsList: any[], type: string, colorClass: string) => {
+    if (!accountsList || !Array.isArray(accountsList)) return null;
+    const topLevel = accountsList.filter((a: any) => a.type === type && (!a.parent_id || !accountsList.some((p: any) => p.id === a.parent_id)));
+    return topLevel.map((parent: any) => {
+      const children = accountsList.filter((a: any) => a.parent_id === parent.id);
+      const hasChildren = children.length > 0;
+      const isExpanded = !!expandedAccounts[parent.id];
+      return (
+        <div key={parent.id} className="space-y-1">
+          <div onClick={() => hasChildren && toggleAccountExpand(parent.id)} className={cn("flex justify-between items-center py-2.5 text-sm border-b border-border/40 font-semibold select-none", hasChildren ? "cursor-pointer hover:bg-accent/5 px-2 -mx-2 rounded-lg transition-colors" : "")}>
+            <div className="flex items-center gap-1.5">
+              {hasChildren ? (isExpanded ? <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" /> : <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />) : <div className="w-4 h-4 shrink-0" />}
+              <span>{parent.name} ({parent.code})</span>
+            </div>
+            <span className={cn("font-bold shrink-0", colorClass)}>₹{Number(parent.periodBalance || 0).toLocaleString()}</span>
+          </div>
+          {hasChildren && isExpanded && (
+            <div className="pl-6 border-l border-border/60 ml-2 space-y-1 mt-1">
+              {children.map((child: any) => (<div key={child.id} className="flex justify-between items-center py-1.5 text-xs text-muted-foreground border-b border-border/20"><span>{child.name} ({child.code})</span><span className="font-semibold">₹{Number(child.periodBalance || 0).toLocaleString()}</span></div>))}
+            </div>
+          )}
+        </div>
+      );
+    });
+  };
+
+  const filteredVouchers = (vouchers || []).filter(v => v.voucher_no.toLowerCase().includes(searchQuery.toLowerCase()) || v.description.toLowerCase().includes(searchQuery.toLowerCase()) || v.debit_account?.name.toLowerCase().includes(searchQuery.toLowerCase()) || v.credit_account?.name.toLowerCase().includes(searchQuery.toLowerCase()) || v.created_by.toLowerCase().includes(searchQuery.toLowerCase()));
+
+  const fetchAccountsAndVouchers = async () => {
+    if (!token) return; setLoading(true);
+    try {
+      const [accRes, vRes] = await Promise.all([fetch(`${API_BASE_URL}/accounting/accounts`, { headers: { Authorization: `Bearer ${token}` } }), fetch(`${API_BASE_URL}/accounting/vouchers`, { headers: { Authorization: `Bearer ${token}` } })]);
+      const accData = await accRes.json(); const vData = await vRes.json();
+      if (Array.isArray(accData)) setAccounts(accData); if (Array.isArray(vData)) setVouchers(vData);
+    } catch { toast.error("Failed to load ledger data."); } finally { setLoading(false); }
+  };
+
+  const fetchReport = useCallback(async () => {
+    if (!token) return; setLoadingReport(true);
+    try {
+      const { period, year, month } = reportFilter;
+      const url = `${API_BASE_URL}/accounting/reports?period=${period}&year=${year}${period === "monthly" ? `&month=${month}` : ""}`;
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json(); setReportData(data);
+    } catch { toast.error("Failed to load reports."); } finally { setLoadingReport(false); }
+  }, [token, reportFilter]);
+
+  const fetchCashFlow = useCallback(async () => {
+    if (!token) return; setCashFlowLoading(true);
+    try {
+      const { period, year, month } = reportFilter;
+      const url = `${API_BASE_URL}/accounting/reports/cashflow?period=${period}&year=${year}${period === "monthly" ? `&month=${month}` : ""}`;
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json(); setCashFlowData(data);
+    } catch { toast.error("Failed to load cash flow."); } finally { setCashFlowLoading(false); }
+  }, [token, reportFilter]);
+
+  const fetchAuditLog = useCallback(async () => {
+    if (!token) return; setAuditLoading(true);
+    try { const res = await fetch(`${API_BASE_URL}/accounting/audit`, { headers: { Authorization: `Bearer ${token}` } }); const data = await res.json(); if (Array.isArray(data)) setAuditLogs(data); }
+    catch { toast.error("Failed to load audit log."); } finally { setAuditLoading(false); }
+  }, [token]);
+
+  const fetchAccountLedger = useCallback(async (account: Account) => {
+    if (!token) return; setDrillLoading(true); setDrillEntries([]);
+    try {
+      const params = new URLSearchParams(); if (drillStart) params.append("startDate", drillStart); if (drillEnd) params.append("endDate", drillEnd);
+      const res = await fetch(`${API_BASE_URL}/accounting/accounts/${account.id}/ledger?${params}`, { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json(); if (data.entries) setDrillEntries(data.entries);
+    } catch { toast.error("Failed to load account ledger."); } finally { setDrillLoading(false); }
+  }, [token, drillStart, drillEnd]);
+
+  useEffect(() => { fetchAccountsAndVouchers(); }, [token]);
+  useEffect(() => { if (activeTab === "reports") { fetchReport(); fetchCashFlow(); } }, [activeTab, reportFilter]);
+  useEffect(() => { if (activeTab === "audit") fetchAuditLog(); }, [activeTab]);
+  useEffect(() => { if (drillAccount) fetchAccountLedger(drillAccount); }, [drillAccount, drillStart, drillEnd]);
+
+  const handleCreateVoucher = async (e: React.FormEvent) => {
+    e.preventDefault(); if (!token || !voucherForm.debit_code || !voucherForm.credit_code || !voucherForm.amount || !voucherForm.description) { toast.error("Fill all fields."); return; }
+    try {
+      const res = await fetch(`${API_BASE_URL}/accounting/vouchers`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ debit_code: voucherForm.debit_code, credit_code: voucherForm.credit_code, amount: parseFloat(voucherForm.amount), description: voucherForm.description, transaction_date: voucherForm.transaction_date }) });
+      if (res.ok) { toast.success("Voucher posted!"); setOpenVoucherDialog(false); setVoucherForm({ debit_code: "", credit_code: "", amount: "", description: "", transaction_date: new Date().toISOString().split("T")[0] }); fetchAccountsAndVouchers(); }
+      else { const err = await res.json(); toast.error(err.message || "Failed."); }
+    } catch { toast.error("Network error."); }
+  };
+
+  const handleCreateAccount = async (e: React.FormEvent) => {
+    e.preventDefault(); if (!token || !accountForm.name || !accountForm.code) { toast.error("Fill all fields."); return; }
+    try {
+      const res = await fetch(`${API_BASE_URL}/accounting/accounts`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ name: accountForm.name, code: accountForm.code, type: accountForm.type, parent_id: accountForm.parent_id || undefined, opening_balance: accountForm.opening_balance ? parseFloat(accountForm.opening_balance) : undefined }) });
+      if (res.ok) { toast.success("Account created!"); setOpenAccountDialog(false); setAccountForm({ name: "", code: "", type: "ASSET", parent_id: "", opening_balance: "" }); fetchAccountsAndVouchers(); }
+      else { const err = await res.json(); toast.error(err.message || "Failed."); }
+    } catch { toast.error("Network error."); }
+  };
+
+  const handleCreateTransaction = async (e: React.FormEvent) => {
+    e.preventDefault(); if (!token || !transactionForm.category_id || !transactionForm.bank_account_id || !transactionForm.amount || !transactionForm.description) { toast.error("Fill all fields."); return; }
+    try {
+      const res = await fetch(`${API_BASE_URL}/accounting/transactions`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ type: transactionForm.type, category_id: transactionForm.category_id, bank_account_id: transactionForm.bank_account_id, amount: parseFloat(transactionForm.amount), description: transactionForm.description, transaction_date: transactionForm.transaction_date }) });
+      if (res.ok) { toast.success("Transaction saved!"); setOpenTransactionDialog(false); setTransactionForm({ type: "EXPENSE", category_id: "", bank_account_id: "", amount: "", description: "", transaction_date: new Date().toISOString().split("T")[0] }); fetchAccountsAndVouchers(); if (activeTab === "reports") { fetchReport(); fetchCashFlow(); } }
+      else { const err = await res.json(); toast.error(err.message || "Failed."); }
+    } catch { toast.error("Network error."); }
+  };
+
+  const handleUpdateOpeningBalance = async (e: React.FormEvent) => {
+    e.preventDefault(); if (!token || !editOBAccount || !editOBAmount) return; setEditOBLoading(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/accounting/accounts/${editOBAccount.id}/opening-balance`, { method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ amount: parseFloat(editOBAmount) }) });
+      if (res.ok) { toast.success(`Opening balance for ${editOBAccount.name} updated!`); setEditOBAccount(null); setEditOBAmount(""); fetchAccountsAndVouchers(); }
+      else { const err = await res.json(); toast.error(err.message || "Failed."); }
+    } catch { toast.error("Network error."); } finally { setEditOBLoading(false); }
+  };
+
   const downloadExcelReport = () => {
     if (!reportData) { toast.error("No report data."); return; }
     try {
@@ -374,4 +543,5 @@
     </div>
   );
 }
+
 
