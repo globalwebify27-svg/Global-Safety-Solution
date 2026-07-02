@@ -1,6 +1,4 @@
-// Hardcoded for production to ensure Vercel doesn't fall back to localhost,
-// but dynamically checks hostname to allow local development testing.
-const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://global-safety-solution.onrender.com';
+const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://global-safety-solution-backend.vercel.app';
 const sanitizedApiUrl = rawApiUrl.endsWith('/') ? rawApiUrl.slice(0, -1) : rawApiUrl;
 
 export const API_BASE_URL = 
