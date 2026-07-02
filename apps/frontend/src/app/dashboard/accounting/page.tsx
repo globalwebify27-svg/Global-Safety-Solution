@@ -1,182 +1,13 @@
-﻿"use client";
-
-import { useEffect, useState, useCallback } from "react";
-import { useAuthStore } from "@/store/auth";
-import { API_BASE_URL } from "@/lib/config";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
-import * as XLSX from "xlsx";
-import {
-  Plus, Calculator, ArrowUpRight, ArrowDownLeft, Search,
-  Download, TrendingUp, DollarSign, ShieldAlert, ChevronDown,
-  ChevronRight, Pencil, X, Activity, Scale, Waves, User
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { toast } from "sonner";
-import { cn } from "@/lib/utils";
-
-interface Account { id: string; name: string; code: string; type: string; balance: number; parent_id?: string | null; }
-interface Voucher { id: string; voucher_no: string; description: string; amount: number; transaction_date: string; debit_account: Account; credit_account: Account; created_by: string; }
-type TabType = "ledgers" | "accounts" | "reports" | "trialbalance" | "audit";
-
-export default function AccountingPage() {
-  const [activeTab, setActiveTab] = useState<TabType>("ledgers");
-  const [accounts, setAccounts] = useState<Account[]>([]);
-  const [vouchers, setVouchers] = useState<Voucher[]>([]);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [openVoucherDialog, setOpenVoucherDialog] = useState(false);
-  const [openAccountDialog, setOpenAccountDialog] = useState(false);
-  const [openTransactionDialog, setOpenTransactionDialog] = useState(false);
-  const [editOBAccount, setEditOBAccount] = useState<Account | null>(null);
-  const [editOBAmount, setEditOBAmount] = useState("");
-  const [editOBLoading, setEditOBLoading] = useState(false);
-  const [drillAccount, setDrillAccount] = useState<Account | null>(null);
-  const [drillEntries, setDrillEntries] = useState<any[]>([]);
-  const [drillLoading, setDrillLoading] = useState(false);
-  const [drillStart, setDrillStart] = useState("");
-  const [drillEnd, setDrillEnd] = useState("");
-  const [auditLogs, setAuditLogs] = useState<any[]>([]);
-  const [auditLoading, setAuditLoading] = useState(false);
-  const [cashFlowData, setCashFlowData] = useState<any>(null);
-  const [cashFlowLoading, setCashFlowLoading] = useState(false);
-  const [transactionForm, setTransactionForm] = useState({ type: "EXPENSE" as "EXPENSE" | "REVENUE", category_id: "", bank_account_id: "", amount: "", description: "", transaction_date: new Date().toISOString().split("T")[0] });
-  const [voucherForm, setVoucherForm] = useState({ debit_code: "", credit_code: "", amount: "", description: "", transaction_date: new Date().toISOString().split("T")[0] });
-  const [accountForm, setAccountForm] = useState({ name: "", code: "", type: "ASSET", parent_id: "", opening_balance: "" });
-  const [reportFilter, setReportFilter] = useState({ period: "monthly" as "monthly" | "halfyearly" | "yearly", year: new Date().getFullYear(), month: new Date().getMonth() });
-  const [reportData, setReportData] = useState<any>(null);
-  const [loadingReport, setLoadingReport] = useState(false);
-  const [expandedAccounts, setExpandedAccounts] = useState<Record<string, boolean>>({});
-  const token = useAuthStore((state) => state.token);
-
-  const toggleAccountExpand = (id: string) => setExpandedAccounts(prev => ({ ...prev, [id]: !prev[id] }));
-  const accountTypeColor = (type: string) => { if (type === "ASSET") return "bg-blue-500/10 text-blue-500"; if (type === "LIABILITY") return "bg-amber-500/10 text-amber-500"; if (type === "EQUITY") return "bg-purple-500/10 text-purple-500"; if (type === "REVENUE") return "bg-emerald-500/10 text-emerald-500"; return "bg-rose-500/10 text-rose-500"; };
-
-  const renderCollapsibleAccountRows = (accountsList: any[], type: string, colorClass: string) => {
-    if (!accountsList) return null;
-    const topLevel = accountsList.filter((a: any) => a.type === type && (!a.parent_id || !accountsList.some((p: any) => p.id === a.parent_id)));
-    return topLevel.map((parent: any) => {
-      const children = accountsList.filter((a: any) => a.parent_id === parent.id);
-      const hasChildren = children.length > 0;
-      const isExpanded = !!expandedAccounts[parent.id];
-      return (
-        <div key={parent.id} className="space-y-1">
-          <div onClick={() => hasChildren && toggleAccountExpand(parent.id)} className={cn("flex justify-between items-center py-2.5 text-sm border-b border-border/40 font-semibold select-none", hasChildren ? "cursor-pointer hover:bg-accent/5 px-2 -mx-2 rounded-lg transition-colors" : "")}>
-            <div className="flex items-center gap-1.5">
-              {hasChildren ? (isExpanded ? <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" /> : <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />) : <div className="w-4 h-4 shrink-0" />}
-              <span>{parent.name} ({parent.code})</span>
-            </div>
-            <span className={cn("font-bold shrink-0", colorClass)}>₹{Number(parent.periodBalance).toLocaleString()}</span>
-          </div>
-          {hasChildren && isExpanded && (
-            <div className="pl-6 border-l border-border/60 ml-2 space-y-1 mt-1">
-              {children.map((child: any) => (<div key={child.id} className="flex justify-between items-center py-1.5 text-xs text-muted-foreground border-b border-border/20"><span>{child.name} ({child.code})</span><span className="font-semibold">₹{Number(child.periodBalance).toLocaleString()}</span></div>))}
-            </div>
-          )}
-        </div>
-      );
-    });
-  };
-
-  const filteredVouchers = vouchers.filter(v => v.voucher_no.toLowerCase().includes(searchQuery.toLowerCase()) || v.description.toLowerCase().includes(searchQuery.toLowerCase()) || v.debit_account.name.toLowerCase().includes(searchQuery.toLowerCase()) || v.credit_account.name.toLowerCase().includes(searchQuery.toLowerCase()) || v.created_by.toLowerCase().includes(searchQuery.toLowerCase()));
-
-  const fetchAccountsAndVouchers = async () => {
-    if (!token) return; setLoading(true);
-    try {
-      const [accRes, vRes] = await Promise.all([fetch(`${API_BASE_URL}/accounting/accounts`, { headers: { Authorization: `Bearer ${token}` } }), fetch(`${API_BASE_URL}/accounting/vouchers`, { headers: { Authorization: `Bearer ${token}` } })]);
-      const accData = await accRes.json(); const vData = await vRes.json();
-      if (Array.isArray(accData)) setAccounts(accData); if (Array.isArray(vData)) setVouchers(vData);
-    } catch { toast.error("Failed to load ledger data."); } finally { setLoading(false); }
-  };
-
-  const fetchReport = useCallback(async () => {
-    if (!token) return; setLoadingReport(true);
-    try {
-      const { period, year, month } = reportFilter;
-      const url = `${API_BASE_URL}/accounting/reports?period=${period}&year=${year}${period === "monthly" ? `&month=${month}` : ""}`;
-      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-      const data = await res.json(); setReportData(data);
-    } catch { toast.error("Failed to load reports."); } finally { setLoadingReport(false); }
-  }, [token, reportFilter]);
-
-  const fetchCashFlow = useCallback(async () => {
-    if (!token) return; setCashFlowLoading(true);
-    try {
-      const { period, year, month } = reportFilter;
-      const url = `${API_BASE_URL}/accounting/reports/cashflow?period=${period}&year=${year}${period === "monthly" ? `&month=${month}` : ""}`;
-      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-      const data = await res.json(); setCashFlowData(data);
-    } catch { toast.error("Failed to load cash flow."); } finally { setCashFlowLoading(false); }
-  }, [token, reportFilter]);
-
-  const fetchAuditLog = useCallback(async () => {
-    if (!token) return; setAuditLoading(true);
-    try { const res = await fetch(`${API_BASE_URL}/accounting/audit`, { headers: { Authorization: `Bearer ${token}` } }); const data = await res.json(); if (Array.isArray(data)) setAuditLogs(data); }
-    catch { toast.error("Failed to load audit log."); } finally { setAuditLoading(false); }
-  }, [token]);
-
-  const fetchAccountLedger = useCallback(async (account: Account) => {
-    if (!token) return; setDrillLoading(true); setDrillEntries([]);
-    try {
-      const params = new URLSearchParams(); if (drillStart) params.append("startDate", drillStart); if (drillEnd) params.append("endDate", drillEnd);
-      const res = await fetch(`${API_BASE_URL}/accounting/accounts/${account.id}/ledger?${params}`, { headers: { Authorization: `Bearer ${token}` } });
-      const data = await res.json(); if (data.entries) setDrillEntries(data.entries);
-    } catch { toast.error("Failed to load account ledger."); } finally { setDrillLoading(false); }
-  }, [token, drillStart, drillEnd]);
-
-  useEffect(() => { fetchAccountsAndVouchers(); }, [token]);
-  useEffect(() => { if (activeTab === "reports") { fetchReport(); fetchCashFlow(); } }, [activeTab, reportFilter]);
-  useEffect(() => { if (activeTab === "audit") fetchAuditLog(); }, [activeTab]);
-  useEffect(() => { if (drillAccount) fetchAccountLedger(drillAccount); }, [drillAccount, drillStart, drillEnd]);
-
-  const handleCreateVoucher = async (e: React.FormEvent) => {
-    e.preventDefault(); if (!token || !voucherForm.debit_code || !voucherForm.credit_code || !voucherForm.amount || !voucherForm.description) { toast.error("Fill all fields."); return; }
-    try {
-      const res = await fetch(`${API_BASE_URL}/accounting/vouchers`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ debit_code: voucherForm.debit_code, credit_code: voucherForm.credit_code, amount: parseFloat(voucherForm.amount), description: voucherForm.description, transaction_date: voucherForm.transaction_date }) });
-      if (res.ok) { toast.success("Voucher posted!"); setOpenVoucherDialog(false); setVoucherForm({ debit_code: "", credit_code: "", amount: "", description: "", transaction_date: new Date().toISOString().split("T")[0] }); fetchAccountsAndVouchers(); }
-      else { const err = await res.json(); toast.error(err.message || "Failed."); }
-    } catch { toast.error("Network error."); }
-  };
-
-  const handleCreateAccount = async (e: React.FormEvent) => {
-    e.preventDefault(); if (!token || !accountForm.name || !accountForm.code) { toast.error("Fill all fields."); return; }
-    try {
-      const res = await fetch(`${API_BASE_URL}/accounting/accounts`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ name: accountForm.name, code: accountForm.code, type: accountForm.type, parent_id: accountForm.parent_id || undefined, opening_balance: accountForm.opening_balance ? parseFloat(accountForm.opening_balance) : undefined }) });
-      if (res.ok) { toast.success("Account created!"); setOpenAccountDialog(false); setAccountForm({ name: "", code: "", type: "ASSET", parent_id: "", opening_balance: "" }); fetchAccountsAndVouchers(); }
-      else { const err = await res.json(); toast.error(err.message || "Failed."); }
-    } catch { toast.error("Network error."); }
-  };
-
-  const handleCreateTransaction = async (e: React.FormEvent) => {
-    e.preventDefault(); if (!token || !transactionForm.category_id || !transactionForm.bank_account_id || !transactionForm.amount || !transactionForm.description) { toast.error("Fill all fields."); return; }
-    try {
-      const res = await fetch(`${API_BASE_URL}/accounting/transactions`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ type: transactionForm.type, category_id: transactionForm.category_id, bank_account_id: transactionForm.bank_account_id, amount: parseFloat(transactionForm.amount), description: transactionForm.description, transaction_date: transactionForm.transaction_date }) });
-      if (res.ok) { toast.success("Transaction saved!"); setOpenTransactionDialog(false); setTransactionForm({ type: "EXPENSE", category_id: "", bank_account_id: "", amount: "", description: "", transaction_date: new Date().toISOString().split("T")[0] }); fetchAccountsAndVouchers(); if (activeTab === "reports") { fetchReport(); fetchCashFlow(); } }
-      else { const err = await res.json(); toast.error(err.message || "Failed."); }
-    } catch { toast.error("Network error."); }
-  };
-
-  const handleUpdateOpeningBalance = async (e: React.FormEvent) => {
-    e.preventDefault(); if (!token || !editOBAccount || !editOBAmount) return; setEditOBLoading(true);
-    try {
-      const res = await fetch(`${API_BASE_URL}/accounting/accounts/${editOBAccount.id}/opening-balance`, { method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ amount: parseFloat(editOBAmount) }) });
-      if (res.ok) { toast.success(`Opening balance for ${editOBAccount.name} updated!`); setEditOBAccount(null); setEditOBAmount(""); fetchAccountsAndVouchers(); }
-      else { const err = await res.json(); toast.error(err.message || "Failed."); }
-    } catch { toast.error("Network error."); } finally { setEditOBLoading(false); }
-  };
-
+﻿
   const downloadExcelReport = () => {
     if (!reportData) { toast.error("No report data."); return; }
     try {
-      const plData = [["Type", "Account", "Code", "Amount (INR)"], ["P&L STATEMENT", "", "", ""], ...reportData.profitAndLoss.revenues.map((r: any) => ["Revenue", r.name, r.code, Number(r.periodBalance)]), ["Total Revenue", "", "", Number(reportData.profitAndLoss.totalRevenue)], ...reportData.profitAndLoss.expenses.map((e: any) => ["Expense", e.name, e.code, Number(e.periodBalance)]), ["Total Expense", "", "", Number(reportData.profitAndLoss.totalExpense)], ["Net Profit", "", "", Number(reportData.profitAndLoss.netProfit)]];
-      const coaData = [["Code", "Account Name", "Type", "Balance (INR)"], ...accounts.map(a => [a.code, a.name, a.type, Number(a.balance)])];
-      const trialData = reportData.trialBalance ? [["Code", "Account Name", "Type", "Debit (Dr)", "Credit (Cr)"], ...reportData.trialBalance.map((t: any) => [t.code, t.name, t.type, Number(t.debit), Number(t.credit)])] : [];
-      const start = new Date(reportData.period.startDate), end = new Date(reportData.period.endDate);
-      const pv = vouchers.filter(v => { const d = new Date(v.transaction_date); return d >= start && d <= end; });
-      const ledgerData = [["Voucher No", "Date", "Debit Acc", "Credit Acc", "Debit", "Credit", "Narration", "Audited By"], ...pv.map(v => [v.voucher_no, new Date(v.transaction_date).toLocaleDateString(), `${v.debit_account.name}`, `${v.credit_account.name}`, Number(v.amount), Number(v.amount), v.description, v.created_by])];
+      const plData = [["Type", "Account", "Code", "Amount (INR)"], ["P&L STATEMENT", "", "", ""], ...(reportData.profitAndLoss?.revenues || []).map((r: any) => ["Revenue", r.name, r.code, Number(r.periodBalance)]), ["Total Revenue", "", "", Number(reportData.profitAndLoss?.totalRevenue || 0)], ...(reportData.profitAndLoss?.expenses || []).map((e: any) => ["Expense", e.name, e.code, Number(e.periodBalance)]), ["Total Expense", "", "", Number(reportData.profitAndLoss?.totalExpense || 0)], ["Net Profit", "", "", Number(reportData.profitAndLoss?.netProfit || 0)]];
+      const coaData = [["Code", "Account Name", "Type", "Balance (INR)"], ...(accounts || []).map(a => [a.code, a.name, a.type, Number(a.balance)])];
+      const trialData = reportData.trialBalance ? [["Code", "Account Name", "Type", "Debit (Dr)", "Credit (Cr)"], ...(reportData.trialBalance || []).map((t: any) => [t.code, t.name, t.type, Number(t.debit), Number(t.credit)])] : [];
+      const start = new Date(reportData.period?.startDate || new Date()), end = new Date(reportData.period?.endDate || new Date());
+      const pv = (vouchers || []).filter(v => { const d = new Date(v.transaction_date); return d >= start && d <= end; });
+      const ledgerData = [["Voucher No", "Date", "Debit Acc", "Credit Acc", "Debit", "Credit", "Narration", "Audited By"], ...pv.map(v => [v.voucher_no, new Date(v.transaction_date).toLocaleDateString(), `${v.debit_account?.name || ""}`, `${v.credit_account?.name || ""}`, Number(v.amount), Number(v.amount), v.description, v.created_by])];
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(plData), "P&L Report");
       XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(coaData), "Chart of Accounts");
@@ -195,11 +26,11 @@ export default function AccountingPage() {
     const ds = period === "monthly" ? new Date(year, month).toLocaleString("default", { month: "long", year: "numeric" }) : period === "halfyearly" ? `Half Yearly (${year})` : `Yearly (${year})`;
     doc.setFontSize(20); doc.setFont("helvetica", "bold"); doc.text("GLOBAL SAFETY SOLUTION", 14, 20);
     doc.setFontSize(12); doc.setFont("helvetica", "normal"); doc.text(`Consolidated Audit Statement - ${ds}`, 14, 28); doc.text(`Generated: ${new Date().toLocaleDateString()}`, 14, 34); doc.line(14, 38, 196, 38);
-    autoTable(doc, { startY: 42, head: [["Indicator", "Balance"]], body: [["Total Revenue", `INR ${reportData.profitAndLoss.totalRevenue.toLocaleString()}`], ["Total Expenses", `INR ${reportData.profitAndLoss.totalExpense.toLocaleString()}`], ["Net Profit", `INR ${reportData.profitAndLoss.netProfit.toLocaleString()}`]], theme: "striped", styles: { fontSize: 10 }, headStyles: { fillColor: [79, 70, 229] } });
+    autoTable(doc, { startY: 42, head: [["Indicator", "Balance"]], body: [["Total Revenue", `INR ${(reportData.profitAndLoss?.totalRevenue || 0).toLocaleString()}`], ["Total Expenses", `INR ${(reportData.profitAndLoss?.totalExpense || 0).toLocaleString()}`], ["Net Profit", `INR ${(reportData.profitAndLoss?.netProfit || 0).toLocaleString()}`]], theme: "striped", styles: { fontSize: 10 }, headStyles: { fillColor: [79, 70, 229] } });
     let y = (doc as any).lastAutoTable.finalY + 15;
-    autoTable(doc, { startY: y, head: [["Classification", "Balance"]], body: [["Total Assets", `INR ${reportData.balanceSheet.totalAssets.toLocaleString()}`], ["Total Liabilities", `INR ${reportData.balanceSheet.totalLiabilities.toLocaleString()}`], ["Total Equity", `INR ${reportData.balanceSheet.totalEquity.toLocaleString()}`]], theme: "striped", styles: { fontSize: 10 }, headStyles: { fillColor: [13, 148, 136] } });
+    autoTable(doc, { startY: y, head: [["Classification", "Balance"]], body: [["Total Assets", `INR ${(reportData.balanceSheet?.totalAssets || 0).toLocaleString()}`], ["Total Liabilities", `INR ${(reportData.balanceSheet?.totalLiabilities || 0).toLocaleString()}`], ["Total Equity", `INR ${(reportData.balanceSheet?.totalEquity || 0).toLocaleString()}`]], theme: "striped", styles: { fontSize: 10 }, headStyles: { fillColor: [13, 148, 136] } });
     doc.addPage();
-    if (reportData.trialBalance) { doc.setFontSize(16); doc.setFont("helvetica", "bold"); doc.text("Trial Balance", 14, 20); autoTable(doc, { startY: 26, head: [["Code", "Account", "Type", "Debit", "Credit"]], body: reportData.trialBalance.map((t: any) => [t.code, t.name, t.type, `INR ${Number(t.debit).toLocaleString()}`, `INR ${Number(t.credit).toLocaleString()}`]), theme: "striped", styles: { fontSize: 9 }, headStyles: { fillColor: [234, 88, 12] } }); }
+    if (reportData.trialBalance) { doc.setFontSize(16); doc.setFont("helvetica", "bold"); doc.text("Trial Balance", 14, 20); autoTable(doc, { startY: 26, head: [["Code", "Account", "Type", "Debit", "Credit"]], body: (reportData.trialBalance || []).map((t: any) => [t.code, t.name, t.type, `INR ${Number(t.debit).toLocaleString()}`, `INR ${Number(t.credit).toLocaleString()}`]), theme: "striped", styles: { fontSize: 9 }, headStyles: { fillColor: [234, 88, 12] } }); }
     const savDs = period === "monthly" ? `${new Date(year, month).toLocaleString("default", { month: "short" })}-${year}` : `${year}`;
     doc.save(`Financial_Report_${savDs}.pdf`); toast.success("PDF downloaded!");
   };
@@ -237,7 +68,7 @@ export default function AccountingPage() {
                 <div className="space-y-1"><Label>Parent Account (Optional)</Label>
                   <select value={accountForm.parent_id} onChange={(e) => setAccountForm({ ...accountForm, parent_id: e.target.value })} className="w-full h-10 px-3 rounded-lg border border-border bg-background text-foreground">
                     <option value="">None (Primary Category)</option>
-                    {accounts.filter(a => a.type === accountForm.type && !a.parent_id).map(a => (<option key={a.id} value={a.id}>{a.name} ({a.code})</option>))}
+                    {(accounts || []).filter(a => a.type === accountForm.type && !a.parent_id).map(a => (<option key={a.id} value={a.id}>{a.name} ({a.code})</option>))}
                   </select>
                 </div>
                 <div className="space-y-1"><Label>Opening Balance (INR - Optional)</Label><Input type="number" step="0.01" placeholder="0.00" value={accountForm.opening_balance} onChange={(e) => setAccountForm({ ...accountForm, opening_balance: e.target.value })} className="bg-background border-border" /></div>
@@ -258,13 +89,13 @@ export default function AccountingPage() {
                 <div className="space-y-1"><Label>Category Account</Label>
                   <select value={transactionForm.category_id} onChange={(e) => setTransactionForm({ ...transactionForm, category_id: e.target.value })} className="w-full h-10 px-3 rounded-lg border border-border bg-background text-foreground">
                     <option value="">Select Category</option>
-                    {accounts.filter(a => a.type === (transactionForm.type === "EXPENSE" ? "EXPENSE" : "REVENUE")).map(a => (<option key={a.id} value={a.id}>{a.name} ({a.code})</option>))}
+                    {(accounts || []).filter(a => a.type === (transactionForm.type === "EXPENSE" ? "EXPENSE" : "REVENUE")).map(a => (<option key={a.id} value={a.id}>{a.name} ({a.code})</option>))}
                   </select>
                 </div>
                 <div className="space-y-1"><Label>{transactionForm.type === "EXPENSE" ? "Paid From (Bank/Cash Account)" : "Deposit To (Bank/Cash Account)"}</Label>
                   <select value={transactionForm.bank_account_id} onChange={(e) => setTransactionForm({ ...transactionForm, bank_account_id: e.target.value })} className="w-full h-10 px-3 rounded-lg border border-border bg-background text-foreground">
                     <option value="">Select Account</option>
-                    {accounts.filter(a => a.type === "ASSET").map(a => (<option key={a.id} value={a.id}>{a.name} ({a.code})</option>))}
+                    {(accounts || []).filter(a => a.type === "ASSET").map(a => (<option key={a.id} value={a.id}>{a.name} ({a.code})</option>))}
                   </select>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
@@ -285,13 +116,13 @@ export default function AccountingPage() {
                   <div className="space-y-1"><Label>Debit Account (Dr.)</Label>
                     <select value={voucherForm.debit_code} onChange={(e) => setVoucherForm({ ...voucherForm, debit_code: e.target.value })} className="w-full h-10 px-3 rounded-lg border border-border bg-background text-foreground">
                       <option value="">Select Account</option>
-                      {accounts.map(a => (<option key={a.id} value={a.code}>{a.name} ({a.code})</option>))}
+                      {(accounts || []).map(a => (<option key={a.id} value={a.code}>{a.name} ({a.code})</option>))}
                     </select>
                   </div>
                   <div className="space-y-1"><Label>Credit Account (Cr.)</Label>
                     <select value={voucherForm.credit_code} onChange={(e) => setVoucherForm({ ...voucherForm, credit_code: e.target.value })} className="w-full h-10 px-3 rounded-lg border border-border bg-background text-foreground">
                       <option value="">Select Account</option>
-                      {accounts.map(a => (<option key={a.id} value={a.code}>{a.name} ({a.code})</option>))}
+                      {(accounts || []).map(a => (<option key={a.id} value={a.code}>{a.name} ({a.code})</option>))}
                     </select>
                   </div>
                 </div>
@@ -333,7 +164,7 @@ export default function AccountingPage() {
                       <tr key={v.id} className="hover:bg-accent/5 transition-colors">
                         <td className="py-4 px-6 font-bold text-indigo-500">{v.voucher_no}</td>
                         <td className="py-4 px-6 text-muted-foreground">{new Date(v.transaction_date).toLocaleDateString()}</td>
-                        <td className="py-4 px-6 font-medium space-y-1"><div className="flex items-center gap-1.5 text-emerald-500"><ArrowUpRight className="w-3.5 h-3.5" />{v.debit_account.name} ({v.debit_account.code})</div><div className="flex items-center gap-1.5 text-rose-500 pl-4"><ArrowDownLeft className="w-3.5 h-3.5" />{v.credit_account.name} ({v.credit_account.code})</div></td>
+                        <td className="py-4 px-6 font-medium space-y-1"><div className="flex items-center gap-1.5 text-emerald-500"><ArrowUpRight className="w-3.5 h-3.5" />{v.debit_account?.name || ""} ({v.debit_account?.code || ""})</div><div className="flex items-center gap-1.5 text-rose-500 pl-4"><ArrowDownLeft className="w-3.5 h-3.5" />{v.credit_account?.name || ""} ({v.credit_account?.code || ""})</div></td>
                         <td className="py-4 px-6 text-right font-bold text-emerald-500">₹{Number(v.amount).toLocaleString()}</td>
                         <td className="py-4 px-6 text-right font-bold text-rose-500">₹{Number(v.amount).toLocaleString()}</td>
                         <td className="py-4 px-6 text-muted-foreground max-w-xs truncate cursor-help" title={v.description}>{v.description}</td>
@@ -355,7 +186,7 @@ export default function AccountingPage() {
                     <table className="w-full text-left border-collapse">
                       <thead><tr className="bg-accent/5 border-b border-border text-muted-foreground text-xs font-black uppercase tracking-wider"><th className="py-4 px-6">Code</th><th className="py-4 px-6">Account Name</th><th className="py-4 px-6">Type</th><th className="py-4 px-6 text-right">Current Balance</th><th className="py-4 px-6 text-center">Actions</th></tr></thead>
                       <tbody className="divide-y divide-border/60 text-sm">
-                        {accounts.map(a => (
+                        {(accounts || []).map(a => (
                           <tr key={a.id} className="hover:bg-accent/5 transition-colors">
                             <td className={cn("py-4 px-6 font-mono font-bold text-indigo-500", a.parent_id ? "pl-8 text-indigo-500/70" : "")}>{a.parent_id && <span className="text-muted-foreground mr-1">↳</span>}{a.code}</td>
                             <td className={cn("py-4 px-6 font-medium", a.parent_id ? "pl-8 text-muted-foreground text-xs" : "")}><button onClick={() => { setDrillAccount(a); setDrillStart(""); setDrillEnd(""); }} className="hover:text-indigo-500 hover:underline transition-colors text-left">{a.name}</button></td>
@@ -372,9 +203,9 @@ export default function AccountingPage() {
                   <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
                     <h3 className="font-bold text-lg mb-4">Financial Equilibrium</h3>
                     <div className="space-y-4">
-                      <div className="p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/10 flex justify-between items-center"><div><p className="text-xs text-muted-foreground font-medium uppercase">Total Assets</p><p className="text-xl font-bold text-emerald-500 mt-1">₹{accounts.filter(a => a.type === "ASSET").reduce((sum, a) => sum + Number(a.balance), 0).toLocaleString()}</p></div><TrendingUp className="w-8 h-8 text-emerald-500 opacity-35" /></div>
-                      <div className="p-4 rounded-xl bg-rose-500/5 border border-rose-500/10 flex justify-between items-center"><div><p className="text-xs text-muted-foreground font-medium uppercase">Total Liabilities</p><p className="text-xl font-bold text-rose-500 mt-1">₹{accounts.filter(a => a.type === "LIABILITY").reduce((sum, a) => sum + Number(a.balance), 0).toLocaleString()}</p></div><ShieldAlert className="w-8 h-8 text-rose-500 opacity-35" /></div>
-                      <div className="p-4 rounded-xl bg-purple-500/5 border border-purple-500/10 flex justify-between items-center"><div><p className="text-xs text-muted-foreground font-medium uppercase">Total Equity</p><p className="text-xl font-bold text-purple-500 mt-1">₹{accounts.filter(a => a.type === "EQUITY").reduce((sum, a) => sum + Number(a.balance), 0).toLocaleString()}</p></div><DollarSign className="w-8 h-8 text-purple-500 opacity-35" /></div>
+                      <div className="p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/10 flex justify-between items-center"><div><p className="text-xs text-muted-foreground font-medium uppercase">Total Assets</p><p className="text-xl font-bold text-emerald-500 mt-1">₹{(accounts || []).filter(a => a.type === "ASSET").reduce((sum, a) => sum + Number(a.balance), 0).toLocaleString()}</p></div><TrendingUp className="w-8 h-8 text-emerald-500 opacity-35" /></div>
+                      <div className="p-4 rounded-xl bg-rose-500/5 border border-rose-500/10 flex justify-between items-center"><div><p className="text-xs text-muted-foreground font-medium uppercase">Total Liabilities</p><p className="text-xl font-bold text-rose-500 mt-1">₹{(accounts || []).filter(a => a.type === "LIABILITY").reduce((sum, a) => sum + Number(a.balance), 0).toLocaleString()}</p></div><ShieldAlert className="w-8 h-8 text-rose-500 opacity-35" /></div>
+                      <div className="p-4 rounded-xl bg-purple-500/5 border border-purple-500/10 flex justify-between items-center"><div><p className="text-xs text-muted-foreground font-medium uppercase">Total Equity</p><p className="text-xl font-bold text-purple-500 mt-1">₹{(accounts || []).filter(a => a.type === "EQUITY").reduce((sum, a) => sum + Number(a.balance), 0).toLocaleString()}</p></div><DollarSign className="w-8 h-8 text-purple-500 opacity-35" /></div>
                     </div>
                   </div>
                 </div>
@@ -444,16 +275,16 @@ export default function AccountingPage() {
                     <div className="bg-card border border-border rounded-2xl p-6 space-y-6 shadow-sm">
                       <div className="flex items-center justify-between border-b border-border pb-4"><h3 className="font-bold text-lg text-indigo-500 uppercase tracking-wider">Profit & Loss Statement</h3><TrendingUp className="w-5 h-5 text-indigo-500" /></div>
                       <div className="space-y-4">
-                        <div><h4 className="text-xs font-black text-muted-foreground uppercase mb-2">Revenue Streams</h4><div className="space-y-1">{renderCollapsibleAccountRows(reportData.profitAndLoss.revenues, "REVENUE", "text-emerald-500")}</div><div className="flex justify-between py-3 font-bold text-sm border-b-2 border-border/80 mt-1"><span>Total Revenue</span><span className="text-emerald-500 underline decoration-double">₹{Number(reportData.profitAndLoss.totalRevenue).toLocaleString()}</span></div></div>
-                        <div className="pt-4"><h4 className="text-xs font-black text-muted-foreground uppercase mb-2">Operating Expenses</h4><div className="space-y-1">{renderCollapsibleAccountRows(reportData.profitAndLoss.expenses, "EXPENSE", "text-rose-500")}</div><div className="flex justify-between py-3 font-bold text-sm border-b-2 border-border/80 mt-1"><span>Total Expenses</span><span className="text-rose-500">₹{Number(reportData.profitAndLoss.totalExpense).toLocaleString()}</span></div></div>
-                        <div className="p-4 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex justify-between items-center mt-6"><span className="font-black text-base uppercase text-indigo-500">Net Business Profit</span><span className={cn("font-black text-xl underline decoration-double", Number(reportData.profitAndLoss.netProfit) >= 0 ? "text-emerald-500" : "text-rose-500")}>₹{Number(reportData.profitAndLoss.netProfit).toLocaleString()}</span></div>
+                        <div><h4 className="text-xs font-black text-muted-foreground uppercase mb-2">Revenue Streams</h4><div className="space-y-1">{renderCollapsibleAccountRows(reportData.profitAndLoss?.revenues, "REVENUE", "text-emerald-500")}</div><div className="flex justify-between py-3 font-bold text-sm border-b-2 border-border/80 mt-1"><span>Total Revenue</span><span className="text-emerald-500 underline decoration-double">₹{Number(reportData.profitAndLoss?.totalRevenue || 0).toLocaleString()}</span></div></div>
+                        <div className="pt-4"><h4 className="text-xs font-black text-muted-foreground uppercase mb-2">Operating Expenses</h4><div className="space-y-1">{renderCollapsibleAccountRows(reportData.profitAndLoss?.expenses, "EXPENSE", "text-rose-500")}</div><div className="flex justify-between py-3 font-bold text-sm border-b-2 border-border/80 mt-1"><span>Total Expenses</span><span className="text-rose-500">₹{Number(reportData.profitAndLoss?.totalExpense || 0).toLocaleString()}</span></div></div>
+                        <div className="p-4 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex justify-between items-center mt-6"><span className="font-black text-base uppercase text-indigo-500">Net Business Profit</span><span className={cn("font-black text-xl underline decoration-double", Number(reportData.profitAndLoss?.netProfit || 0) >= 0 ? "text-emerald-500" : "text-rose-500")}>₹{Number(reportData.profitAndLoss?.netProfit || 0).toLocaleString()}</span></div>
                       </div>
                     </div>
                     <div className="bg-card border border-border rounded-2xl p-6 space-y-6 shadow-sm">
                       <div className="flex items-center justify-between border-b border-border pb-4"><h3 className="font-bold text-lg text-teal-500 uppercase tracking-wider">Balance Sheet Summary</h3><DollarSign className="w-5 h-5 text-teal-500" /></div>
                       <div className="space-y-4">
-                        <div><h4 className="text-xs font-black text-muted-foreground uppercase mb-2">Assets (Dr.)</h4><div className="space-y-1">{renderCollapsibleAccountRows(reportData.balanceSheet.assets, "ASSET", "text-emerald-500")}</div><div className="flex justify-between py-3 font-bold text-sm border-b-2 border-border/80 mt-1"><span>Total Assets</span><span className="text-emerald-500 underline decoration-double">₹{Number(reportData.balanceSheet.totalAssets).toLocaleString()}</span></div></div>
-                        <div className="pt-4"><h4 className="text-xs font-black text-muted-foreground uppercase mb-2">Liabilities & Equity (Cr.)</h4><div className="space-y-1">{renderCollapsibleAccountRows(reportData.balanceSheet.liabilities, "LIABILITY", "text-rose-500")}{renderCollapsibleAccountRows(reportData.balanceSheet.equity, "EQUITY", "text-purple-500")}</div><div className="flex justify-between py-3 font-bold text-sm border-b-2 border-border/80 mt-1"><span>Total Liabilities & Equity</span><span className="text-teal-500 underline decoration-double">₹{(Number(reportData.balanceSheet.totalLiabilities) + Number(reportData.balanceSheet.totalEquity)).toLocaleString()}</span></div></div>
+                        <div><h4 className="text-xs font-black text-muted-foreground uppercase mb-2">Assets (Dr.)</h4><div className="space-y-1">{renderCollapsibleAccountRows(reportData.balanceSheet?.assets, "ASSET", "text-emerald-500")}</div><div className="flex justify-between py-3 font-bold text-sm border-b-2 border-border/80 mt-1"><span>Total Assets</span><span className="text-emerald-500 underline decoration-double">₹{Number(reportData.balanceSheet?.totalAssets || 0).toLocaleString()}</span></div></div>
+                        <div className="pt-4"><h4 className="text-xs font-black text-muted-foreground uppercase mb-2">Liabilities & Equity (Cr.)</h4><div className="space-y-1">{renderCollapsibleAccountRows(reportData.balanceSheet?.liabilities, "LIABILITY", "text-rose-500")}{renderCollapsibleAccountRows(reportData.balanceSheet?.equity, "EQUITY", "text-purple-500")}</div><div className="flex justify-between py-3 font-bold text-sm border-b-2 border-border/80 mt-1"><span>Total Liabilities & Equity</span><span className="text-teal-500 underline decoration-double">₹{(Number(reportData.balanceSheet?.totalLiabilities || 0) + Number(reportData.balanceSheet?.totalEquity || 0)).toLocaleString()}</span></div></div>
                       </div>
                     </div>
                   </div>
@@ -465,12 +296,12 @@ export default function AccountingPage() {
                           <div key={section.key} className={cn("rounded-xl p-4 border", section.bg)}>
                             <h4 className={cn("text-xs font-black uppercase mb-3", section.color)}>{section.label}</h4>
                             <div className="space-y-2">
-                              {section.data.items.length === 0 ? (<p className="text-xs text-muted-foreground italic">No activity.</p>) : section.data.items.map((item: any, i: number) => (<div key={i} className="flex justify-between items-start text-xs py-1.5 border-b border-border/30"><div className="flex-1 pr-2"><p className="font-medium truncate" title={item.description}>{item.description}</p><p className="text-muted-foreground">{item.opposite_account}</p></div><span className={cn("font-bold shrink-0", item.amount >= 0 ? "text-emerald-500" : "text-rose-500")}>₹{Math.abs(item.amount).toLocaleString()}</span></div>))}
+                              {(!section.data || !section.data.items || section.data.items.length === 0) ? (<p className="text-xs text-muted-foreground italic">No activity.</p>) : section.data.items.map((item: any, i: number) => (<div key={i} className="flex justify-between items-start text-xs py-1.5 border-b border-border/30"><div className="flex-1 pr-2"><p className="font-medium truncate" title={item.description}>{item.description}</p><p className="text-muted-foreground">{item.opposite_account}</p></div><span className={cn("font-bold shrink-0", item.amount >= 0 ? "text-emerald-500" : "text-rose-500")}>₹{Math.abs(item.amount).toLocaleString()}</span></div>))}
                             </div>
-                            <div className={cn("flex justify-between font-bold text-sm mt-3 pt-2 border-t border-border/60", section.color)}><span>Net</span><span>₹{Number(section.data.total).toLocaleString()}</span></div>
+                            <div className={cn("flex justify-between font-bold text-sm mt-3 pt-2 border-t border-border/60", section.color)}><span>Net</span><span>₹{Number(section.data?.total || 0).toLocaleString()}</span></div>
                           </div>
                         ))}
-                        <div className="md:col-span-3 p-4 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex justify-between items-center"><span className="font-black text-base uppercase text-cyan-500">Net Cash Flow (Period)</span><span className={cn("font-black text-xl", Number(cashFlowData.netCashFlow) >= 0 ? "text-emerald-500" : "text-rose-500")}>₹{Number(cashFlowData.netCashFlow).toLocaleString()}</span></div>
+                        <div className="md:col-span-3 p-4 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex justify-between items-center"><span className="font-black text-base uppercase text-cyan-500">Net Cash Flow (Period)</span><span className={cn("font-black text-xl", Number(cashFlowData.netCashFlow || 0) >= 0 ? "text-emerald-500" : "text-rose-500")}>₹{Number(cashFlowData.netCashFlow || 0).toLocaleString()}</span></div>
                       </div>
                     ) : null}
                   </div>
@@ -494,9 +325,9 @@ export default function AccountingPage() {
                     <table className="w-full text-left border-collapse">
                       <thead><tr className="bg-accent/5 border-b border-border text-muted-foreground text-xs font-black uppercase tracking-wider"><th className="py-4 px-6">Code</th><th className="py-4 px-6">Account Name</th><th className="py-4 px-6">Type</th><th className="py-4 px-6 text-right">Debit (Dr)</th><th className="py-4 px-6 text-right">Credit (Cr)</th></tr></thead>
                       <tbody className="divide-y divide-border/60 text-sm">
-                        {reportData.trialBalance.map((t: any) => (<tr key={t.id} className="hover:bg-accent/5 transition-colors"><td className="py-3 px-6 font-mono font-bold text-indigo-500">{t.code}</td><td className="py-3 px-6 font-medium">{t.name}</td><td className="py-3 px-6"><span className={cn("text-xs px-2.5 py-1 rounded-full font-bold", accountTypeColor(t.type))}>{t.type}</span></td><td className="py-3 px-6 text-right font-bold text-emerald-500">{t.debit > 0 ? `₹${Number(t.debit).toLocaleString()}` : "—"}</td><td className="py-3 px-6 text-right font-bold text-rose-500">{t.credit > 0 ? `₹${Number(t.credit).toLocaleString()}` : "—"}</td></tr>))}
+                        {(reportData.trialBalance || []).map((t: any) => (<tr key={t.id} className="hover:bg-accent/5 transition-colors"><td className="py-3 px-6 font-mono font-bold text-indigo-500">{t.code}</td><td className="py-3 px-6 font-medium">{t.name}</td><td className="py-3 px-6"><span className={cn("text-xs px-2.5 py-1 rounded-full font-bold", accountTypeColor(t.type))}>{t.type}</span></td><td className="py-3 px-6 text-right font-bold text-emerald-500">{t.debit > 0 ? `₹${Number(t.debit).toLocaleString()}` : "—"}</td><td className="py-3 px-6 text-right font-bold text-rose-500">{t.credit > 0 ? `₹${Number(t.credit).toLocaleString()}` : "—"}</td></tr>))}
                       </tbody>
-                      <tfoot>{(() => { const td = reportData.trialBalance.reduce((s: number, t: any) => s + Number(t.debit), 0); const tc = reportData.trialBalance.reduce((s: number, t: any) => s + Number(t.credit), 0); const bal = Math.abs(td - tc) < 0.01; return (<tr className={cn("border-t-2 font-black text-sm", bal ? "bg-emerald-500/5 border-emerald-500/30" : "bg-rose-500/5 border-rose-500/30")}><td colSpan={3} className="py-4 px-6">{bal ? <span className="text-emerald-500">✓ Balanced — Books are correct</span> : <span className="text-rose-500">✗ Unbalanced — Diff: ₹{Math.abs(td - tc).toLocaleString()}</span>}</td><td className="py-4 px-6 text-right text-emerald-500">₹{td.toLocaleString()}</td><td className="py-4 px-6 text-right text-rose-500">₹{tc.toLocaleString()}</td></tr>); })()}</tfoot>
+                      <tfoot>{(() => { const td = (reportData.trialBalance || []).reduce((s: number, t: any) => s + Number(t.debit), 0); const tc = (reportData.trialBalance || []).reduce((s: number, t: any) => s + Number(t.credit), 0); const bal = Math.abs(td - tc) < 0.01; return (<tr className={cn("border-t-2 font-black text-sm", bal ? "bg-emerald-500/5 border-emerald-500/30" : "bg-rose-500/5 border-rose-500/30")}><td colSpan={3} className="py-4 px-6">{bal ? <span className="text-emerald-500">✓ Balanced — Books are correct</span> : <span className="text-rose-500">✗ Unbalanced — Diff: ₹{Math.abs(td - tc).toLocaleString()}</span>}</td><td className="py-4 px-6 text-right text-emerald-500">₹{td.toLocaleString()}</td><td className="py-4 px-6 text-right text-rose-500">₹{tc.toLocaleString()}</td></tr>); })()}</tfoot>
                     </table>
                   </div>
                 </div>
