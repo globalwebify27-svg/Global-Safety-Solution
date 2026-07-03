@@ -233,6 +233,21 @@ export default function AccountingPage() {
     } catch { toast.error("Excel generation failed."); }
   };
 
+  const downloadPDFReport = () => {
+    if (!reportData) return;
+    const doc = new jsPDF();
+    const { period, year, month } = reportFilter;
+    const ds = period === "monthly" ? new Date(year, month).toLocaleString("default", { month: "long", year: "numeric" }) : period === "halfyearly" ? `Half Yearly (${year})` : `Yearly (${year})`;
+    doc.setFontSize(20); doc.setFont("helvetica", "bold"); doc.text("GLOBAL SAFETY SOLUTION", 14, 20);
+    doc.setFontSize(12); doc.setFont("helvetica", "normal"); doc.text(`Consolidated Audit Statement - ${ds}`, 14, 28); doc.text(`Generated: ${new Date().toLocaleDateString()}`, 14, 34); doc.line(14, 38, 196, 38);
+    autoTable(doc, { startY: 42, head: [["Indicator", "Balance"]], body: [["Total Revenue", `INR ${(reportData.profitAndLoss?.totalRevenue || 0).toLocaleString()}`], ["Total Expenses", `INR ${(reportData.profitAndLoss?.totalExpense || 0).toLocaleString()}`], ["Net Profit", `INR ${(reportData.profitAndLoss?.netProfit || 0).toLocaleString()}`]], theme: "striped", styles: { fontSize: 10 }, headStyles: { fillColor: [79, 70, 229] } });
+    let y = (doc as any).lastAutoTable.finalY + 15;
+    autoTable(doc, { startY: y, head: [["Classification", "Balance"]], body: [["Total Assets", `INR ${(reportData.balanceSheet?.totalAssets || 0).toLocaleString()}`], ["Total Liabilities", `INR ${(reportData.balanceSheet?.totalLiabilities || 0).toLocaleString()}`], ["Total Equity", `INR ${(reportData.balanceSheet?.totalEquity || 0).toLocaleString()}`]], theme: "striped", styles: { fontSize: 10 }, headStyles: { fillColor: [13, 148, 136] } });
+    const savDs = period === "monthly" ? `${new Date(year, month).toLocaleString("default", { month: "short" })}-${year}` : `${year}`;
+    doc.save(`Audit_Financial_Statement_${savDs}.pdf`); 
+    toast.success("PDF downloaded!");
+  };
+
   const downloadCOAExcel = () => {
     try {
       const data = [
