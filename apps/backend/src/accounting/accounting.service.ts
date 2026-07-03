@@ -132,11 +132,23 @@ export class AccountingService {
             old_data: JSON.stringify({ opening_balance: oldAmt }), 
             new_data: JSON.stringify({ opening_balance: newAmt, updated_by: updatedBy || "System" }), 
             user_id: updatedBy || "System"
-          } 
+          }
         }).catch(() => {});
       });
     } else {
-      await this.postVoucher({ description: `Opening Balance for ${account.name}`, amount: newAmt, debit_code: isDebitClass ? account.code : "3999", credit_code: isDebitClass ? "3999" : account.code, created_by: updatedBy || "System" });
+      await this.prisma.$transaction(async (tx) => {
+        await this.postVoucher({ description: `Opening Balance for ${account.name}`, amount: newAmt, debit_code: isDebitClass ? account.code : "3999", credit_code: isDebitClass ? "3999" : account.code, created_by: updatedBy || "System" });
+        await tx.auditLog.create({
+          data: {
+            action: "EDIT_OPENING_BALANCE",
+            entity_type: "ACCOUNT",
+            entity_id: accountId,
+            old_data: JSON.stringify({ opening_balance: 0 }),
+            new_data: JSON.stringify({ opening_balance: newAmt, updated_by: updatedBy || "System" }),
+            user_id: updatedBy || "System"
+          }
+        }).catch(() => {});
+      });
     }
     return this.prisma.account.findUnique({ where: { id: accountId } });
   }
