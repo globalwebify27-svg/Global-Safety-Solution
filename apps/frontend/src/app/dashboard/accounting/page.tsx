@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState, useCallback } from "react";
 import { useAuthStore } from "@/store/auth";
@@ -51,6 +51,8 @@ export default function AccountingPage() {
   const [loadingReport, setLoadingReport] = useState(false);
   const [expandedAccounts, setExpandedAccounts] = useState<Record<string, boolean>>({});
   const token = useAuthStore((state) => state.token);
+  const [ledgerStart, setLedgerStart] = useState("");
+  const [ledgerEnd, setLedgerEnd] = useState("");
 
   const toggleAccountExpand = (id: string) => setExpandedAccounts(prev => ({ ...prev, [id]: !prev[id] }));
   const accountTypeColor = (type: string) => { if (type === "ASSET") return "bg-blue-500/10 text-blue-500"; if (type === "LIABILITY") return "bg-amber-500/10 text-amber-500"; if (type === "EQUITY") return "bg-purple-500/10 text-purple-500"; if (type === "REVENUE") return "bg-emerald-500/10 text-emerald-500"; return "bg-rose-500/10 text-rose-500"; };
@@ -81,7 +83,26 @@ export default function AccountingPage() {
     });
   };
 
-  const filteredVouchers = (vouchers || []).filter(v => v.voucher_no.toLowerCase().includes(searchQuery.toLowerCase()) || v.description.toLowerCase().includes(searchQuery.toLowerCase()) || v.debit_account?.name.toLowerCase().includes(searchQuery.toLowerCase()) || v.credit_account?.name.toLowerCase().includes(searchQuery.toLowerCase()) || v.created_by.toLowerCase().includes(searchQuery.toLowerCase()));
+  const filteredVouchers = (vouchers || []).filter(v => {
+    const textMatch = v.voucher_no.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                      v.description.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                      v.debit_account?.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                      v.credit_account?.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                      v.created_by.toLowerCase().includes(searchQuery.toLowerCase());
+    if (!textMatch) return false;
+    if (ledgerStart) {
+      const vDate = new Date(v.transaction_date);
+      const sDate = new Date(ledgerStart);
+      if (vDate < sDate) return false;
+    }
+    if (ledgerEnd) {
+      const vDate = new Date(v.transaction_date);
+      const eDate = new Date(ledgerEnd);
+      eDate.setHours(23, 59, 59, 999);
+      if (vDate > eDate) return false;
+    }
+    return true;
+  });
 
   const fetchAccountsAndVouchers = async () => {
     if (!token) return; setLoading(true);
@@ -171,37 +192,217 @@ export default function AccountingPage() {
   const downloadExcelReport = () => {
     if (!reportData) { toast.error("No report data."); return; }
     try {
-      const plData = [["Type", "Account", "Code", "Amount (INR)"], ["P&L STATEMENT", "", "", ""], ...(reportData.profitAndLoss?.revenues || []).map((r: any) => ["Revenue", r.name, r.code, Number(r.periodBalance)]), ["Total Revenue", "", "", Number(reportData.profitAndLoss?.totalRevenue || 0)], ...(reportData.profitAndLoss?.expenses || []).map((e: any) => ["Expense", e.name, e.code, Number(e.periodBalance)]), ["Total Expense", "", "", Number(reportData.profitAndLoss?.totalExpense || 0)], ["Net Profit", "", "", Number(reportData.profitAndLoss?.netProfit || 0)]];
-      const coaData = [["Code", "Account Name", "Type", "Balance (INR)"], ...(accounts || []).map(a => [a.code, a.name, a.type, Number(a.balance)])];
-      const trialData = reportData.trialBalance ? [["Code", "Account Name", "Type", "Debit (Dr)", "Credit (Cr)"], ...(reportData.trialBalance || []).map((t: any) => [t.code, t.name, t.type, Number(t.debit), Number(t.credit)])] : [];
-      const start = new Date(reportData.period?.startDate || new Date()), end = new Date(reportData.period?.endDate || new Date());
-      const pv = (vouchers || []).filter(v => { const d = new Date(v.transaction_date); return d >= start && d <= end; });
-      const ledgerData = [["Voucher No", "Date", "Debit Acc", "Credit Acc", "Debit", "Credit", "Narration", "Audited By"], ...pv.map(v => [v.voucher_no, new Date(v.transaction_date).toLocaleDateString(), `${v.debit_account?.name || ""}`, `${v.credit_account?.name || ""}`, Number(v.amount), Number(v.amount), v.description, v.created_by])];
+      const plData = [
+        ["GLOBAL SAFETY SOLUTION"],
+        ["PROFIT & LOSS STATEMENT"],
+        [],
+        ["Type", "Account", "Code", "Amount (INR)"],
+        ...(reportData.profitAndLoss?.revenues || []).map((r: any) => ["Revenue", r.name, r.code, Number(r.periodBalance)]),
+        ["Total Revenue", "", "", Number(reportData.profitAndLoss?.totalRevenue || 0)],
+        ...(reportData.profitAndLoss?.expenses || []).map((e: any) => ["Expense", e.name, e.code, Number(e.periodBalance)]),
+        ["Total Expense", "", "", Number(reportData.profitAndLoss?.totalExpense || 0)],
+        ["Net Profit", "", "", Number(reportData.profitAndLoss?.netProfit || 0)]
+      ];
+      
+      const bsData = [
+        ["GLOBAL SAFETY SOLUTION"],
+        ["BALANCE SHEET SUMMARY"],
+        [],
+        ["Classification", "Account Name", "Code", "Balance (INR)"],
+        ["ASSETS", "", "", ""],
+        ...(reportData.balanceSheet?.assets || []).map((a: any) => ["Asset", a.name, a.code, Number(a.periodBalance)]),
+        ["Total Assets", "", "", Number(reportData.balanceSheet?.totalAssets || 0)],
+        [],
+        ["LIABILITIES", "", "", ""],
+        ...(reportData.balanceSheet?.liabilities || []).map((l: any) => ["Liability", l.name, l.code, Number(l.periodBalance)]),
+        ["Total Liabilities", "", "", Number(reportData.balanceSheet?.totalLiabilities || 0)],
+        [],
+        ["EQUITY", "", "", ""],
+        ...(reportData.balanceSheet?.equity || []).map((eq: any) => ["Equity", eq.name, eq.code, Number(eq.periodBalance)]),
+        ["Total Equity", "", "", Number(reportData.balanceSheet?.totalEquity || 0)],
+        ["Total Liabilities & Equity", "", "", Number(reportData.balanceSheet?.totalLiabilities || 0) + Number(reportData.balanceSheet?.totalEquity || 0)]
+      ];
+
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(plData), "P&L Report");
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(coaData), "Chart of Accounts");
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(trialData), "Trial Balance");
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ledgerData), "Ledger Board");
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(plData), "Profit & Loss");
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(bsData), "Balance Sheet");
       const { period, year, month } = reportFilter;
       const ds = period === "monthly" ? `${new Date(year, month).toLocaleString("default", { month: "short" })}-${year}` : period === "halfyearly" ? `H-${year}` : `${year}`;
-      XLSX.writeFile(wb, `Financial_Report_${ds}.xlsx`); toast.success("Excel downloaded!");
+      XLSX.writeFile(wb, `Audit_Financial_Statement_${ds}.xlsx`); 
+      toast.success("Excel downloaded!");
     } catch { toast.error("Excel generation failed."); }
   };
 
-  const downloadPDFReport = () => {
-    if (!reportData) return;
+  const downloadCOAExcel = () => {
+    try {
+      const data = [
+        ["GLOBAL SAFETY SOLUTION"],
+        ["CHART OF ACCOUNTS"],
+        [],
+        ["Code", "Account Name", "Classification", "Current Balance (INR)"],
+        ...(accounts || []).map(a => [a.code, a.name, a.type, Number(a.balance)])
+      ];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(data), "Chart of Accounts");
+      XLSX.writeFile(wb, "Chart_of_Accounts.xlsx");
+      toast.success("COA Excel downloaded!");
+    } catch { toast.error("COA Excel export failed."); }
+  };
+
+  const downloadCOAPDF = () => {
     const doc = new jsPDF();
-    const { period, year, month } = reportFilter;
-    const ds = period === "monthly" ? new Date(year, month).toLocaleString("default", { month: "long", year: "numeric" }) : period === "halfyearly" ? `Half Yearly (${year})` : `Yearly (${year})`;
-    doc.setFontSize(20); doc.setFont("helvetica", "bold"); doc.text("GLOBAL SAFETY SOLUTION", 14, 20);
-    doc.setFontSize(12); doc.setFont("helvetica", "normal"); doc.text(`Consolidated Audit Statement - ${ds}`, 14, 28); doc.text(`Generated: ${new Date().toLocaleDateString()}`, 14, 34); doc.line(14, 38, 196, 38);
-    autoTable(doc, { startY: 42, head: [["Indicator", "Balance"]], body: [["Total Revenue", `INR ${(reportData.profitAndLoss?.totalRevenue || 0).toLocaleString()}`], ["Total Expenses", `INR ${(reportData.profitAndLoss?.totalExpense || 0).toLocaleString()}`], ["Net Profit", `INR ${(reportData.profitAndLoss?.netProfit || 0).toLocaleString()}`]], theme: "striped", styles: { fontSize: 10 }, headStyles: { fillColor: [79, 70, 229] } });
-    let y = (doc as any).lastAutoTable.finalY + 15;
-    autoTable(doc, { startY: y, head: [["Classification", "Balance"]], body: [["Total Assets", `INR ${(reportData.balanceSheet?.totalAssets || 0).toLocaleString()}`], ["Total Liabilities", `INR ${(reportData.balanceSheet?.totalLiabilities || 0).toLocaleString()}`], ["Total Equity", `INR ${(reportData.balanceSheet?.totalEquity || 0).toLocaleString()}`]], theme: "striped", styles: { fontSize: 10 }, headStyles: { fillColor: [13, 148, 136] } });
-    doc.addPage();
-    if (reportData.trialBalance) { doc.setFontSize(16); doc.setFont("helvetica", "bold"); doc.text("Trial Balance", 14, 20); autoTable(doc, { startY: 26, head: [["Code", "Account", "Type", "Debit", "Credit"]], body: (reportData.trialBalance || []).map((t: any) => [t.code, t.name, t.type, `INR ${Number(t.debit).toLocaleString()}`, `INR ${Number(t.credit).toLocaleString()}`]), theme: "striped", styles: { fontSize: 9 }, headStyles: { fillColor: [234, 88, 12] } }); }
-    const savDs = period === "monthly" ? `${new Date(year, month).toLocaleString("default", { month: "short" })}-${year}` : `${year}`;
-    doc.save(`Financial_Report_${savDs}.pdf`); toast.success("PDF downloaded!");
+    doc.setFontSize(18); doc.setFont("helvetica", "bold"); doc.text("GLOBAL SAFETY SOLUTION", 14, 20);
+    doc.setFontSize(12); doc.setFont("helvetica", "normal"); doc.text("Chart of Accounts Registry", 14, 27); doc.line(14, 32, 196, 32);
+    autoTable(doc, {
+      startY: 36,
+      head: [["Code", "Account Name", "Classification", "Balance (INR)"]],
+      body: (accounts || []).map(a => [a.code, a.name, a.type, `₹${Number(a.balance).toLocaleString()}`]),
+      theme: "striped",
+      headStyles: { fillColor: [79, 70, 229] }
+    });
+    doc.save("Chart_of_Accounts.pdf");
+    toast.success("COA PDF downloaded!");
+  };
+
+  const downloadTrialBalanceExcel = () => {
+    if (!reportData?.trialBalance) { toast.error("No trial balance data."); return; }
+    try {
+      const tb = reportData.trialBalance;
+      const td = tb.reduce((s: number, t: any) => s + Number(t.debit), 0);
+      const tc = tb.reduce((s: number, t: any) => s + Number(t.credit), 0);
+      const data = [
+        ["GLOBAL SAFETY SOLUTION"],
+        ["TRIAL BALANCE"],
+        [],
+        ["Code", "Account Name", "Type", "Debit (INR)", "Credit (INR)"],
+        ...tb.map((t: any) => [t.code, t.name, t.type, t.debit > 0 ? Number(t.debit) : "", t.credit > 0 ? Number(t.credit) : ""]),
+        [],
+        ["Total Sum", "", "", td, tc],
+        [Math.abs(td - tc) < 0.01 ? "✓ Balanced" : "✗ Unbalanced", "", "", "", ""]
+      ];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(data), "Trial Balance");
+      XLSX.writeFile(wb, "Trial_Balance.xlsx");
+      toast.success("Trial Balance Excel downloaded!");
+    } catch { toast.error("Trial Balance Excel export failed."); }
+  };
+
+  const downloadTrialBalancePDF = () => {
+    if (!reportData?.trialBalance) { toast.error("No trial balance data."); return; }
+    const doc = new jsPDF();
+    const tb = reportData.trialBalance;
+    const td = tb.reduce((s: number, t: any) => s + Number(t.debit), 0);
+    const tc = tb.reduce((s: number, t: any) => s + Number(t.credit), 0);
+    const isBalanced = Math.abs(td - tc) < 0.01;
+    doc.setFontSize(18); doc.setFont("helvetica", "bold"); doc.text("GLOBAL SAFETY SOLUTION", 14, 20);
+    doc.setFontSize(12); doc.setFont("helvetica", "normal"); doc.text("Trial Balance Summary Sheet", 14, 27); doc.line(14, 32, 196, 32);
+    autoTable(doc, {
+      startY: 36,
+      head: [["Code", "Account Name", "Classification", "Debit (Dr)", "Credit (Cr)"]],
+      body: [
+        ...tb.map((t: any) => [t.code, t.name, t.type, t.debit > 0 ? `₹${Number(t.debit).toLocaleString()}` : "—", t.credit > 0 ? `₹${Number(t.credit).toLocaleString()}` : "—"]),
+        ["Total Sum", "Aggregate Totals", "", `₹${td.toLocaleString()}`, `₹${tc.toLocaleString()}`],
+        [isBalanced ? "✓ Balanced — Books Correct" : "✗ Unbalanced", "", "", "", ""]
+      ],
+      theme: "striped",
+      headStyles: { fillColor: [234, 88, 12] }
+    });
+    doc.save("Trial_Balance.pdf");
+    toast.success("Trial Balance PDF downloaded!");
+  };
+
+  const downloadDrillLedgerExcel = (account: Account, entries: any[]) => {
+    try {
+      const data = [
+        ["GLOBAL SAFETY SOLUTION"],
+        [`LEDGER STATEMENT: ${account.name.toUpperCase()} (${account.code})`],
+        [],
+        ["Voucher No", "Date", "Particulars", "Debit (INR)", "Credit (INR)", "Running Balance (INR)", "Audited By"],
+        ...entries.map(e => [
+          e.voucher_no,
+          new Date(e.transaction_date).toLocaleDateString(),
+          `${e.particulars} (${e.particulars_code})`,
+          e.debit > 0 ? Number(e.debit) : "",
+          e.credit > 0 ? Number(e.credit) : "",
+          Number(e.balance),
+          e.created_by
+        ])
+      ];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(data), "Ledger Account Details");
+      XLSX.writeFile(wb, `Ledger_Account_${account.code}.xlsx`);
+      toast.success("Ledger Excel downloaded!");
+    } catch { toast.error("Ledger Excel export failed."); }
+  };
+
+  const downloadDrillLedgerPDF = (account: Account, entries: any[]) => {
+    const doc = new jsPDF();
+    doc.setFontSize(18); doc.setFont("helvetica", "bold"); doc.text("GLOBAL SAFETY SOLUTION", 14, 20);
+    doc.setFontSize(12); doc.setFont("helvetica", "normal"); doc.text(`Ledger Statement for Account: ${account.name} (${account.code})`, 14, 27); doc.line(14, 32, 196, 32);
+    autoTable(doc, {
+      startY: 36,
+      head: [["Voucher No", "Date", "Particulars", "Debit", "Credit", "Running Balance", "Audited By"]],
+      body: entries.map(e => [
+        e.voucher_no,
+        new Date(e.transaction_date).toLocaleDateString(),
+        `${e.particulars} (${e.particulars_code})`,
+        e.debit > 0 ? `₹${Number(e.debit).toLocaleString()}` : "—",
+        e.credit > 0 ? `₹${Number(e.credit).toLocaleString()}` : "—",
+        `₹${Number(e.balance).toLocaleString()}`,
+        e.created_by
+      ]),
+      theme: "striped",
+      headStyles: { fillColor: [79, 70, 229] }
+    });
+    doc.save(`Ledger_Account_${account.code}.pdf`);
+    toast.success("Ledger PDF downloaded!");
+  };
+
+  const downloadLedgerBoardExcel = () => {
+    try {
+      const data = [
+        ["GLOBAL SAFETY SOLUTION"],
+        ["GENERAL LEDGER VOUCHERS BOARD"],
+        [],
+        ["Voucher No", "Date", "Particulars (Dr / Cr)", "Debit (INR)", "Credit (INR)", "Narration", "Audited By"],
+        ...filteredVouchers.map(v => [
+          v.voucher_no,
+          new Date(v.transaction_date).toLocaleDateString(),
+          `Dr: ${v.debit_account?.name || ""} / Cr: ${v.credit_account?.name || ""}`,
+          Number(v.amount),
+          Number(v.amount),
+          v.description,
+          v.created_by
+        ])
+      ];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(data), "Ledger Board");
+      XLSX.writeFile(wb, "Ledger_Board_Vouchers.xlsx");
+      toast.success("Ledger Board Excel downloaded!");
+    } catch { toast.error("Ledger Board Excel export failed."); }
+  };
+
+  const downloadLedgerBoardPDF = () => {
+    const doc = new jsPDF();
+    doc.setFontSize(18); doc.setFont("helvetica", "bold"); doc.text("GLOBAL SAFETY SOLUTION", 14, 20);
+    doc.setFontSize(12); doc.setFont("helvetica", "normal"); doc.text("General Ledger Vouchers Audit Log", 14, 27); doc.line(14, 32, 196, 32);
+    autoTable(doc, {
+      startY: 36,
+      head: [["Voucher No", "Date", "Dr Particulars", "Cr Particulars", "Debit Amount", "Credit Amount", "Audited By"]],
+      body: filteredVouchers.map(v => [
+        v.voucher_no,
+        new Date(v.transaction_date).toLocaleDateString(),
+        `${v.debit_account?.name || ""} (${v.debit_account?.code || ""})`,
+        `${v.credit_account?.name || ""} (${v.credit_account?.code || ""})`,
+        `₹${Number(v.amount).toLocaleString()}`,
+        `₹${Number(v.amount).toLocaleString()}`,
+        v.created_by
+      ]),
+      theme: "striped",
+      headStyles: { fillColor: [79, 70, 229] }
+    });
+    doc.save("Ledger_Board_Vouchers.pdf");
+    toast.success("Ledger Board PDF downloaded!");
   };
 
   const tabs = [
@@ -321,9 +522,24 @@ export default function AccountingPage() {
         <>
           {activeTab === "ledgers" && (
             <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
-              <div className="p-6 border-b border-border flex items-center justify-between">
+              <div className="p-6 border-b border-border flex flex-wrap items-center justify-between gap-4">
                 <h3 className="font-bold text-lg">Voucher Audit Entries</h3>
-                <div className="relative"><Search className="w-4 h-4 absolute left-3 top-3.5 text-muted-foreground" /><Input placeholder="Search vouchers..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9 h-10 w-64 bg-background border-border rounded-xl" /></div>
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <Label className="text-xs text-muted-foreground whitespace-nowrap">From</Label>
+                    <Input type="date" value={ledgerStart} onChange={e => setLedgerStart(e.target.value)} className="h-9 text-xs bg-background border-border w-36 rounded-xl" />
+                    <Label className="text-xs text-muted-foreground whitespace-nowrap">To</Label>
+                    <Input type="date" value={ledgerEnd} onChange={e => setLedgerEnd(e.target.value)} className="h-9 text-xs bg-background border-border w-36 rounded-xl" />
+                  </div>
+                  <div className="relative">
+                    <Search className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
+                    <Input placeholder="Search vouchers..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9 h-9 w-48 bg-background border-border rounded-xl" />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button onClick={downloadLedgerBoardExcel} size="sm" variant="outline" className="h-9 rounded-xl border-border hover:bg-indigo-500/10 hover:text-indigo-500 font-bold"><Download className="w-3.5 h-3.5 mr-1.5" /> Excel</Button>
+                    <Button onClick={downloadLedgerBoardPDF} size="sm" variant="outline" className="h-9 rounded-xl border-border hover:bg-emerald-500/10 hover:text-emerald-500 font-bold"><Download className="w-3.5 h-3.5 mr-1.5" /> PDF</Button>
+                  </div>
+                </div>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
@@ -350,7 +566,13 @@ export default function AccountingPage() {
             <>
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <div className="lg:col-span-2 bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
-                  <div className="p-6 border-b border-border"><h3 className="font-bold text-lg">Chart of Accounts Ledger</h3></div>
+                  <div className="p-6 border-b border-border flex items-center justify-between">
+                    <h3 className="font-bold text-lg">Chart of Accounts Ledger</h3>
+                    <div className="flex items-center gap-2">
+                      <Button onClick={downloadCOAExcel} size="sm" variant="outline" className="h-8 rounded-lg border-border hover:bg-indigo-500/10 hover:text-indigo-500 text-xs font-bold"><Download className="w-3 h-3 mr-1" /> Excel</Button>
+                      <Button onClick={downloadCOAPDF} size="sm" variant="outline" className="h-8 rounded-lg border-border hover:bg-emerald-500/10 hover:text-emerald-500 text-xs font-bold"><Download className="w-3 h-3 mr-1" /> PDF</Button>
+                    </div>
+                  </div>
                   <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse">
                       <thead><tr className="bg-accent/5 border-b border-border text-muted-foreground text-xs font-black uppercase tracking-wider"><th className="py-4 px-6">Code</th><th className="py-4 px-6">Account Name</th><th className="py-4 px-6">Type</th><th className="py-4 px-6 text-right">Current Balance</th><th className="py-4 px-6 text-center">Actions</th></tr></thead>
@@ -381,14 +603,18 @@ export default function AccountingPage() {
               </div>
               {drillAccount && (
                 <div className="bg-card border border-indigo-500/30 rounded-2xl shadow-lg overflow-hidden">
-                  <div className="p-5 border-b border-border flex items-center justify-between bg-indigo-500/5">
+                  <div className="p-5 border-b border-border flex flex-wrap items-center justify-between gap-4 bg-indigo-500/5">
                     <div><h3 className="font-bold text-base text-indigo-500">{drillAccount.name} ({drillAccount.code})</h3><p className="text-xs text-muted-foreground mt-0.5">Individual account ledger — date-filtered transaction history</p></div>
                     <div className="flex items-center gap-3">
                       <div className="flex items-center gap-2">
                         <Label className="text-xs text-muted-foreground whitespace-nowrap">From</Label><Input type="date" value={drillStart} onChange={e => setDrillStart(e.target.value)} className="h-8 text-xs bg-background border-border w-36" />
                         <Label className="text-xs text-muted-foreground whitespace-nowrap">To</Label><Input type="date" value={drillEnd} onChange={e => setDrillEnd(e.target.value)} className="h-8 text-xs bg-background border-border w-36" />
                       </div>
-                      <button onClick={() => { setDrillAccount(null); setDrillEntries([]); }} className="p-1.5 rounded-lg hover:bg-rose-500/10 text-muted-foreground hover:text-rose-500 transition-colors"><X className="w-4 h-4" /></button>
+                      <div className="flex items-center gap-1.5 border-l border-border pl-3">
+                        <Button onClick={() => downloadDrillLedgerExcel(drillAccount, drillEntries)} size="sm" variant="outline" className="h-8 rounded-lg border-border hover:bg-indigo-500/10 hover:text-indigo-500 text-xs font-bold"><Download className="w-3 h-3 mr-1" /> Excel</Button>
+                        <Button onClick={() => downloadDrillLedgerPDF(drillAccount, drillEntries)} size="sm" variant="outline" className="h-8 rounded-lg border-border hover:bg-emerald-500/10 hover:text-emerald-500 text-xs font-bold"><Download className="w-3 h-3 mr-1" /> PDF</Button>
+                      </div>
+                      <button onClick={() => { setDrillAccount(null); setDrillEntries([]); }} className="p-1.5 rounded-lg hover:bg-rose-500/10 text-muted-foreground hover:text-rose-500 transition-colors border border-border ml-1"><X className="w-4 h-4" /></button>
                     </div>
                   </div>
                   {drillLoading ? (<div className="flex items-center justify-center py-10"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-500"></div></div>) : (
@@ -489,7 +715,16 @@ export default function AccountingPage() {
               </div>
               {loadingReport ? (<div className="flex items-center justify-center py-20"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div></div>) : reportData?.trialBalance ? (
                 <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
-                  <div className="p-6 border-b border-border flex items-center justify-between"><h3 className="font-bold text-lg">Trial Balance</h3><span className="text-xs text-muted-foreground">In a balanced system, Total Debits = Total Credits</span></div>
+                  <div className="p-6 border-b border-border flex items-center justify-between">
+                    <div>
+                      <h3 className="font-bold text-lg">Trial Balance</h3>
+                      <p className="text-xs text-muted-foreground mt-0.5">In a balanced system, Total Debits = Total Credits</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button onClick={downloadTrialBalanceExcel} size="sm" variant="outline" className="h-9 rounded-xl border-border hover:bg-indigo-500/10 hover:text-indigo-500 font-bold"><Download className="w-3.5 h-3.5 mr-1.5" /> Excel</Button>
+                      <Button onClick={downloadTrialBalancePDF} size="sm" variant="outline" className="h-9 rounded-xl border-border hover:bg-emerald-500/10 hover:text-emerald-500 font-bold"><Download className="w-3.5 h-3.5 mr-1.5" /> PDF</Button>
+                    </div>
+                  </div>
                   <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse">
                       <thead><tr className="bg-accent/5 border-b border-border text-muted-foreground text-xs font-black uppercase tracking-wider"><th className="py-4 px-6">Code</th><th className="py-4 px-6">Account Name</th><th className="py-4 px-6">Type</th><th className="py-4 px-6 text-right">Debit (Dr)</th><th className="py-4 px-6 text-right">Credit (Cr)</th></tr></thead>
