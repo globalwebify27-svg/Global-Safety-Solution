@@ -30,7 +30,7 @@ export class AccountingService {
       data: { name: data.name, code: data.code, type: data.type, parent_id: data.parent_id || null, balance: 0 },
     });
     await this.prisma.auditLog.create({
-      data: { action: "CREATE_ACCOUNT", entity_type: "ACCOUNT", entity_id: account.id, new_data: JSON.stringify({ name: data.name, code: data.code, type: data.type, created_by: data.created_by || "System" }), user_id: null },
+      data: { action: "CREATE_ACCOUNT", entity_type: "ACCOUNT", entity_id: account.id, new_data: JSON.stringify({ name: data.name, code: data.code, type: data.type, created_by: data.created_by || "System" }), user_id: data.created_by || "System" },
     }).catch(() => {});
     const openingBal = Number(data.opening_balance);
     if (openingBal && openingBal > 0) {
@@ -63,7 +63,7 @@ export class AccountingService {
       await tx.account.update({ where: { id: debitAcc.id }, data: { balance: { increment: amt * debitMult } } });
       const creditMult = (creditAcc.type === "ASSET" || creditAcc.type === "EXPENSE") ? -1 : 1;
       await tx.account.update({ where: { id: creditAcc.id }, data: { balance: { increment: amt * creditMult } } });
-      tx.auditLog.create({ data: { action: "POST_VOUCHER", entity_type: "LEDGER_ENTRY", entity_id: entry.id, new_data: JSON.stringify({ voucher_no: voucherNo, debit: `${debitAcc.name} (${debitAcc.code})`, credit: `${creditAcc.name} (${creditAcc.code})`, amount: amt, created_by: data.created_by || "System" }), user_id: null } }).catch(() => {});
+      tx.auditLog.create({ data: { action: "POST_VOUCHER", entity_type: "LEDGER_ENTRY", entity_id: entry.id, new_data: JSON.stringify({ voucher_no: voucherNo, debit: `${debitAcc.name} (${debitAcc.code})`, credit: `${creditAcc.name} (${creditAcc.code})`, amount: amt, created_by: data.created_by || "System" }), user_id: data.created_by || "System" } }).catch(() => {});
       return entry;
     });
   }
@@ -131,7 +131,7 @@ export class AccountingService {
             entity_id: accountId, 
             old_data: JSON.stringify({ opening_balance: oldAmt }), 
             new_data: JSON.stringify({ opening_balance: newAmt, updated_by: updatedBy || "System" }), 
-            user_id: null 
+            user_id: updatedBy || "System"
           } 
         }).catch(() => {});
       });

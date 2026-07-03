@@ -765,7 +765,7 @@ export default function AccountingPage() {
                       {auditLogs.length === 0 ? (<tr><td colSpan={5} className="py-10 text-center text-muted-foreground italic">No audit logs recorded yet.</td></tr>) : auditLogs.map((log: any) => {
                         let parsedData: any = {};
                         try { parsedData = JSON.parse(log.new_data || "{}"); } catch {}
-                        const staffName = parsedData.created_by || parsedData.updated_by || "System";
+                        const staffName = log.user_id || parsedData.created_by || parsedData.updated_by || "System";
                         const actionColors: Record<string, string> = { CREATE_ACCOUNT: "bg-blue-500/10 text-blue-500", POST_VOUCHER: "bg-emerald-500/10 text-emerald-500", EDIT_OPENING_BALANCE: "bg-amber-500/10 text-amber-500" };
                         return (
                           <tr key={log.id} className="hover:bg-accent/5 transition-colors">
