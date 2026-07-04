@@ -703,15 +703,42 @@ export default function AccountingPage() {
                     {cashFlowLoading ? (<div className="flex items-center justify-center py-10"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-cyan-500"></div></div>) : cashFlowData ? (
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         {[{ key: "operating", label: "Operating Activities", color: "text-emerald-500", bg: "bg-emerald-500/5 border-emerald-500/20", data: cashFlowData.operating }, { key: "investing", label: "Investing Activities", color: "text-blue-500", bg: "bg-blue-500/5 border-blue-500/20", data: cashFlowData.investing }, { key: "financing", label: "Financing Activities", color: "text-purple-500", bg: "bg-purple-500/5 border-purple-500/20", data: cashFlowData.financing }].map(section => (
-                          <div key={section.key} className={cn("rounded-xl p-4 border", section.bg)}>
-                            <h4 className={cn("text-xs font-black uppercase mb-3", section.color)}>{section.label}</h4>
-                            <div className="space-y-2">
-                              {(!section.data || !section.data.items || section.data.items.length === 0) ? (<p className="text-xs text-muted-foreground italic">No activity.</p>) : section.data.items.map((item: any, i: number) => (<div key={i} className="flex justify-between items-start text-xs py-1.5 border-b border-border/30"><div className="flex-1 pr-2"><p className="font-medium truncate" title={item.description}>{item.description}</p><p className="text-muted-foreground">{item.opposite_account}</p></div><span className={cn("font-bold shrink-0", item.amount >= 0 ? "text-emerald-500" : "text-rose-500")}>₹{Math.abs(item.amount).toLocaleString()}</span></div>))}
+                          <div key={section.key} className={cn("rounded-xl p-5 border flex flex-col justify-between h-full backdrop-blur-sm transition-all duration-300 hover:shadow-md", section.bg)}>
+                            <div>
+                              <h4 className={cn("text-xs font-black uppercase tracking-wider mb-4 pb-2 border-b border-current/10", section.color)}>{section.label}</h4>
+                              <div className="space-y-3">
+                                {(!section.data || !section.data.items || section.data.items.length === 0) ? (
+                                  <div className="py-6 text-center">
+                                    <p className="text-xs text-muted-foreground italic">No activity recorded for this period</p>
+                                  </div>
+                                ) : section.data.items.map((item: any, i: number) => (
+                                  <div key={i} className="group flex justify-between items-start text-xs py-2 border-b border-border/20 last:border-0 hover:bg-black/5 dark:hover:bg-white/5 px-2 rounded-lg transition-colors">
+                                    <div className="flex-1 pr-3 min-w-0">
+                                      <p className="font-semibold text-foreground truncate" title={item.description}>{item.description}</p>
+                                      <p className="text-[10px] font-medium text-muted-foreground mt-0.5 tracking-wide uppercase">{item.opposite_account}</p>
+                                    </div>
+                                    <span className={cn("font-bold shrink-0 text-xs tabular-nums mt-0.5", item.amount >= 0 ? "text-emerald-500" : "text-rose-500")}>
+                                      {item.amount >= 0 ? "+" : "-"}₹{Math.abs(item.amount).toLocaleString()}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
                             </div>
-                            <div className={cn("flex justify-between font-bold text-sm mt-3 pt-2 border-t border-border/60", section.color)}><span>Net</span><span>₹{Number(section.data?.total || 0).toLocaleString()}</span></div>
+                            <div className={cn("flex justify-between items-center font-bold text-sm mt-6 pt-3 border-t border-border/60", section.color)}>
+                              <span className="uppercase tracking-wider text-xs">Total Net Flow</span>
+                              <span className="text-base tabular-nums">₹{Number(section.data?.total || 0).toLocaleString()}</span>
+                            </div>
                           </div>
                         ))}
-                        <div className="md:col-span-3 p-4 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex justify-between items-center"><span className="font-black text-base uppercase text-cyan-500">Net Cash Flow (Period)</span><span className={cn("font-black text-xl", Number(cashFlowData.netCashFlow || 0) >= 0 ? "text-emerald-500" : "text-rose-500")}>₹{Number(cashFlowData.netCashFlow || 0).toLocaleString()}</span></div>
+                        <div className="md:col-span-3 p-5 rounded-xl bg-gradient-to-r from-cyan-500/5 to-cyan-500/10 border border-cyan-500/20 flex justify-between items-center shadow-inner">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-2.5 h-2.5 rounded-full bg-cyan-500 animate-pulse" />
+                            <span className="font-black text-xs md:text-sm uppercase tracking-wider text-cyan-600 dark:text-cyan-400">Net Cash Flow (Period)</span>
+                          </div>
+                          <span className={cn("font-black text-xl md:text-2xl tracking-tight tabular-nums", Number(cashFlowData.netCashFlow || 0) >= 0 ? "text-emerald-500" : "text-rose-500")}>
+                            ₹{Number(cashFlowData.netCashFlow || 0).toLocaleString()}
+                          </span>
+                        </div>
                       </div>
                     ) : null}
                   </div>
