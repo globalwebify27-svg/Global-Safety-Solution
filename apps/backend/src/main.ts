@@ -5,8 +5,13 @@ import { execSync } from 'child_process';
 
 // Force Prisma to generate the library engine client on startup
 try {
-  console.log('Generating Prisma Client on startup...');
-  execSync(`"${process.execPath}" node_modules/prisma/build/index.js generate --schema=dist/prisma/schema.prisma`, { stdio: 'inherit' });
+  const fs = require('fs');
+  let schemaPath = 'dist/prisma/schema.prisma';
+  if (!fs.existsSync(schemaPath)) {
+    schemaPath = 'prisma/schema.prisma';
+  }
+  console.log(`Generating Prisma Client on startup using schema: ${schemaPath}`);
+  execSync(`"${process.execPath}" node_modules/prisma/build/index.js generate --schema=${schemaPath}`, { stdio: 'inherit' });
 } catch (error) {
   console.error('Failed to generate Prisma client on startup:', error);
 }
