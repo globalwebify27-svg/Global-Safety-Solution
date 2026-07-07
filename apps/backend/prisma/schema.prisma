@@ -1,0 +1,1027 @@
+generator client {
+  provider   = "prisma-client-js"
+  engineType = "library"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                      String                @id @default(uuid()) @db.VarChar(36)
+  name                    String                @db.VarChar(255)
+  email                   String                @unique @db.VarChar(255)
+  phone                   String?               @db.VarChar(50)
+  password_hash           String
+  is_active               Boolean               @default(true)
+  is_on_hold              Boolean               @default(false)
+  is_email_verified       Boolean               @default(false)
+  last_login              DateTime?             @db.DateTime(6)
+  failed_login_attempts   Int                   @default(0)
+  locked_until            DateTime?             @db.DateTime(6)
+  created_at              DateTime              @default(now()) @db.DateTime(6)
+  updated_at              DateTime              @updatedAt @db.DateTime(6)
+  department              String?               @db.VarChar(100)
+  designation             String?               @db.VarChar(100)
+  employee_id             String?               @unique @db.VarChar(50)
+  join_date               DateTime?             @db.Date
+  aadhar_number           String?               @db.VarChar(20)
+  address                 String?
+  base_salary             Decimal?              @db.Decimal(12, 2)
+  emergency_contact_name  String?               @db.VarChar(255)
+  emergency_contact_phone String?               @db.VarChar(50)
+  esi_number              String?               @db.VarChar(50)
+  leave_balance           Int                   @default(24)
+  pan_number              String?               @db.VarChar(20)
+  pf_number               String?               @db.VarChar(50)
+  assets                  Asset[]               @relation("AssetAssignee")
+  attendance              Attendance[]
+  assigned_clients        Client[]              @relation("ClientStaff")
+  compliance_logs         ComplianceLog[]
+  documents_uploaded      Document[]            @relation("DocumentUploader")
+  approved_expenses       Expense[]             @relation("ExpenseApprover")
+  expenses                Expense[]
+  inspections             Inspection[]
+  approved_leaves         LeaveRequest[]        @relation("ApprovedLeaves")
+  leave_requests          LeaveRequest[]        @relation("UserLeaves")
+  notifications           Notification[]
+  payroll_records         PayrollRecord[]
+  salary_history          SalaryHistory[]
+  tasks                   Task[]
+  user_feature_overrides  UserFeatureOverride[]
+  roles                   UserRole[]
+
+  @@map("users")
+}
+
+model Notification {
+  id         String   @id @default(uuid()) @db.VarChar(36)
+  user_id    String   @db.VarChar(36)
+  title      String   @db.VarChar(255)
+  message    String
+  type       String   @default("INFO") @db.VarChar(50)
+  link       String?
+  is_read    Boolean  @default(false)
+  created_at DateTime @default(now()) @db.DateTime(6)
+  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id], map: "notifications_user_id_fkey")
+  @@map("notifications")
+}
+
+model Role {
+  id                  String              @id @default(uuid()) @db.VarChar(36)
+  name                String              @unique @db.VarChar(100)
+  description         String?
+  created_at          DateTime            @default(now()) @db.DateTime(6)
+  updated_at          DateTime            @updatedAt @db.DateTime(6)
+  feature_permissions FeaturePermission[]
+  permissions         RolePermission[]
+  users               UserRole[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String           @id @default(uuid()) @db.VarChar(36)
+  name        String           @unique @db.VarChar(100)
+  description String?
+  module      String           @db.VarChar(100)
+  created_at  DateTime         @default(now()) @db.DateTime(6)
+  updated_at  DateTime         @updatedAt @db.DateTime(6)
+  roles       RolePermission[]
+
+  @@map("permissions")
+}
+
+model UserRole {
+  user_id     String   @db.VarChar(36)
+  role_id     String   @db.VarChar(36)
+  assigned_at DateTime @default(now()) @db.DateTime(6)
+  role        Role     @relation(fields: [role_id], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@id([user_id, role_id])
+  @@index([role_id], map: "user_roles_role_id_fkey")
+  @@map("user_roles")
+}
+
+model RolePermission {
+  role_id       String     @db.VarChar(36)
+  permission_id String     @db.VarChar(36)
+  assigned_at   DateTime   @default(now()) @db.DateTime(6)
+  permission    Permission @relation(fields: [permission_id], references: [id], onDelete: Cascade)
+  role          Role       @relation(fields: [role_id], references: [id], onDelete: Cascade)
+
+  @@id([role_id, permission_id])
+  @@index([permission_id], map: "role_permissions_permission_id_fkey")
+  @@map("role_permissions")
+}
+
+model Module {
+  id          String    @id @default(uuid()) @db.VarChar(36)
+  name        String    @unique @db.VarChar(100)
+  description String?
+  is_active   Boolean   @default(true)
+  created_at  DateTime  @default(now()) @db.DateTime(6)
+  updated_at  DateTime  @updatedAt @db.DateTime(6)
+  features    Feature[]
+
+  @@map("modules")
+}
+
+model Feature {
+  id                     String                @id @default(uuid()) @db.VarChar(36)
+  module_id              String                @db.VarChar(36)
+  name                   String                @db.VarChar(100)
+  slug                   String                @unique @db.VarChar(150)
+  description            String?
+  is_active              Boolean               @default(true)
+  created_at             DateTime              @default(now()) @db.DateTime(6)
+  updated_at             DateTime              @updatedAt @db.DateTime(6)
+  feature_permissions    FeaturePermission[]
+  module                 Module                @relation(fields: [module_id], references: [id], onDelete: Cascade)
+  user_feature_overrides UserFeatureOverride[]
+
+  @@index([module_id], map: "features_module_id_fkey")
+  @@map("features")
+}
+
+model FeaturePermission {
+  id          String   @id @default(uuid()) @db.VarChar(36)
+  feature_id  String   @db.VarChar(36)
+  role_id     String   @db.VarChar(36)
+  can_create  Boolean  @default(false)
+  can_read    Boolean  @default(false)
+  can_update  Boolean  @default(false)
+  can_delete  Boolean  @default(false)
+  assigned_by String?  @db.VarChar(36)
+  created_at  DateTime @default(now()) @db.DateTime(6)
+  updated_at  DateTime @updatedAt @db.DateTime(6)
+  feature     Feature  @relation(fields: [feature_id], references: [id], onDelete: Cascade)
+  role        Role     @relation(fields: [role_id], references: [id], onDelete: Cascade)
+
+  @@unique([feature_id, role_id])
+  @@index([role_id], map: "feature_permissions_role_id_fkey")
+  @@map("feature_permissions")
+}
+
+model UserFeatureOverride {
+  id          String   @id @default(uuid()) @db.VarChar(36)
+  user_id     String   @db.VarChar(36)
+  feature_id  String   @db.VarChar(36)
+  can_create  Boolean  @default(false)
+  can_read    Boolean  @default(false)
+  can_update  Boolean  @default(false)
+  can_delete  Boolean  @default(false)
+  assigned_by String?  @db.VarChar(36)
+  created_at  DateTime @default(now()) @db.DateTime(6)
+  updated_at  DateTime @updatedAt @db.DateTime(6)
+  feature     Feature  @relation(fields: [feature_id], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, feature_id])
+  @@index([feature_id], map: "user_feature_overrides_feature_id_fkey")
+  @@map("user_feature_overrides")
+}
+
+model Client {
+  id                String          @id @default(uuid()) @db.VarChar(36)
+  name              String          @db.VarChar(255)
+  gst_number        String?         @db.VarChar(50)
+  pan_number        String?         @db.VarChar(50)
+  email             String?         @db.VarChar(255)
+  phone             String?         @db.VarChar(50)
+  billing_address   String?
+  shipping_address  String?
+  city              String?         @db.VarChar(100)
+  state             String?         @db.VarChar(100)
+  country           String?         @db.VarChar(100)
+  pincode           String?         @db.VarChar(20)
+  industry          String?         @db.VarChar(100)
+  is_active         Boolean         @default(true)
+  created_at        DateTime        @default(now()) @db.DateTime(6)
+  updated_at        DateTime        @updatedAt @db.DateTime(6)
+  assigned_staff_id String?         @db.VarChar(36)
+  credit_limit      Decimal?        @db.Decimal(15, 2)
+  payment_terms     Int?
+  contacts          ClientContact[]
+  assigned_staff    User?           @relation("ClientStaff", fields: [assigned_staff_id], references: [id])
+  compliances       Compliance[]
+  documents         Document[]
+  inspections       Inspection[]
+  invoices          Invoice[]
+  leads             Lead[]
+  projects          Project[]
+  quotations        Quotation[]
+
+  @@index([assigned_staff_id], map: "clients_assigned_staff_id_fkey")
+  @@map("clients")
+}
+
+model SalaryHistory {
+  id             String   @id @default(uuid()) @db.VarChar(36)
+  user_id        String   @db.VarChar(36)
+  amount         Decimal  @db.Decimal(12, 2)
+  designation    String   @db.VarChar(100)
+  effective_date DateTime @db.Date
+  reason         String?
+  created_at     DateTime @default(now()) @db.DateTime(6)
+  user           User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id], map: "salary_history_user_id_fkey")
+  @@map("salary_history")
+}
+
+model PayrollRecord {
+  id          String    @id @default(uuid()) @db.VarChar(36)
+  user_id     String    @db.VarChar(36)
+  month       Int
+  year        Int
+  base_salary Decimal   @db.Decimal(12, 2)
+  bonus       Decimal   @default(0.00) @db.Decimal(12, 2)
+  deductions  Decimal   @default(0.00) @db.Decimal(12, 2)
+  net_pay     Decimal   @db.Decimal(12, 2)
+  status      String    @default("PROCESSING") @db.VarChar(50)
+  paid_at     DateTime? @db.DateTime(6)
+  remarks     String?
+  created_at  DateTime  @default(now()) @db.DateTime(6)
+  user        User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, month, year])
+  @@map("payroll_records")
+}
+
+model ClientContact {
+  id          String   @id @default(uuid()) @db.VarChar(36)
+  client_id   String   @db.VarChar(36)
+  name        String   @db.VarChar(255)
+  phone       String?  @db.VarChar(50)
+  email       String?  @db.VarChar(255)
+  designation String?  @db.VarChar(100)
+  is_primary  Boolean  @default(false)
+  created_at  DateTime @default(now()) @db.DateTime(6)
+  updated_at  DateTime @updatedAt @db.DateTime(6)
+  client      Client   @relation(fields: [client_id], references: [id], onDelete: Cascade)
+
+  @@index([client_id], map: "client_contacts_client_id_fkey")
+  @@map("client_contacts")
+}
+
+model Compliance {
+  id                 String          @id @default(uuid()) @db.VarChar(36)
+  client_id          String          @db.VarChar(36)
+  compliance_type    String          @db.VarChar(100)
+  reference_number   String?         @db.VarChar(100)
+  issue_date         DateTime?       @db.Date
+  expiry_date        DateTime?       @db.Date
+  renewal_cycle_days Int?
+  status             String          @default("ACTIVE") @db.VarChar(50)
+  reminder_sent      Boolean         @default(false)
+  created_at         DateTime        @default(now()) @db.DateTime(6)
+  updated_at         DateTime        @updatedAt @db.DateTime(6)
+  logs               ComplianceLog[]
+  client             Client          @relation(fields: [client_id], references: [id], onDelete: Cascade)
+  documents          Document[]
+
+  @@index([client_id], map: "compliances_client_id_fkey")
+  @@map("compliances")
+}
+
+model ComplianceLog {
+  id            String     @id @default(uuid()) @db.VarChar(36)
+  compliance_id String     @db.VarChar(36)
+  action        String     @db.VarChar(255)
+  performed_by  String?    @db.VarChar(36)
+  performed_at  DateTime   @default(now()) @db.DateTime(6)
+  remarks       String?
+  compliance    Compliance @relation(fields: [compliance_id], references: [id], onDelete: Cascade)
+  user          User?      @relation(fields: [performed_by], references: [id])
+
+  @@index([compliance_id], map: "compliance_logs_compliance_id_fkey")
+  @@index([performed_by], map: "compliance_logs_performed_by_fkey")
+  @@map("compliance_logs")
+}
+
+model Reminder {
+  id                String   @id @default(uuid()) @db.VarChar(36)
+  reference_type    String   @db.VarChar(100)
+  reference_id      String   @db.VarChar(36)
+  reminder_date     DateTime @db.Date
+  reminder_for_days Int
+  status            String   @default("PENDING") @db.VarChar(50)
+  created_at        DateTime @default(now()) @db.DateTime(6)
+  updated_at        DateTime @updatedAt @db.DateTime(6)
+
+  @@map("reminders")
+}
+
+model Project {
+  id          String       @id @default(uuid()) @db.VarChar(36)
+  client_id   String       @db.VarChar(36)
+  name        String       @db.VarChar(255)
+  description String?
+  start_date  DateTime?    @db.Date
+  end_date    DateTime?    @db.Date
+  status      String       @default("PENDING") @db.VarChar(50)
+  created_at  DateTime     @default(now()) @db.DateTime(6)
+  updated_at  DateTime     @updatedAt @db.DateTime(6)
+  documents   Document[]
+  inspections Inspection[]
+  client      Client       @relation(fields: [client_id], references: [id], onDelete: Cascade)
+  tasks       Task[]
+  work_orders WorkOrder[]
+
+  @@index([client_id], map: "projects_client_id_fkey")
+  @@map("projects")
+}
+
+model Task {
+  id          String    @id @default(uuid()) @db.VarChar(36)
+  project_id  String    @db.VarChar(36)
+  title       String    @db.VarChar(255)
+  description String?
+  assigned_to String?   @db.VarChar(36)
+  due_date    DateTime? @db.Date
+  priority    String    @default("MEDIUM") @db.VarChar(50)
+  status      String    @default("TODO") @db.VarChar(50)
+  created_at  DateTime  @default(now()) @db.DateTime(6)
+  updated_at  DateTime  @updatedAt @db.DateTime(6)
+  assignee    User?     @relation(fields: [assigned_to], references: [id])
+  project     Project   @relation(fields: [project_id], references: [id], onDelete: Cascade)
+
+  @@index([assigned_to], map: "tasks_assigned_to_fkey")
+  @@index([project_id], map: "tasks_project_id_fkey")
+  @@map("tasks")
+}
+
+model Attendance {
+  id           String    @id @default(uuid()) @db.VarChar(36)
+  user_id      String    @db.VarChar(36)
+  date         DateTime  @db.Date
+  check_in     DateTime? @db.DateTime(6)
+  check_out    DateTime? @db.DateTime(6)
+  status       String    @default("PRESENT") @db.VarChar(50)
+  location_in  String?   @db.VarChar(255)
+  location_out String?   @db.VarChar(255)
+  created_at   DateTime  @default(now()) @db.DateTime(6)
+  updated_at   DateTime  @updatedAt @db.DateTime(6)
+  user         User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, date])
+  @@map("attendance")
+}
+
+model LeaveRequest {
+  id          String   @id @default(uuid()) @db.VarChar(36)
+  user_id     String   @db.VarChar(36)
+  leave_type  String   @db.VarChar(50)
+  start_date  DateTime @db.Date
+  end_date    DateTime @db.Date
+  reason      String?
+  status      String   @default("PENDING") @db.VarChar(50)
+  approved_by String?  @db.VarChar(36)
+  created_at  DateTime @default(now()) @db.DateTime(6)
+  updated_at  DateTime @updatedAt @db.DateTime(6)
+  approver    User?    @relation("ApprovedLeaves", fields: [approved_by], references: [id])
+  user        User     @relation("UserLeaves", fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([approved_by], map: "leave_requests_approved_by_fkey")
+  @@index([user_id], map: "leave_requests_user_id_fkey")
+  @@map("leave_requests")
+}
+
+model Lead {
+  id                  String            @id @default(uuid()) @db.VarChar(36)
+  company_name        String            @db.VarChar(255)
+  contact_person      String            @db.VarChar(255)
+  email               String?           @db.VarChar(255)
+  phone               String?           @db.VarChar(50)
+  source              String?           @db.VarChar(100)
+  status              String            @default("NEW") @db.VarChar(50)
+  notes               String?
+  assigned_to         String?           @db.VarChar(36)
+  created_at          DateTime          @default(now()) @db.DateTime(6)
+  updated_at          DateTime          @updatedAt @db.DateTime(6)
+  client_id           String?           @db.VarChar(36)
+  closure_probability Int?              @default(0)
+  next_follow_up      DateTime?         @db.DateTime(6)
+  expected_value      Decimal?          @default(0.00) @db.Decimal(15, 2)
+  documents           Document[]
+  activities          LeadActivity[]
+  transactions        LeadTransaction[]
+  client              Client?           @relation(fields: [client_id], references: [id])
+  quotations          Quotation[]
+
+  @@index([client_id], map: "leads_client_id_fkey")
+  @@map("leads")
+}
+
+model LeadTransaction {
+  id          String   @id @default(uuid()) @db.VarChar(36)
+  lead_id     String   @db.VarChar(36)
+  date        DateTime @default(now()) @db.DateTime(6)
+  description String
+  type        String   @db.VarChar(20)
+  amount      Decimal  @db.Decimal(15, 2)
+  balance     Decimal  @db.Decimal(15, 2)
+  created_at  DateTime @default(now()) @db.DateTime(6)
+  lead        Lead     @relation(fields: [lead_id], references: [id], onDelete: Cascade)
+
+  @@index([lead_id], map: "lead_transactions_lead_id_fkey")
+  @@map("lead_transactions")
+}
+
+model LeadActivity {
+  id          String   @id @default(uuid()) @db.VarChar(36)
+  lead_id     String   @db.VarChar(36)
+  type        String   @db.VarChar(50)
+  subject     String   @db.VarChar(255)
+  description String   @db.Text
+  date        DateTime @default(now()) @db.DateTime(6)
+  created_at  DateTime @default(now()) @db.DateTime(6)
+  lead        Lead     @relation(fields: [lead_id], references: [id], onDelete: Cascade)
+
+  @@index([lead_id], map: "lead_activities_lead_id_fkey")
+  @@map("lead_activities")
+}
+
+model Quotation {
+  id           String      @id @default(uuid()) @db.VarChar(36)
+  lead_id      String?     @db.VarChar(36)
+  client_id    String?     @db.VarChar(36)
+  quote_number String      @unique @db.VarChar(50)
+  date         DateTime    @default(now()) @db.DateTime(6)
+  valid_until  DateTime?   @db.Date
+  subtotal     Decimal     @default(0.00) @db.Decimal(15, 2)
+  total_amount Decimal     @default(0.00) @db.Decimal(15, 2)
+  tax_amount   Decimal     @default(0.00) @db.Decimal(15, 2)
+  cgst         Decimal     @default(0.00) @db.Decimal(15, 2)
+  sgst         Decimal     @default(0.00) @db.Decimal(15, 2)
+  igst         Decimal     @default(0.00) @db.Decimal(15, 2)
+  status       String      @default("DRAFT") @db.VarChar(50)
+  notes        String?
+  created_at   DateTime    @default(now()) @db.DateTime(6)
+  updated_at   DateTime    @updatedAt @db.DateTime(6)
+  discount     Decimal     @default(0.00) @db.Decimal(15, 2)
+  invoice      Invoice?
+  client       Client?     @relation(fields: [client_id], references: [id])
+  lead         Lead?       @relation(fields: [lead_id], references: [id])
+  items        QuoteItem[]
+  work_orders  WorkOrder[]
+
+  @@index([client_id], map: "quotations_client_id_fkey")
+  @@index([lead_id], map: "quotations_lead_id_fkey")
+  @@map("quotations")
+}
+
+model QuoteItem {
+  id           String    @id @default(uuid()) @db.VarChar(36)
+  quotation_id String    @db.VarChar(36)
+  description  String
+  quantity     Int       @default(1)
+  unit_price   Decimal   @db.Decimal(15, 2)
+  total        Decimal   @db.Decimal(15, 2)
+  quotation    Quotation @relation(fields: [quotation_id], references: [id], onDelete: Cascade)
+
+  @@index([quotation_id], map: "quote_items_quotation_id_fkey")
+  @@map("quote_items")
+}
+
+model Invoice {
+  id             String        @id @default(uuid()) @db.VarChar(36)
+  client_id      String        @db.VarChar(36)
+  quotation_id   String?       @unique @db.VarChar(36)
+  invoice_number String        @unique @db.VarChar(50)
+  date           DateTime      @default(now()) @db.DateTime(6)
+  due_date       DateTime?     @db.Date
+  subtotal       Decimal       @db.Decimal(15, 2)
+  tax_amount     Decimal       @default(0.00) @db.Decimal(15, 2)
+  cgst           Decimal       @default(0.00) @db.Decimal(15, 2)
+  sgst           Decimal       @default(0.00) @db.Decimal(15, 2)
+  igst           Decimal       @default(0.00) @db.Decimal(15, 2)
+  total_amount   Decimal       @db.Decimal(15, 2)
+  status         String        @default("UNPAID") @db.VarChar(50)
+  notes          String?
+  created_at     DateTime      @default(now()) @db.DateTime(6)
+  updated_at     DateTime      @updatedAt @db.DateTime(6)
+  balance_amount Decimal       @default(0.00) @db.Decimal(15, 2)
+  paid_amount    Decimal       @default(0.00) @db.Decimal(15, 2)
+  work_order_id  String?       @db.VarChar(36)
+  discount       Decimal       @default(0.00) @db.Decimal(15, 2)
+  po_date        DateTime?     @db.Date
+  po_number      String?       @db.VarChar(100)
+  items          InvoiceItem[]
+  client         Client        @relation(fields: [client_id], references: [id], onDelete: Cascade)
+  quotation      Quotation?    @relation(fields: [quotation_id], references: [id])
+  work_order     WorkOrder?    @relation(fields: [work_order_id], references: [id])
+  payments       Payment[]
+
+  @@index([client_id], map: "invoices_client_id_fkey")
+  @@index([work_order_id], map: "invoices_work_order_id_fkey")
+  @@map("invoices")
+}
+
+model InvoiceItem {
+  id          String  @id @default(uuid()) @db.VarChar(36)
+  invoice_id  String  @db.VarChar(36)
+  description String
+  quantity    Int
+  unit_price  Decimal @db.Decimal(15, 2)
+  total       Decimal @db.Decimal(15, 2)
+  invoice     Invoice @relation(fields: [invoice_id], references: [id], onDelete: Cascade)
+
+  @@index([invoice_id], map: "invoice_items_invoice_id_fkey")
+  @@map("invoice_items")
+}
+
+model Payment {
+  id             String   @id @default(uuid()) @db.VarChar(36)
+  invoice_id     String   @db.VarChar(36)
+  amount         Decimal  @db.Decimal(15, 2)
+  payment_date   DateTime @default(now()) @db.DateTime(6)
+  payment_method String   @db.VarChar(50)
+  transaction_id String?  @db.VarChar(100)
+  status         String   @default("COMPLETED") @db.VarChar(50)
+  notes          String?
+  created_at     DateTime @default(now()) @db.DateTime(6)
+  invoice        Invoice  @relation(fields: [invoice_id], references: [id], onDelete: Cascade)
+
+  @@index([invoice_id], map: "payments_invoice_id_fkey")
+  @@map("payments")
+}
+
+model InventoryItem {
+  id             String             @id @default(uuid()) @db.VarChar(36)
+  sku            String             @unique @db.VarChar(50)
+  name           String             @db.VarChar(255)
+  category       String             @db.VarChar(100)
+  description    String?
+  unit           String             @default("PCS") @db.VarChar(20)
+  min_stock      Int                @default(0)
+  current_stock  Int                @default(0)
+  price_per_unit Decimal?           @db.Decimal(15, 2)
+  created_at     DateTime           @default(now()) @db.DateTime(6)
+  updated_at     DateTime           @updatedAt @db.DateTime(6)
+  transactions   StockTransaction[]
+
+  @@map("inventory_items")
+}
+
+model StockTransaction {
+  id               String        @id @default(uuid()) @db.VarChar(36)
+  item_id          String        @db.VarChar(36)
+  transaction_type String        @db.VarChar(50)
+  quantity         Int
+  reference_id     String?       @db.VarChar(36)
+  performed_by     String?       @db.VarChar(36)
+  remarks          String?
+  created_at       DateTime      @default(now()) @db.DateTime(6)
+  item             InventoryItem @relation(fields: [item_id], references: [id], onDelete: Cascade)
+
+  @@index([item_id], map: "stock_transactions_item_id_fkey")
+  @@map("stock_transactions")
+}
+
+model Asset {
+  id               String    @id @default(uuid()) @db.VarChar(36)
+  asset_tag        String    @unique @db.VarChar(100)
+  name             String    @db.VarChar(255)
+  serial_number    String?   @unique @db.VarChar(255)
+  model_number     String?   @db.VarChar(255)
+  purchase_date    DateTime? @db.Date
+  purchase_value   Decimal?  @db.Decimal(15, 2)
+  assigned_to      String?   @db.VarChar(36)
+  status           String    @default("AVAILABLE") @db.VarChar(50)
+  last_maintenance DateTime? @db.DateTime(6)
+  created_at       DateTime  @default(now()) @db.DateTime(6)
+  updated_at       DateTime  @updatedAt @db.DateTime(6)
+  assignee         User?     @relation("AssetAssignee", fields: [assigned_to], references: [id])
+
+  @@index([assigned_to], map: "assets_assigned_to_fkey")
+  @@map("assets")
+}
+
+model Document {
+  id            String      @id @default(uuid()) @db.VarChar(36)
+  name          String      @db.VarChar(255)
+  file_url      String      @db.LongText
+  file_type     String      @db.VarChar(50)
+  file_size     Int
+  category      String      @db.VarChar(100)
+  client_id     String?     @db.VarChar(36)
+  project_id    String?     @db.VarChar(36)
+  compliance_id String?     @db.VarChar(36)
+  expiry_date   DateTime?   @db.Date
+  uploaded_by   String?     @db.VarChar(36)
+  created_at    DateTime    @default(now()) @db.DateTime(6)
+  updated_at    DateTime    @updatedAt @db.DateTime(6)
+  lead_id       String?     @db.VarChar(36)
+  notes         String?     @db.Text
+  test_date     DateTime?   @db.Date
+  client        Client?     @relation(fields: [client_id], references: [id])
+  compliance    Compliance? @relation(fields: [compliance_id], references: [id])
+  lead          Lead?       @relation(fields: [lead_id], references: [id])
+  project       Project?    @relation(fields: [project_id], references: [id])
+  uploader      User?       @relation("DocumentUploader", fields: [uploaded_by], references: [id])
+
+  @@index([client_id], map: "documents_client_id_fkey")
+  @@index([compliance_id], map: "documents_compliance_id_fkey")
+  @@index([lead_id], map: "documents_lead_id_fkey")
+  @@index([project_id], map: "documents_project_id_fkey")
+  @@index([uploaded_by], map: "documents_uploaded_by_fkey")
+  @@map("documents")
+}
+
+model SystemSetting {
+  id          String   @id @default(uuid()) @db.VarChar(36)
+  key         String   @unique @db.VarChar(100)
+  value       String
+  category    String   @default("GENERAL") @db.VarChar(50)
+  description String?
+  updated_at  DateTime @updatedAt @db.DateTime(6)
+
+  @@map("system_settings")
+}
+
+model Inspection {
+  id             String            @id @default(uuid()) @db.VarChar(36)
+  client_id      String            @db.VarChar(36)
+  project_id     String?           @db.VarChar(36)
+  engineer_id    String?           @db.VarChar(36)
+  scheduled_date DateTime          @db.Date
+  completed_date DateTime?         @db.DateTime(6)
+  status         String            @default("SCHEDULED") @db.VarChar(50)
+  lat            Decimal?          @db.Decimal(10, 8)
+  lng            Decimal?          @db.Decimal(11, 8)
+  remarks        String?           @db.Text
+  expenditure    Decimal?          @default(0.00) @db.Decimal(15, 2)
+  created_at     DateTime          @default(now()) @db.DateTime(6)
+  updated_at     DateTime          @updatedAt @db.DateTime(6)
+  work_order_id  String?           @db.VarChar(36)
+  pdf_url        String?           @db.LongText
+  certificates   Certificate[]
+  items          InspectionItem[]
+  report         InspectionReport?
+  client         Client            @relation(fields: [client_id], references: [id], onDelete: Cascade)
+  engineer       User?             @relation(fields: [engineer_id], references: [id])
+  project        Project?          @relation(fields: [project_id], references: [id])
+  work_order     WorkOrder?        @relation(fields: [work_order_id], references: [id])
+
+  @@index([client_id], map: "inspections_client_id_fkey")
+  @@index([engineer_id], map: "inspections_engineer_id_fkey")
+  @@index([project_id], map: "inspections_project_id_fkey")
+  @@index([work_order_id], map: "inspections_work_order_id_fkey")
+  @@map("inspections")
+}
+
+model InspectionItem {
+  id              String     @id @default(uuid()) @db.VarChar(36)
+  inspection_id   String     @db.VarChar(36)
+  description     String
+  status          String     @default("PENDING") @db.VarChar(50)
+  notes           String?
+  photo_url       String?    @db.LongText
+  scope           String?    @db.Text
+  recommendations String?    @db.Text
+  expenditure     Decimal?   @default(0.00) @db.Decimal(15, 2)
+  inspection      Inspection @relation(fields: [inspection_id], references: [id], onDelete: Cascade)
+  certificate     Certificate?
+
+  // 4 dynamic fields for section certificates
+  cert_ref_no       String?    @db.VarChar(100)
+  cert_test_date    DateTime?  @db.Date
+  cert_expiry_date  DateTime?  @db.Date
+  cert_competency_no String?   @db.VarChar(100)
+  cert_template_id   String?   @db.VarChar(36)
+  cert_template_fields String? @db.LongText
+
+  @@index([inspection_id], map: "inspection_items_inspection_id_fkey")
+  @@map("inspection_items")
+}
+
+model Vendor {
+  id              String          @id @default(uuid()) @db.VarChar(36)
+  name            String          @db.VarChar(255)
+  email           String?         @db.VarChar(255)
+  phone           String?         @db.VarChar(50)
+  gst_number      String?         @db.VarChar(50)
+  pan_number      String?         @db.VarChar(50)
+  address         String?
+  city            String?         @db.VarChar(100)
+  state           String?         @db.VarChar(100)
+  is_active       Boolean         @default(true)
+  created_at      DateTime        @default(now()) @db.DateTime(6)
+  updated_at      DateTime        @updatedAt @db.DateTime(6)
+  expenses        Expense[]
+  purchase_orders PurchaseOrder[]
+  vendor_payments VendorPayment[]
+
+  @@map("vendors")
+}
+
+model Expense {
+  id              String          @id @default(uuid()) @db.VarChar(36)
+  description     String
+  amount          Decimal         @db.Decimal(15, 2)
+  category        String          @db.VarChar(100)
+  date            DateTime        @default(now()) @db.DateTime(6)
+  status          String          @default("PENDING") @db.VarChar(50)
+  vendor_id       String?         @db.VarChar(36)
+  user_id         String          @db.VarChar(36)
+  approved_by     String?         @db.VarChar(36)
+  attachment_url  String?
+  created_at      DateTime        @default(now()) @db.DateTime(6)
+  updated_at      DateTime        @updatedAt @db.DateTime(6)
+  approver        User?           @relation("ExpenseApprover", fields: [approved_by], references: [id])
+  user            User            @relation(fields: [user_id], references: [id])
+  vendor          Vendor?         @relation(fields: [vendor_id], references: [id])
+  vendor_payments VendorPayment[]
+
+  @@index([approved_by], map: "expenses_approved_by_fkey")
+  @@index([user_id], map: "expenses_user_id_fkey")
+  @@index([vendor_id], map: "expenses_vendor_id_fkey")
+  @@map("expenses")
+}
+
+model VendorPayment {
+  id             String   @id @default(uuid()) @db.VarChar(36)
+  vendor_id      String   @db.VarChar(36)
+  expense_id     String?  @db.VarChar(36)
+  amount         Decimal  @db.Decimal(15, 2)
+  payment_date   DateTime @default(now()) @db.DateTime(6)
+  payment_method String   @db.VarChar(50)
+  transaction_id String?  @db.VarChar(100)
+  notes          String?
+  created_at     DateTime @default(now()) @db.DateTime(6)
+  expense        Expense? @relation(fields: [expense_id], references: [id])
+  vendor         Vendor   @relation(fields: [vendor_id], references: [id], onDelete: Cascade)
+
+  @@index([expense_id], map: "vendor_payments_expense_id_fkey")
+  @@index([vendor_id], map: "vendor_payments_vendor_id_fkey")
+  @@map("vendor_payments")
+}
+
+model WorkOrder {
+  id              String          @id @default(uuid()) @db.VarChar(36)
+  project_id      String          @db.VarChar(36)
+  quotation_id    String?         @db.VarChar(36)
+  service_id      String?         @db.VarChar(36)
+  work_order_no   String          @unique @db.VarChar(50)
+  description     String?
+  status          String          @default("PENDING") @db.VarChar(50)
+  scheduled_date  DateTime?       @db.Date
+  completed_date  DateTime?       @db.DateTime(6)
+  created_at      DateTime        @default(now()) @db.DateTime(6)
+  updated_at      DateTime        @updatedAt @db.DateTime(6)
+  inspections     Inspection[]
+  invoices        Invoice[]
+  items           WorkOrderItem[]
+  project         Project         @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  quotation       Quotation?      @relation(fields: [quotation_id], references: [id])
+  service_product ServiceProduct? @relation(fields: [service_id], references: [id])
+
+  @@index([project_id], map: "work_orders_project_id_fkey")
+  @@index([quotation_id], map: "work_orders_quotation_id_fkey")
+  @@index([service_id], map: "work_orders_service_id_fkey")
+  @@map("work_orders")
+}
+
+model ServiceProduct {
+  id          String          @id @default(uuid()) @db.VarChar(36)
+  name        String          @db.VarChar(255)
+  description String?
+  category    String?         @db.VarChar(100)
+  is_active   Boolean         @default(true)
+  created_at  DateTime        @default(now()) @db.DateTime(6)
+  updated_at  DateTime        @updatedAt @db.DateTime(6)
+  checklist   ChecklistItem[]
+  work_orders WorkOrder[]
+
+  @@map("service_products")
+}
+
+model ChecklistItem {
+  id          String         @id @default(uuid()) @db.VarChar(36)
+  service_id  String         @db.VarChar(36)
+  question    String
+  field_type  String         @default("BOOLEAN") @db.VarChar(50)
+  options     String?
+  is_required Boolean        @default(true)
+  created_at  DateTime       @default(now()) @db.DateTime(6)
+  service     ServiceProduct @relation(fields: [service_id], references: [id], onDelete: Cascade)
+
+  @@index([service_id], map: "checklist_items_service_id_fkey")
+  @@map("checklist_items")
+}
+
+model Certificate {
+  id                 String          @id @default(uuid()) @db.VarChar(36)
+  inspection_id      String          @db.VarChar(36)
+  inspection_item_id String?         @unique @db.VarChar(36)
+  certificate_no     String          @unique @db.VarChar(100)
+  issue_date         DateTime        @db.Date
+  expiry_date        DateTime        @db.Date
+  validity_period    String          @db.VarChar(50)
+  status             String          @default("ACTIVE") @db.VarChar(50)
+  pdf_url            String?
+  metadata           String?         @db.LongText
+  created_at         DateTime        @default(now()) @db.DateTime(6)
+  updated_at         DateTime        @updatedAt @db.DateTime(6)
+  inspection         Inspection      @relation(fields: [inspection_id], references: [id], onDelete: Cascade)
+  inspection_item    InspectionItem? @relation(fields: [inspection_item_id], references: [id], onDelete: Cascade)
+
+  @@index([inspection_id], map: "certificates_inspection_id_fkey")
+  @@map("certificates")
+}
+
+model WorkOrderItem {
+  id            String    @id @default(uuid()) @db.VarChar(36)
+  work_order_id String    @db.VarChar(36)
+  description   String    @db.Text
+  quantity      Int       @default(1)
+  unit_price    Decimal   @db.Decimal(15, 2)
+  gst_rate      Decimal   @default(18.00) @db.Decimal(5, 2)
+  total_amount  Decimal   @db.Decimal(15, 2)
+  work_order    WorkOrder @relation(fields: [work_order_id], references: [id], onDelete: Cascade)
+
+  @@index([work_order_id], map: "work_order_items_work_order_id_fkey")
+  @@map("work_order_items")
+}
+
+model PurchaseOrder {
+  id           String   @id @default(uuid()) @db.VarChar(36)
+  po_number    String   @unique @db.VarChar(100)
+  vendor_id    String   @db.VarChar(36)
+  po_date      DateTime @default(now()) @db.DateTime(6)
+  total_amount Decimal  @db.Decimal(15, 2)
+  status       String   @default("PENDING") @db.VarChar(50)
+  created_by   String?  @db.VarChar(36)
+  created_at   DateTime @default(now()) @db.DateTime(6)
+  updated_at   DateTime @updatedAt @db.DateTime(6)
+  vendor       Vendor   @relation(fields: [vendor_id], references: [id], onDelete: Cascade)
+
+  @@index([vendor_id], map: "purchase_orders_vendor_id_fkey")
+  @@map("purchase_orders")
+}
+
+model InspectionReport {
+  id            String     @id @default(uuid()) @db.VarChar(36)
+  inspection_id String     @unique @db.VarChar(36)
+  report_text   String     @db.Text
+  images        String?    @db.LongText
+  created_at    DateTime   @default(now()) @db.DateTime(6)
+  inspection    Inspection @relation(fields: [inspection_id], references: [id], onDelete: Cascade)
+
+  @@map("inspection_reports")
+}
+
+model AuditLog {
+  id          String   @id @default(uuid()) @db.VarChar(36)
+  user_id     String?  @db.VarChar(36)
+  action      String   @db.VarChar(255)
+  entity_type String   @db.VarChar(100)
+  entity_id   String   @db.VarChar(36)
+  old_data    String?  @db.LongText
+  new_data    String?  @db.LongText
+  created_at  DateTime @default(now()) @db.DateTime(6)
+
+  @@map("audit_logs")
+}
+
+model SystemLog {
+  id         String   @id @default(uuid()) @db.VarChar(36)
+  type       String   @db.VarChar(50)
+  name       String   @db.VarChar(255)
+  message    String   @db.Text
+  body       String?  @db.Text
+  variables  String?  @db.LongText
+  created_at DateTime @default(now()) @db.DateTime(6)
+
+  @@map("system_logs")
+}
+
+model Warehouse {
+  id         String   @id @default(uuid()) @db.VarChar(36)
+  name       String   @db.VarChar(255)
+  location   String?  @db.VarChar(255)
+  status     String   @default("ACTIVE") @db.VarChar(50)
+  created_at DateTime @default(now()) @db.DateTime(6)
+  updated_at DateTime @updatedAt @db.DateTime(6)
+  stock      Stock[]
+
+  @@map("warehouses")
+}
+
+model Equipment {
+  id                   String                @id @default(uuid()) @db.VarChar(36)
+  name                 String                @db.VarChar(255)
+  serial_number        String?               @unique @db.VarChar(255)
+  batch_number         String?               @db.VarChar(255)
+  model                String?               @db.VarChar(255)
+  purchase_date        DateTime?             @db.Date
+  status               String                @default("AVAILABLE") @db.VarChar(50)
+  next_inspection_date DateTime?             @db.Date
+  location             String?               @db.VarChar(255)
+  created_at           DateTime              @default(now()) @db.DateTime(6)
+  updated_at           DateTime              @updatedAt @db.DateTime(6)
+  assignments          EquipmentAssignment[]
+  inspections          EquipmentInspection[]
+  stock                Stock[]
+
+  @@map("equipment")
+}
+
+model EquipmentAssignment {
+  id            String    @id @default(uuid()) @db.VarChar(36)
+  equipment_id  String    @db.VarChar(36)
+  user_id       String    @db.VarChar(36)
+  assigned_date DateTime  @default(now()) @db.DateTime(6)
+  status        String    @default("ASSIGNED") @db.VarChar(50)
+  created_at    DateTime  @default(now()) @db.DateTime(6)
+  equipment     Equipment @relation(fields: [equipment_id], references: [id], onDelete: Cascade)
+
+  @@index([equipment_id], map: "equipment_assignments_equipment_id_fkey")
+  @@map("equipment_assignments")
+}
+
+model EquipmentInspection {
+  id              String    @id @default(uuid()) @db.VarChar(36)
+  equipment_id    String    @db.VarChar(36)
+  inspection_date DateTime  @default(now()) @db.DateTime(6)
+  next_due_date   DateTime  @db.Date
+  status          String    @default("PASSED") @db.VarChar(50)
+  remarks         String?   @db.Text
+  created_at      DateTime  @default(now()) @db.DateTime(6)
+  equipment       Equipment @relation(fields: [equipment_id], references: [id], onDelete: Cascade)
+
+  @@index([equipment_id], map: "equipment_inspections_equipment_id_fkey")
+  @@map("equipment_inspections")
+}
+
+model Stock {
+  id           String    @id @default(uuid()) @db.VarChar(36)
+  equipment_id String    @db.VarChar(36)
+  warehouse_id String    @db.VarChar(36)
+  quantity     Int       @default(0)
+  min_quantity Int       @default(0)
+  status       String    @default("IN_STOCK") @db.VarChar(50)
+  updated_at   DateTime  @updatedAt @db.DateTime(6)
+  equipment    Equipment @relation(fields: [equipment_id], references: [id], onDelete: Cascade)
+  warehouse    Warehouse @relation(fields: [warehouse_id], references: [id], onDelete: Cascade)
+
+  @@unique([equipment_id, warehouse_id])
+  @@index([warehouse_id], map: "stock_warehouse_id_fkey")
+  @@map("stock")
+}
+
+model Account {
+  id             String        @id @default(uuid()) @db.VarChar(36)
+  name           String        @unique @db.VarChar(255)
+  code           String        @unique @db.VarChar(50)
+  type           String        @db.VarChar(50)         // ASSET, LIABILITY, EQUITY, REVENUE, EXPENSE
+  balance        Decimal       @default(0.00) @db.Decimal(15, 2)
+  parent_id      String?       @db.VarChar(36)
+  created_at     DateTime      @default(now()) @db.DateTime(6)
+  updated_at     DateTime      @updatedAt @db.DateTime(6)
+  debits         LedgerEntry[] @relation("DebitAccount")
+  credits        LedgerEntry[] @relation("CreditAccount")
+  parent         Account?      @relation("ParentChild", fields: [parent_id], references: [id])
+  children       Account[]     @relation("ParentChild")
+
+  @@index([parent_id], map: "accounts_parent_id_fkey")
+  @@map("accounts")
+}
+
+model LedgerEntry {
+  id                String   @id @default(uuid()) @db.VarChar(36)
+  voucher_no        String   @unique @db.VarChar(100)
+  description       String   @db.Text
+  amount            Decimal  @db.Decimal(15, 2)
+  transaction_date  DateTime @default(now()) @db.DateTime(6)
+  debit_account_id  String   @db.VarChar(36)
+  credit_account_id String   @db.VarChar(36)
+  created_by        String   @db.VarChar(255)
+  created_at        DateTime @default(now()) @db.DateTime(6)
+
+  debit_account     Account  @relation("DebitAccount", fields: [debit_account_id], references: [id])
+  credit_account    Account  @relation("CreditAccount", fields: [credit_account_id], references: [id])
+
+  @@index([debit_account_id], map: "ledger_entries_debit_account_id_fkey")
+  @@index([credit_account_id], map: "ledger_entries_credit_account_id_fkey")
+  @@map("ledger_entries")
+}
+
+model CertificateTemplate {
+  id           String   @id @default(uuid()) @db.VarChar(36)
+  name         String   @db.VarChar(255)
+  description  String?  @db.Text
+  html_content String   @db.LongText
+  fields       String   @db.LongText // JSON array string of dynamic template fields / inputs
+  created_at   DateTime @default(now()) @db.DateTime(6)
+  updated_at   DateTime @updatedAt @db.DateTime(6)
+
+  @@map("certificate_templates")
+}
+

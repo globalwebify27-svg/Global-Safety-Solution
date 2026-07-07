@@ -1,6 +1,15 @@
 import 'dotenv/config';
 import { NestFactory, HttpAdapterHost } from '@nestjs/core';
 import { AppModule } from './app.module';
+import { execSync } from 'child_process';
+
+// Force Prisma to generate the library engine client on startup
+try {
+  console.log('Generating Prisma Client on startup...');
+  execSync(`"${process.execPath}" node_modules/prisma/build/index.js generate --schema=dist/prisma/schema.prisma`, { stdio: 'inherit' });
+} catch (error) {
+  console.error('Failed to generate Prisma client on startup:', error);
+}
 
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';

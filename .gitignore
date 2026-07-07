@@ -50,3 +50,9 @@ globalsafety_backup.sql
 hostinger_backup.sql
 *.sql
 
+# Temporary deployment archives
+apps/backend/backend.zip
+
+# Uploaded assets
+apps/backend/public/uploads/
+

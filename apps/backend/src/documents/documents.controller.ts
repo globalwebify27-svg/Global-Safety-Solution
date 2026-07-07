@@ -16,11 +16,15 @@ import { DocumentsService } from './documents.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import { Permissions } from '../auth/decorators/permissions.decorator';
+import { LocalStorageService } from '../common/services/local-storage.service';
 
 @Controller('documents')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 export class DocumentsController {
-  constructor(private readonly documentsService: DocumentsService) {}
+  constructor(
+    private readonly documentsService: DocumentsService,
+    private readonly localStorageService: LocalStorageService,
+  ) {}
 
   @Get()
   @Permissions('READ_DOCUMENT')
@@ -59,11 +63,11 @@ export class DocumentsController {
 
       let fileUrl = data.file_url;
       if (file && file.buffer) {
-        const base64 = file.buffer.toString('base64');
-        fileUrl = `data:${file.mimetype};base64,${base64}`;
-        console.log('Base64 string successfully generated (Length:', fileUrl.length, ')');
+        // Save file to local filesystem (or Hostinger disk) instead of converting to Base64
+        fileUrl = await this.localStorageService.saveFile(file.buffer, file.originalname);
+        console.log('File successfully saved to local storage URL:', fileUrl);
       } else {
-        console.warn('Warning: No file buffer found to convert to Base64');
+        console.warn('Warning: No file buffer found to save');
       }
 
       const result = await this.documentsService.create(

@@ -1,6 +1,6 @@
 import { Controller, Post, Body, UnauthorizedException, Get } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { PrismaClient } from '@repo/database';
+import { PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
 @Controller('auth')
