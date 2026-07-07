@@ -554,9 +554,9 @@ export default function AccountingPage() {
                     <Search className="w-4 h-4 absolute left-3 top-2.5 text-muted-foreground" />
                     <Input placeholder="Search vouchers..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9 h-9 w-full bg-background border-border rounded-xl text-xs sm:text-sm" />
                   </div>
-                  <div className="grid grid-cols-2 gap-2 w-full sm:flex sm:w-auto">
-                    <Button onClick={downloadLedgerBoardExcel} size="sm" variant="outline" className="h-9 rounded-xl border-border hover:bg-indigo-500/10 hover:text-indigo-500 font-bold text-xs"><Download className="w-3.5 h-3.5 mr-1.5" /> Excel</Button>
-                    <Button onClick={downloadLedgerBoardPDF} size="sm" variant="outline" className="h-9 rounded-xl border-border hover:bg-emerald-500/10 hover:text-emerald-500 font-bold text-xs"><Download className="w-3.5 h-3.5 mr-1.5" /> PDF</Button>
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+                    <Button onClick={downloadLedgerBoardExcel} size="sm" variant="outline" className="h-9 rounded-xl border-border hover:bg-indigo-500/10 hover:text-indigo-500 font-bold text-xs w-full sm:w-auto"><Download className="w-3.5 h-3.5 mr-1.5" /> Excel</Button>
+                    <Button onClick={downloadLedgerBoardPDF} size="sm" variant="outline" className="h-9 rounded-xl border-border hover:bg-emerald-500/10 hover:text-emerald-500 font-bold text-xs w-full sm:w-auto"><Download className="w-3.5 h-3.5 mr-1.5" /> PDF</Button>
                   </div>
                 </div>
               </div>
@@ -587,7 +587,7 @@ export default function AccountingPage() {
                 <div className="lg:col-span-2 bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
                   <div className="p-4 sm:p-6 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <h3 className="font-bold text-base sm:text-lg">Chart of Accounts Ledger</h3>
-                    <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto justify-end">
                       <Button onClick={downloadCOAExcel} size="sm" variant="outline" className="h-8 rounded-lg border-border hover:bg-indigo-500/10 hover:text-indigo-500 text-xs font-bold w-full sm:w-auto"><Download className="w-3 h-3 mr-1" /> Excel</Button>
                       <Button onClick={downloadCOAPDF} size="sm" variant="outline" className="h-8 rounded-lg border-border hover:bg-emerald-500/10 hover:text-emerald-500 text-xs font-bold w-full sm:w-auto"><Download className="w-3 h-3 mr-1" /> PDF</Button>
                     </div>
@@ -683,15 +683,15 @@ export default function AccountingPage() {
 
           {activeTab === "reports" && (
             <div className="space-y-6 sm:space-y-8">
-              <div className="bg-card border border-border rounded-2xl p-4 sm:p-6 flex flex-col lg:flex-row lg:items-center justify-between gap-4 shadow-sm">
-                <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-3 sm:gap-4 w-full lg:w-auto">
+              <div className="bg-card border border-border rounded-2xl p-4 sm:p-6 flex flex-col xl:flex-row xl:items-center justify-between gap-4 shadow-sm">
+                <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-3 sm:gap-4 w-full xl:w-auto">
                   <div className="flex flex-col gap-1 w-full sm:w-auto"><Label className="text-xs font-bold text-muted-foreground">Reporting Period</Label><select value={reportFilter.period} onChange={(e) => setReportFilter({ ...reportFilter, period: e.target.value as any })} className="h-10 px-3 rounded-xl border border-border bg-background text-xs sm:text-sm text-foreground font-medium w-full"><option value="monthly">Monthly Statement</option><option value="halfyearly">Half Yearly (H1/H2)</option><option value="yearly">Yearly Statement</option></select></div>
                   {reportFilter.period === "monthly" && (<div className="flex flex-col gap-1 w-full sm:w-auto"><Label className="text-xs font-bold text-muted-foreground">Month</Label><select value={reportFilter.month} onChange={(e) => setReportFilter({ ...reportFilter, month: Number(e.target.value) })} className="h-10 px-3 rounded-xl border border-border bg-background text-xs sm:text-sm text-foreground font-medium w-full">{Array.from({ length: 12 }, (_, i) => (<option key={i} value={i}>{new Date(0, i).toLocaleString("default", { month: "long" })}</option>))}</select></div>)}
                   <div className="flex flex-col gap-1 w-full sm:w-auto"><Label className="text-xs font-bold text-muted-foreground">Year</Label><select value={reportFilter.year} onChange={(e) => setReportFilter({ ...reportFilter, year: Number(e.target.value) })} className="h-10 px-3 rounded-xl border border-border bg-background text-xs sm:text-sm text-foreground font-medium w-full">{[2025, 2026, 2027].map(y => (<option key={y} value={y}>{y}</option>))}</select></div>
                 </div>
-                <div className="flex items-center gap-2 w-full lg:w-auto sm:grid sm:grid-cols-2 lg:flex mt-2 lg:mt-0">
-                  <Button onClick={downloadExcelReport} className="bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl h-10 font-bold shadow-md shadow-indigo-500/20 text-xs w-full"><Download className="w-4 h-4 mr-1.5 shrink-0" /> Audit Excel</Button>
-                  <Button onClick={downloadPDFReport} className="bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl h-10 font-bold shadow-md shadow-emerald-500/20 text-xs w-full"><Download className="w-4 h-4 mr-1.5 shrink-0" /> Audit PDF</Button>
+                <div className="flex flex-col sm:grid sm:grid-cols-2 xl:flex xl:flex-row gap-2 w-full xl:w-auto mt-2 xl:mt-0">
+                  <Button onClick={downloadExcelReport} className="bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl h-10 font-bold shadow-md shadow-indigo-500/20 text-xs w-full xl:w-auto"><Download className="w-4 h-4 mr-1.5 shrink-0" /> Audit Excel</Button>
+                  <Button onClick={downloadPDFReport} className="bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl h-10 font-bold shadow-md shadow-emerald-500/20 text-xs w-full xl:w-auto"><Download className="w-4 h-4 mr-1.5 shrink-0" /> Audit PDF</Button>
                 </div>
               </div>
               {loadingReport ? (<div className="flex items-center justify-center py-20"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500"></div></div>) : reportData ? (
@@ -764,14 +764,14 @@ export default function AccountingPage() {
 
           {activeTab === "trialbalance" && (
             <div className="space-y-6">
-              <div className="bg-card border border-border rounded-2xl p-4 sm:p-6 flex flex-col sm:flex-row sm:items-center gap-4 shadow-sm">
-                <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-3 sm:gap-4 w-full sm:w-auto">
+              <div className="bg-card border border-border rounded-2xl p-4 sm:p-6 flex flex-col xl:flex-row xl:items-center justify-between gap-4 shadow-sm">
+                <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-3 sm:gap-4 w-full xl:w-auto">
                   <div className="flex flex-col gap-1 w-full sm:w-auto"><Label className="text-xs font-bold text-muted-foreground">Reporting Period</Label><select value={reportFilter.period} onChange={(e) => setReportFilter({ ...reportFilter, period: e.target.value as any })} className="h-10 px-3 rounded-xl border border-border bg-background text-xs sm:text-sm text-foreground font-medium w-full"><option value="monthly">Monthly</option><option value="halfyearly">Half Yearly</option><option value="yearly">Yearly</option></select></div>
                   {reportFilter.period === "monthly" && (<div className="flex flex-col gap-1 w-full sm:w-auto"><Label className="text-xs font-bold text-muted-foreground">Month</Label><select value={reportFilter.month} onChange={(e) => setReportFilter({ ...reportFilter, month: Number(e.target.value) })} className="h-10 px-3 rounded-xl border border-border bg-background text-xs sm:text-sm text-foreground font-medium w-full">{Array.from({ length: 12 }, (_, i) => (<option key={i} value={i}>{new Date(0, i).toLocaleString("default", { month: "long" })}</option>))}</select></div>)}
                   <div className="flex flex-col gap-1 w-full sm:w-auto"><Label className="text-xs font-bold text-muted-foreground">Year</Label><select value={reportFilter.year} onChange={(e) => setReportFilter({ ...reportFilter, year: Number(e.target.value) })} className="h-10 px-3 rounded-xl border border-border bg-background text-xs sm:text-sm text-foreground font-medium w-full">{[2025, 2026, 2027].map(y => (<option key={y} value={y}>{y}</option>))}</select></div>
                 </div>
-                <div className="w-full sm:w-auto flex justify-end">
-                  <Button onClick={fetchReport} className="bg-orange-600 hover:bg-orange-500 text-white rounded-xl h-10 font-bold w-full sm:w-auto text-xs sm:text-sm">Generate Trial Balance</Button>
+                <div className="w-full xl:w-auto flex justify-end">
+                  <Button onClick={fetchReport} className="bg-orange-600 hover:bg-orange-500 text-white rounded-xl h-10 font-bold w-full xl:w-auto text-xs sm:text-sm">Generate Trial Balance</Button>
                 </div>
               </div>
               {loadingReport ? (<div className="flex items-center justify-center py-20"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div></div>) : reportData?.trialBalance ? (
@@ -781,7 +781,7 @@ export default function AccountingPage() {
                       <h3 className="font-bold text-base sm:text-lg">Trial Balance</h3>
                       <p className="text-xs text-muted-foreground mt-0.5">In a balanced system, Total Debits = Total Credits</p>
                     </div>
-                    <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto justify-end">
                       <Button onClick={downloadTrialBalanceExcel} size="sm" variant="outline" className="h-9 rounded-xl border-border hover:bg-indigo-500/10 hover:text-indigo-500 font-bold text-xs w-full sm:w-auto"><Download className="w-3.5 h-3.5 mr-1.5" /> Excel</Button>
                       <Button onClick={downloadTrialBalancePDF} size="sm" variant="outline" className="h-9 rounded-xl border-border hover:bg-emerald-500/10 hover:text-emerald-500 font-bold text-xs w-full sm:w-auto"><Download className="w-3.5 h-3.5 mr-1.5" /> PDF</Button>
                     </div>
