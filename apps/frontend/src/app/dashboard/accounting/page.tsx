@@ -429,104 +429,104 @@ export default function AccountingPage() {
   ];
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="space-y-6 sm:space-y-8 px-1 sm:px-0">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
-          <h1 className="text-4xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-foreground via-foreground to-muted-foreground flex items-center gap-3">
-            <Calculator className="w-9 h-9 text-indigo-500" /> Tally Ledger & Accounts
+          <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-foreground via-foreground to-muted-foreground flex items-center gap-2 sm:gap-3">
+            <Calculator className="w-7 h-7 sm:w-9 sm:h-9 text-indigo-500 shrink-0" /> Tally Ledger & Accounts
           </h1>
-          <p className="text-muted-foreground font-medium">Professional double-entry ledger book, chart of accounts, and audit reports.</p>
+          <p className="text-xs sm:text-sm text-muted-foreground font-medium mt-1">Professional double-entry ledger book, chart of accounts, and audit reports.</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 w-full lg:w-auto">
           <Dialog open={openAccountDialog} onOpenChange={setOpenAccountDialog}>
-            <DialogTrigger asChild><Button variant="outline" className="border-border hover:bg-accent/10 rounded-xl h-11 font-bold">Add Account</Button></DialogTrigger>
-            <DialogContent className="bg-card border-border text-foreground rounded-2xl max-w-md p-6">
-              <DialogHeader><DialogTitle className="text-xl font-bold">New Ledger Account</DialogTitle><DialogDescription>Initialize a new account in your Chart of Accounts.</DialogDescription></DialogHeader>
-              <form onSubmit={handleCreateAccount} className="space-y-4 py-4">
-                <div className="space-y-1"><Label>Account Name</Label><Input placeholder="e.g. Petty Cash" value={accountForm.name} onChange={(e) => setAccountForm({ ...accountForm, name: e.target.value })} className="bg-background border-border" /></div>
-                <div className="space-y-1"><Label>Account Code (Unique)</Label><Input placeholder="e.g. 1020" value={accountForm.code} onChange={(e) => setAccountForm({ ...accountForm, code: e.target.value })} className="bg-background border-border" /></div>
-                <div className="space-y-1"><Label>Classification</Label>
-                  <select value={accountForm.type} onChange={(e) => setAccountForm({ ...accountForm, type: e.target.value, parent_id: "" })} className="w-full h-10 px-3 rounded-lg border border-border bg-background text-foreground">
+            <DialogTrigger asChild><Button variant="outline" className="border-border hover:bg-accent/10 rounded-xl h-10 sm:h-11 font-bold w-full sm:w-auto">Add Account</Button></DialogTrigger>
+            <DialogContent className="bg-card border-border text-foreground rounded-2xl max-w-md p-4 sm:p-6 w-[95vw] sm:w-full">
+              <DialogHeader><DialogTitle className="text-lg sm:text-xl font-bold">New Ledger Account</DialogTitle><DialogDescription className="text-xs sm:text-sm">Initialize a new account in your Chart of Accounts.</DialogDescription></DialogHeader>
+              <form onSubmit={handleCreateAccount} className="space-y-3 sm:space-y-4 py-2 sm:py-4">
+                <div className="space-y-1"><Label className="text-xs sm:text-sm">Account Name</Label><Input placeholder="e.g. Petty Cash" value={accountForm.name} onChange={(e) => setAccountForm({ ...accountForm, name: e.target.value })} className="bg-background border-border h-9 sm:h-10 text-xs sm:text-sm" /></div>
+                <div className="space-y-1"><Label className="text-xs sm:text-sm">Account Code (Unique)</Label><Input placeholder="e.g. 1020" value={accountForm.code} onChange={(e) => setAccountForm({ ...accountForm, code: e.target.value })} className="bg-background border-border h-9 sm:h-10 text-xs sm:text-sm" /></div>
+                <div className="space-y-1"><Label className="text-xs sm:text-sm">Classification</Label>
+                  <select value={accountForm.type} onChange={(e) => setAccountForm({ ...accountForm, type: e.target.value, parent_id: "" })} className="w-full h-9 sm:h-10 px-3 rounded-lg border border-border bg-background text-foreground text-xs sm:text-sm">
                     <option value="ASSET">ASSET</option><option value="LIABILITY">LIABILITY</option><option value="EQUITY">EQUITY</option><option value="REVENUE">REVENUE</option><option value="EXPENSE">EXPENSE</option>
                   </select>
                 </div>
-                <div className="space-y-1"><Label>Parent Account (Optional)</Label>
-                  <select value={accountForm.parent_id} onChange={(e) => setAccountForm({ ...accountForm, parent_id: e.target.value })} className="w-full h-10 px-3 rounded-lg border border-border bg-background text-foreground">
+                <div className="space-y-1"><Label className="text-xs sm:text-sm">Parent Account (Optional)</Label>
+                  <select value={accountForm.parent_id} onChange={(e) => setAccountForm({ ...accountForm, parent_id: e.target.value })} className="w-full h-9 sm:h-10 px-3 rounded-lg border border-border bg-background text-foreground text-xs sm:text-sm">
                     <option value="">None (Primary Category)</option>
                     {(accounts || []).filter(a => a.type === accountForm.type && !a.parent_id).map(a => (<option key={a.id} value={a.id}>{a.name} ({a.code})</option>))}
                   </select>
                 </div>
-                <div className="space-y-1"><Label>Opening Balance (INR - Optional)</Label><Input type="number" step="0.01" placeholder="0.00" value={accountForm.opening_balance} onChange={(e) => setAccountForm({ ...accountForm, opening_balance: e.target.value })} className="bg-background border-border" /></div>
-                <DialogFooter><Button type="submit" className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold w-full rounded-xl">Create Account</Button></DialogFooter>
+                <div className="space-y-1"><Label className="text-xs sm:text-sm">Opening Balance (INR - Optional)</Label><Input type="number" step="0.01" placeholder="0.00" value={accountForm.opening_balance} onChange={(e) => setAccountForm({ ...accountForm, opening_balance: e.target.value })} className="bg-background border-border h-9 sm:h-10 text-xs sm:text-sm" /></div>
+                <DialogFooter className="pt-2"><Button type="submit" className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold w-full rounded-xl h-10 text-xs sm:text-sm">Create Account</Button></DialogFooter>
               </form>
             </DialogContent>
           </Dialog>
           <Dialog open={openTransactionDialog} onOpenChange={setOpenTransactionDialog}>
-            <DialogTrigger asChild><Button className="bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl h-11 font-bold px-6 shadow-lg shadow-emerald-500/20"><Plus className="w-4 h-4 mr-2" /> Log Transaction</Button></DialogTrigger>
-            <DialogContent className="bg-card border-border text-foreground rounded-2xl max-w-lg p-6">
-              <DialogHeader><DialogTitle className="text-xl font-bold">Log Transaction</DialogTitle><DialogDescription>Record a manual expense or income receipt.</DialogDescription></DialogHeader>
-              <form onSubmit={handleCreateTransaction} className="space-y-4 py-4">
-                <div className="space-y-1"><Label>Transaction Type</Label>
-                  <select value={transactionForm.type} onChange={(e) => setTransactionForm({ ...transactionForm, type: e.target.value as any, category_id: "" })} className="w-full h-10 px-3 rounded-lg border border-border bg-background text-foreground">
+            <DialogTrigger asChild><Button className="bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl h-10 sm:h-11 font-bold px-4 sm:px-6 shadow-lg shadow-emerald-500/20 w-full sm:w-auto"><Plus className="w-4 h-4 mr-1.5 sm:mr-2 shrink-0" /> Log Transaction</Button></DialogTrigger>
+            <DialogContent className="bg-card border-border text-foreground rounded-2xl max-w-lg p-4 sm:p-6 w-[95vw] sm:w-full">
+              <DialogHeader><DialogTitle className="text-lg sm:text-xl font-bold">Log Transaction</DialogTitle><DialogDescription className="text-xs sm:text-sm">Record a manual expense or income receipt.</DialogDescription></DialogHeader>
+              <form onSubmit={handleCreateTransaction} className="space-y-3 sm:space-y-4 py-2 sm:py-4">
+                <div className="space-y-1"><Label className="text-xs sm:text-sm">Transaction Type</Label>
+                  <select value={transactionForm.type} onChange={(e) => setTransactionForm({ ...transactionForm, type: e.target.value as any, category_id: "" })} className="w-full h-9 sm:h-10 px-3 rounded-lg border border-border bg-background text-foreground text-xs sm:text-sm">
                     <option value="EXPENSE">Expense (Outflow / Payment)</option><option value="REVENUE">Revenue (Inflow / Receipt)</option>
                   </select>
                 </div>
-                <div className="space-y-1"><Label>Category Account</Label>
-                  <select value={transactionForm.category_id} onChange={(e) => setTransactionForm({ ...transactionForm, category_id: e.target.value })} className="w-full h-10 px-3 rounded-lg border border-border bg-background text-foreground">
+                <div className="space-y-1"><Label className="text-xs sm:text-sm">Category Account</Label>
+                  <select value={transactionForm.category_id} onChange={(e) => setTransactionForm({ ...transactionForm, category_id: e.target.value })} className="w-full h-9 sm:h-10 px-3 rounded-lg border border-border bg-background text-foreground text-xs sm:text-sm">
                     <option value="">Select Category</option>
                     {(accounts || []).filter(a => a.type === (transactionForm.type === "EXPENSE" ? "EXPENSE" : "REVENUE")).map(a => (<option key={a.id} value={a.id}>{a.name} ({a.code})</option>))}
                   </select>
                 </div>
-                <div className="space-y-1"><Label>{transactionForm.type === "EXPENSE" ? "Paid From (Bank/Cash Account)" : "Deposit To (Bank/Cash Account)"}</Label>
-                  <select value={transactionForm.bank_account_id} onChange={(e) => setTransactionForm({ ...transactionForm, bank_account_id: e.target.value })} className="w-full h-10 px-3 rounded-lg border border-border bg-background text-foreground">
+                <div className="space-y-1"><Label className="text-xs sm:text-sm">{transactionForm.type === "EXPENSE" ? "Paid From (Bank/Cash Account)" : "Deposit To (Bank/Cash Account)"}</Label>
+                  <select value={transactionForm.bank_account_id} onChange={(e) => setTransactionForm({ ...transactionForm, bank_account_id: e.target.value })} className="w-full h-9 sm:h-10 px-3 rounded-lg border border-border bg-background text-foreground text-xs sm:text-sm">
                     <option value="">Select Account</option>
                     {(accounts || []).filter(a => a.type === "ASSET").map(a => (<option key={a.id} value={a.id}>{a.name} ({a.code})</option>))}
                   </select>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1"><Label>Amount (INR)</Label><Input type="number" step="0.01" placeholder="0.00" value={transactionForm.amount} onChange={(e) => setTransactionForm({ ...transactionForm, amount: e.target.value })} className="bg-background border-border" /></div>
-                  <div className="space-y-1"><Label>Transaction Date</Label><Input type="date" value={transactionForm.transaction_date} onChange={(e) => setTransactionForm({ ...transactionForm, transaction_date: e.target.value })} className="bg-background border-border" /></div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                  <div className="space-y-1"><Label className="text-xs sm:text-sm">Amount (INR)</Label><Input type="number" step="0.01" placeholder="0.00" value={transactionForm.amount} onChange={(e) => setTransactionForm({ ...transactionForm, amount: e.target.value })} className="bg-background border-border h-9 sm:h-10 text-xs sm:text-sm" /></div>
+                  <div className="space-y-1"><Label className="text-xs sm:text-sm">Transaction Date</Label><Input type="date" value={transactionForm.transaction_date} onChange={(e) => setTransactionForm({ ...transactionForm, transaction_date: e.target.value })} className="bg-background border-border h-9 sm:h-10 text-xs sm:text-sm" /></div>
                 </div>
-                <div className="space-y-1"><Label>Narration</Label><Input placeholder="e.g. Paid Wi-Fi bill" value={transactionForm.description} onChange={(e) => setTransactionForm({ ...transactionForm, description: e.target.value })} className="bg-background border-border" /></div>
-                <DialogFooter><Button type="submit" className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold w-full rounded-xl">Save Transaction</Button></DialogFooter>
+                <div className="space-y-1"><Label className="text-xs sm:text-sm">Narration</Label><Input placeholder="e.g. Paid Wi-Fi bill" value={transactionForm.description} onChange={(e) => setTransactionForm({ ...transactionForm, description: e.target.value })} className="bg-background border-border h-9 sm:h-10 text-xs sm:text-sm" /></div>
+                <DialogFooter className="pt-2"><Button type="submit" className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold w-full rounded-xl h-10 text-xs sm:text-sm">Save Transaction</Button></DialogFooter>
               </form>
             </DialogContent>
           </Dialog>
           <Dialog open={openVoucherDialog} onOpenChange={setOpenVoucherDialog}>
-            <DialogTrigger asChild><Button className="bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl h-11 font-bold px-6 shadow-lg shadow-indigo-500/20"><Plus className="w-4 h-4 mr-2" /> Post Voucher</Button></DialogTrigger>
-            <DialogContent className="bg-card border-border text-foreground rounded-2xl max-w-lg p-6">
-              <DialogHeader><DialogTitle className="text-xl font-bold">New Journal Voucher (JV)</DialogTitle><DialogDescription>Record a custom double-entry ledger voucher.</DialogDescription></DialogHeader>
-              <form onSubmit={handleCreateVoucher} className="space-y-4 py-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1"><Label>Debit Account (Dr.)</Label>
-                    <select value={voucherForm.debit_code} onChange={(e) => setVoucherForm({ ...voucherForm, debit_code: e.target.value })} className="w-full h-10 px-3 rounded-lg border border-border bg-background text-foreground">
+            <DialogTrigger asChild><Button className="bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl h-10 sm:h-11 font-bold px-4 sm:px-6 shadow-lg shadow-indigo-500/20 w-full sm:w-auto"><Plus className="w-4 h-4 mr-1.5 sm:mr-2 shrink-0" /> Post Voucher</Button></DialogTrigger>
+            <DialogContent className="bg-card border-border text-foreground rounded-2xl max-w-lg p-4 sm:p-6 w-[95vw] sm:w-full">
+              <DialogHeader><DialogTitle className="text-lg sm:text-xl font-bold">New Journal Voucher (JV)</DialogTitle><DialogDescription className="text-xs sm:text-sm">Record a custom double-entry ledger voucher.</DialogDescription></DialogHeader>
+              <form onSubmit={handleCreateVoucher} className="space-y-3 sm:space-y-4 py-2 sm:py-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                  <div className="space-y-1"><Label className="text-xs sm:text-sm">Debit Account (Dr.)</Label>
+                    <select value={voucherForm.debit_code} onChange={(e) => setVoucherForm({ ...voucherForm, debit_code: e.target.value })} className="w-full h-9 sm:h-10 px-3 rounded-lg border border-border bg-background text-foreground text-xs sm:text-sm">
                       <option value="">Select Account</option>
                       {(accounts || []).map(a => (<option key={a.id} value={a.code}>{a.name} ({a.code})</option>))}
                     </select>
                   </div>
-                  <div className="space-y-1"><Label>Credit Account (Cr.)</Label>
-                    <select value={voucherForm.credit_code} onChange={(e) => setVoucherForm({ ...voucherForm, credit_code: e.target.value })} className="w-full h-10 px-3 rounded-lg border border-border bg-background text-foreground">
+                  <div className="space-y-1"><Label className="text-xs sm:text-sm">Credit Account (Cr.)</Label>
+                    <select value={voucherForm.credit_code} onChange={(e) => setVoucherForm({ ...voucherForm, credit_code: e.target.value })} className="w-full h-9 sm:h-10 px-3 rounded-lg border border-border bg-background text-foreground text-xs sm:text-sm">
                       <option value="">Select Account</option>
                       {(accounts || []).map(a => (<option key={a.id} value={a.code}>{a.name} ({a.code})</option>))}
                     </select>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1"><Label>Amount (INR)</Label><Input type="number" step="0.01" placeholder="0.00" value={voucherForm.amount} onChange={(e) => setVoucherForm({ ...voucherForm, amount: e.target.value })} className="bg-background border-border" /></div>
-                  <div className="space-y-1"><Label>Posting Date</Label><Input type="date" value={voucherForm.transaction_date} onChange={(e) => setVoucherForm({ ...voucherForm, transaction_date: e.target.value })} className="bg-background border-border" /></div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                  <div className="space-y-1"><Label className="text-xs sm:text-sm">Amount (INR)</Label><Input type="number" step="0.01" placeholder="0.00" value={voucherForm.amount} onChange={(e) => setVoucherForm({ ...voucherForm, amount: e.target.value })} className="bg-background border-border h-9 sm:h-10 text-xs sm:text-sm" /></div>
+                  <div className="space-y-1"><Label className="text-xs sm:text-sm">Posting Date</Label><Input type="date" value={voucherForm.transaction_date} onChange={(e) => setVoucherForm({ ...voucherForm, transaction_date: e.target.value })} className="bg-background border-border h-9 sm:h-10 text-xs sm:text-sm" /></div>
                 </div>
-                <div className="space-y-1"><Label>Narration</Label><Input placeholder="Enter transactional details" value={voucherForm.description} onChange={(e) => setVoucherForm({ ...voucherForm, description: e.target.value })} className="bg-background border-border" /></div>
-                <DialogFooter><Button type="submit" className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold w-full rounded-xl">Post Journal Voucher</Button></DialogFooter>
+                <div className="space-y-1"><Label className="text-xs sm:text-sm">Narration</Label><Input placeholder="Enter transactional details" value={voucherForm.description} onChange={(e) => setVoucherForm({ ...voucherForm, description: e.target.value })} className="bg-background border-border h-9 sm:h-10 text-xs sm:text-sm" /></div>
+                <DialogFooter className="pt-2"><Button type="submit" className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold w-full rounded-xl h-10 text-xs sm:text-sm">Post Journal Voucher</Button></DialogFooter>
               </form>
             </DialogContent>
           </Dialog>
         </div>
       </div>
 
-      <div className="flex flex-wrap border-b border-border/80">
+      <div className="flex overflow-x-auto whitespace-nowrap border-b border-border/80 -mx-1 px-1 sm:mx-0 sm:px-0 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
         {tabs.map(tab => (
-          <button key={tab.key} onClick={() => setActiveTab(tab.key)} className={cn("px-5 py-3 font-bold text-sm border-b-2 transition-all flex items-center gap-2", activeTab === tab.key ? "border-indigo-500 text-indigo-500" : "border-transparent text-muted-foreground hover:text-foreground")}>
-            <tab.icon className="w-4 h-4" />{tab.label}
+          <button key={tab.key} onClick={() => setActiveTab(tab.key)} className={cn("px-4 sm:px-5 py-3 font-bold text-xs sm:text-sm border-b-2 transition-all flex items-center gap-2 shrink-0", activeTab === tab.key ? "border-indigo-500 text-indigo-500" : "border-transparent text-muted-foreground hover:text-foreground")}>
+            <tab.icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />{tab.label}
           </button>
         ))}
       </div>
@@ -537,27 +537,31 @@ export default function AccountingPage() {
         <>
           {activeTab === "ledgers" && (
             <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
-              <div className="p-6 border-b border-border flex flex-wrap items-center justify-between gap-4">
-                <h3 className="font-bold text-lg">Voucher Audit Entries</h3>
-                <div className="flex flex-wrap items-center gap-3">
-                  <div className="flex items-center gap-2">
-                    <Label className="text-xs text-muted-foreground whitespace-nowrap">From</Label>
-                    <Input type="date" value={ledgerStart} onChange={e => setLedgerStart(e.target.value)} className="h-9 text-xs bg-background border-border w-36 rounded-xl" />
-                    <Label className="text-xs text-muted-foreground whitespace-nowrap">To</Label>
-                    <Input type="date" value={ledgerEnd} onChange={e => setLedgerEnd(e.target.value)} className="h-9 text-xs bg-background border-border w-36 rounded-xl" />
+              <div className="p-4 sm:p-6 border-b border-border flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                <h3 className="font-bold text-base sm:text-lg">Voucher Audit Entries</h3>
+                <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-3 w-full lg:w-auto">
+                  <div className="grid grid-cols-2 gap-2 w-full sm:w-auto">
+                    <div className="flex items-center gap-1.5 w-full">
+                      <span className="text-[10px] sm:text-xs text-muted-foreground uppercase font-bold shrink-0">From</span>
+                      <Input type="date" value={ledgerStart} onChange={e => setLedgerStart(e.target.value)} className="h-9 text-xs bg-background border-border w-full sm:w-32 rounded-xl" />
+                    </div>
+                    <div className="flex items-center gap-1.5 w-full">
+                      <span className="text-[10px] sm:text-xs text-muted-foreground uppercase font-bold shrink-0">To</span>
+                      <Input type="date" value={ledgerEnd} onChange={e => setLedgerEnd(e.target.value)} className="h-9 text-xs bg-background border-border w-full sm:w-32 rounded-xl" />
+                    </div>
                   </div>
-                  <div className="relative">
-                    <Search className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
-                    <Input placeholder="Search vouchers..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9 h-9 w-48 bg-background border-border rounded-xl" />
+                  <div className="relative w-full sm:w-48">
+                    <Search className="w-4 h-4 absolute left-3 top-2.5 text-muted-foreground" />
+                    <Input placeholder="Search vouchers..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9 h-9 w-full bg-background border-border rounded-xl text-xs sm:text-sm" />
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Button onClick={downloadLedgerBoardExcel} size="sm" variant="outline" className="h-9 rounded-xl border-border hover:bg-indigo-500/10 hover:text-indigo-500 font-bold"><Download className="w-3.5 h-3.5 mr-1.5" /> Excel</Button>
-                    <Button onClick={downloadLedgerBoardPDF} size="sm" variant="outline" className="h-9 rounded-xl border-border hover:bg-emerald-500/10 hover:text-emerald-500 font-bold"><Download className="w-3.5 h-3.5 mr-1.5" /> PDF</Button>
+                  <div className="grid grid-cols-2 gap-2 w-full sm:flex sm:w-auto">
+                    <Button onClick={downloadLedgerBoardExcel} size="sm" variant="outline" className="h-9 rounded-xl border-border hover:bg-indigo-500/10 hover:text-indigo-500 font-bold text-xs"><Download className="w-3.5 h-3.5 mr-1.5" /> Excel</Button>
+                    <Button onClick={downloadLedgerBoardPDF} size="sm" variant="outline" className="h-9 rounded-xl border-border hover:bg-emerald-500/10 hover:text-emerald-500 font-bold text-xs"><Download className="w-3.5 h-3.5 mr-1.5" /> PDF</Button>
                   </div>
                 </div>
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
+                <table className="w-full text-left border-collapse min-w-[750px]">
                   <thead><tr className="bg-accent/5 border-b border-border text-muted-foreground text-xs font-black uppercase tracking-wider"><th className="py-4 px-6">Voucher No</th><th className="py-4 px-6">Date</th><th className="py-4 px-6">Particulars (Dr / Cr)</th><th className="py-4 px-6 text-right">Debit (Dr)</th><th className="py-4 px-6 text-right">Credit (Cr)</th><th className="py-4 px-6">Narration</th><th className="py-4 px-6">Audited By</th></tr></thead>
                   <tbody className="divide-y divide-border/60 text-sm">
                     {filteredVouchers.length === 0 ? (<tr><td colSpan={7} className="py-10 text-center text-muted-foreground italic">No vouchers found.</td></tr>) : filteredVouchers.map(v => (
@@ -579,17 +583,17 @@ export default function AccountingPage() {
 
           {activeTab === "accounts" && (
             <>
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8">
                 <div className="lg:col-span-2 bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
-                  <div className="p-6 border-b border-border flex items-center justify-between">
-                    <h3 className="font-bold text-lg">Chart of Accounts Ledger</h3>
-                    <div className="flex items-center gap-2">
-                      <Button onClick={downloadCOAExcel} size="sm" variant="outline" className="h-8 rounded-lg border-border hover:bg-indigo-500/10 hover:text-indigo-500 text-xs font-bold"><Download className="w-3 h-3 mr-1" /> Excel</Button>
-                      <Button onClick={downloadCOAPDF} size="sm" variant="outline" className="h-8 rounded-lg border-border hover:bg-emerald-500/10 hover:text-emerald-500 text-xs font-bold"><Download className="w-3 h-3 mr-1" /> PDF</Button>
+                  <div className="p-4 sm:p-6 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <h3 className="font-bold text-base sm:text-lg">Chart of Accounts Ledger</h3>
+                    <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                      <Button onClick={downloadCOAExcel} size="sm" variant="outline" className="h-8 rounded-lg border-border hover:bg-indigo-500/10 hover:text-indigo-500 text-xs font-bold w-full sm:w-auto"><Download className="w-3 h-3 mr-1" /> Excel</Button>
+                      <Button onClick={downloadCOAPDF} size="sm" variant="outline" className="h-8 rounded-lg border-border hover:bg-emerald-500/10 hover:text-emerald-500 text-xs font-bold w-full sm:w-auto"><Download className="w-3 h-3 mr-1" /> PDF</Button>
                     </div>
                   </div>
                   <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
+                    <table className="w-full text-left border-collapse min-w-[650px]">
                       <thead><tr className="bg-accent/5 border-b border-border text-muted-foreground text-xs font-black uppercase tracking-wider"><th className="py-4 px-6">Code</th><th className="py-4 px-6">Account Name</th><th className="py-4 px-6">Type</th><th className="py-4 px-6 text-right">Current Balance</th><th className="py-4 px-6 text-center">Actions</th></tr></thead>
                       <tbody className="divide-y divide-border/60 text-sm">
                         {(accounts || []).map(a => (
@@ -606,35 +610,43 @@ export default function AccountingPage() {
                   </div>
                 </div>
                 <div className="space-y-6">
-                  <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
-                    <h3 className="font-bold text-lg mb-4">Financial Equilibrium</h3>
+                  <div className="bg-card border border-border rounded-2xl p-4 sm:p-6 shadow-sm">
+                    <h3 className="font-bold text-base sm:text-lg mb-4">Financial Equilibrium</h3>
                     <div className="space-y-4">
-                      <div className="p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/10 flex justify-between items-center"><div><p className="text-xs text-muted-foreground font-medium uppercase">Total Assets</p><p className="text-xl font-bold text-emerald-500 mt-1">₹{(accounts || []).filter(a => a.type === "ASSET").reduce((sum, a) => sum + Number(a.balance), 0).toLocaleString()}</p></div><TrendingUp className="w-8 h-8 text-emerald-500 opacity-35" /></div>
-                      <div className="p-4 rounded-xl bg-rose-500/5 border border-rose-500/10 flex justify-between items-center"><div><p className="text-xs text-muted-foreground font-medium uppercase">Total Liabilities</p><p className="text-xl font-bold text-rose-500 mt-1">₹{(accounts || []).filter(a => a.type === "LIABILITY").reduce((sum, a) => sum + Number(a.balance), 0).toLocaleString()}</p></div><ShieldAlert className="w-8 h-8 text-rose-500 opacity-35" /></div>
-                      <div className="p-4 rounded-xl bg-purple-500/5 border border-purple-500/10 flex justify-between items-center"><div><p className="text-xs text-muted-foreground font-medium uppercase">Total Equity</p><p className="text-xl font-bold text-purple-500 mt-1">₹{(accounts || []).filter(a => a.type === "EQUITY").reduce((sum, a) => sum + Number(a.balance), 0).toLocaleString()}</p></div><DollarSign className="w-8 h-8 text-purple-500 opacity-35" /></div>
+                      <div className="p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/10 flex justify-between items-center"><div><p className="text-[10px] sm:text-xs text-muted-foreground font-medium uppercase">Total Assets</p><p className="text-lg sm:text-xl font-bold text-emerald-500 mt-1">₹{(accounts || []).filter(a => a.type === "ASSET").reduce((sum, a) => sum + Number(a.balance), 0).toLocaleString()}</p></div><TrendingUp className="w-7 h-7 sm:w-8 sm:h-8 text-emerald-500 opacity-35" /></div>
+                      <div className="p-4 rounded-xl bg-rose-500/5 border border-rose-500/10 flex justify-between items-center"><div><p className="text-[10px] sm:text-xs text-muted-foreground font-medium uppercase">Total Liabilities</p><p className="text-lg sm:text-xl font-bold text-rose-500 mt-1">₹{(accounts || []).filter(a => a.type === "LIABILITY").reduce((sum, a) => sum + Number(a.balance), 0).toLocaleString()}</p></div><ShieldAlert className="w-7 h-7 sm:w-8 sm:h-8 text-rose-500 opacity-35" /></div>
+                      <div className="p-4 rounded-xl bg-purple-500/5 border border-purple-500/10 flex justify-between items-center"><div><p className="text-[10px] sm:text-xs text-muted-foreground font-medium uppercase">Total Equity</p><p className="text-lg sm:text-xl font-bold text-purple-500 mt-1">₹{(accounts || []).filter(a => a.type === "EQUITY").reduce((sum, a) => sum + Number(a.balance), 0).toLocaleString()}</p></div><DollarSign className="w-7 h-7 sm:w-8 sm:h-8 text-purple-500 opacity-35" /></div>
                     </div>
                   </div>
                 </div>
               </div>
               {drillAccount && (
-                <div className="bg-card border border-indigo-500/30 rounded-2xl shadow-lg overflow-hidden">
-                  <div className="p-5 border-b border-border flex flex-wrap items-center justify-between gap-4 bg-indigo-500/5">
-                    <div><h3 className="font-bold text-base text-indigo-500">{drillAccount.name} ({drillAccount.code})</h3><p className="text-xs text-muted-foreground mt-0.5">Individual account ledger — date-filtered transaction history</p></div>
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center gap-2">
-                        <Label className="text-xs text-muted-foreground whitespace-nowrap">From</Label><Input type="date" value={drillStart} onChange={e => setDrillStart(e.target.value)} className="h-8 text-xs bg-background border-border w-36" />
-                        <Label className="text-xs text-muted-foreground whitespace-nowrap">To</Label><Input type="date" value={drillEnd} onChange={e => setDrillEnd(e.target.value)} className="h-8 text-xs bg-background border-border w-36" />
+                <div className="bg-card border border-indigo-500/30 rounded-2xl shadow-lg overflow-hidden mt-6 sm:mt-8">
+                  <div className="p-4 sm:p-5 border-b border-border flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-indigo-500/5">
+                    <div><h3 className="font-bold text-sm sm:text-base text-indigo-500">{drillAccount.name} ({drillAccount.code})</h3><p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">Individual account ledger — date-filtered transaction history</p></div>
+                    <div className="flex flex-col sm:flex-row lg:items-center gap-3 w-full lg:w-auto">
+                      <div className="grid grid-cols-2 gap-2 w-full sm:w-auto">
+                        <div className="flex items-center gap-1.5 w-full">
+                          <span className="text-[10px] sm:text-xs text-muted-foreground uppercase font-bold shrink-0">From</span>
+                          <Input type="date" value={drillStart} onChange={e => setDrillStart(e.target.value)} className="h-8 text-xs bg-background border-border w-full sm:w-32" />
+                        </div>
+                        <div className="flex items-center gap-1.5 w-full">
+                          <span className="text-[10px] sm:text-xs text-muted-foreground uppercase font-bold shrink-0">To</span>
+                          <Input type="date" value={drillEnd} onChange={e => setDrillEnd(e.target.value)} className="h-8 text-xs bg-background border-border w-full sm:w-32" />
+                        </div>
                       </div>
-                      <div className="flex items-center gap-1.5 border-l border-border pl-3">
-                        <Button onClick={() => downloadDrillLedgerExcel(drillAccount, drillEntries)} size="sm" variant="outline" className="h-8 rounded-lg border-border hover:bg-indigo-500/10 hover:text-indigo-500 text-xs font-bold"><Download className="w-3 h-3 mr-1" /> Excel</Button>
-                        <Button onClick={() => downloadDrillLedgerPDF(drillAccount, drillEntries)} size="sm" variant="outline" className="h-8 rounded-lg border-border hover:bg-emerald-500/10 hover:text-emerald-500 text-xs font-bold"><Download className="w-3 h-3 mr-1" /> PDF</Button>
+                      <div className="flex items-center justify-between gap-2 border-t sm:border-t-0 sm:border-l border-border pt-2 sm:pt-0 sm:pl-3 w-full lg:w-auto">
+                        <div className="flex items-center gap-1.5">
+                          <Button onClick={() => downloadDrillLedgerExcel(drillAccount, drillEntries)} size="sm" variant="outline" className="h-8 rounded-lg border-border hover:bg-indigo-500/10 hover:text-indigo-500 text-[10px] sm:text-xs font-bold"><Download className="w-3 h-3 mr-1" /> Excel</Button>
+                          <Button onClick={() => downloadDrillLedgerPDF(drillAccount, drillEntries)} size="sm" variant="outline" className="h-8 rounded-lg border-border hover:bg-emerald-500/10 hover:text-emerald-500 text-[10px] sm:text-xs font-bold"><Download className="w-3 h-3 mr-1" /> PDF</Button>
+                        </div>
+                        <button onClick={() => { setDrillAccount(null); setDrillEntries([]); }} className="p-1.5 rounded-lg hover:bg-rose-500/10 text-muted-foreground hover:text-rose-500 transition-colors border border-border shrink-0"><X className="w-4 h-4" /></button>
                       </div>
-                      <button onClick={() => { setDrillAccount(null); setDrillEntries([]); }} className="p-1.5 rounded-lg hover:bg-rose-500/10 text-muted-foreground hover:text-rose-500 transition-colors border border-border ml-1"><X className="w-4 h-4" /></button>
                     </div>
                   </div>
                   {drillLoading ? (<div className="flex items-center justify-center py-10"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-500"></div></div>) : (
                     <div className="overflow-x-auto">
-                      <table className="w-full text-left border-collapse">
+                      <table className="w-full text-left border-collapse min-w-[700px]">
                         <thead><tr className="bg-accent/5 border-b border-border text-muted-foreground text-xs font-black uppercase tracking-wider"><th className="py-3 px-5">Voucher No</th><th className="py-3 px-5">Date</th><th className="py-3 px-5">Particulars</th><th className="py-3 px-5 text-right">Debit (Dr)</th><th className="py-3 px-5 text-right">Credit (Cr)</th><th className="py-3 px-5 text-right">Running Balance</th><th className="py-3 px-5">Audited By</th></tr></thead>
                         <tbody className="divide-y divide-border/60 text-sm">
                           {drillEntries.length === 0 ? (<tr><td colSpan={7} className="py-8 text-center text-muted-foreground italic">No transactions found for selected range.</td></tr>) : drillEntries.map((e: any) => (
@@ -655,13 +667,13 @@ export default function AccountingPage() {
                 </div>
               )}
               {editOBAccount && (
-                <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center backdrop-blur-sm" onClick={() => setEditOBAccount(null)}>
-                  <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-md shadow-2xl" onClick={e => e.stopPropagation()}>
-                    <div className="flex items-center justify-between mb-4"><div><h3 className="font-bold text-lg">Edit Opening Balance</h3><p className="text-xs text-muted-foreground mt-0.5">{editOBAccount.name} ({editOBAccount.code})</p></div><button onClick={() => setEditOBAccount(null)} className="p-1.5 rounded-lg hover:bg-rose-500/10 text-muted-foreground hover:text-rose-500 transition-colors"><X className="w-4 h-4" /></button></div>
-                    <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 mb-4"><p className="text-xs text-amber-500 font-medium">Warning: This will reverse the old opening balance entry and create a new one. Both account balance and the ledger entry will be updated.</p></div>
+                <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center backdrop-blur-sm px-4" onClick={() => setEditOBAccount(null)}>
+                  <div className="bg-card border border-border rounded-2xl p-4 sm:p-6 w-full max-w-md shadow-2xl" onClick={e => e.stopPropagation()}>
+                    <div className="flex items-center justify-between mb-4"><div><h3 className="font-bold text-base sm:text-lg">Edit Opening Balance</h3><p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">{editOBAccount.name} ({editOBAccount.code})</p></div><button onClick={() => setEditOBAccount(null)} className="p-1.5 rounded-lg hover:bg-rose-500/10 text-muted-foreground hover:text-rose-500 transition-colors"><X className="w-4 h-4" /></button></div>
+                    <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 mb-4"><p className="text-[10px] sm:text-xs text-amber-500 font-medium">Warning: This will reverse the old opening balance entry and create a new one. Both account balance and the ledger entry will be updated.</p></div>
                     <form onSubmit={handleUpdateOpeningBalance} className="space-y-4">
-                      <div className="space-y-1"><Label>New Opening Balance (INR)</Label><Input type="number" step="0.01" placeholder="0.00" value={editOBAmount} onChange={e => setEditOBAmount(e.target.value)} className="bg-background border-border" autoFocus /></div>
-                      <Button type="submit" disabled={editOBLoading} className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold w-full rounded-xl">{editOBLoading ? "Updating..." : "Update Opening Balance"}</Button>
+                      <div className="space-y-1"><Label className="text-xs sm:text-sm">New Opening Balance (INR)</Label><Input type="number" step="0.01" placeholder="0.00" value={editOBAmount} onChange={e => setEditOBAmount(e.target.value)} className="bg-background border-border h-9 sm:h-10 text-xs sm:text-sm" autoFocus /></div>
+                      <Button type="submit" disabled={editOBLoading} className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold w-full rounded-xl h-10 text-xs sm:text-sm">{editOBLoading ? "Updating..." : "Update Opening Balance"}</Button>
                     </form>
                   </div>
                 </div>
@@ -670,42 +682,45 @@ export default function AccountingPage() {
           )}
 
           {activeTab === "reports" && (
-            <div className="space-y-8">
-              <div className="bg-card border border-border rounded-2xl p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm">
-                <div className="flex flex-wrap items-center gap-4">
-                  <div className="flex flex-col gap-1"><Label className="text-xs font-bold text-muted-foreground">Reporting Period</Label><select value={reportFilter.period} onChange={(e) => setReportFilter({ ...reportFilter, period: e.target.value as any })} className="h-10 px-3 rounded-xl border border-border bg-background text-sm text-foreground font-medium"><option value="monthly">Monthly Statement</option><option value="halfyearly">Half Yearly (H1/H2)</option><option value="yearly">Yearly Statement</option></select></div>
-                  {reportFilter.period === "monthly" && (<div className="flex flex-col gap-1"><Label className="text-xs font-bold text-muted-foreground">Month</Label><select value={reportFilter.month} onChange={(e) => setReportFilter({ ...reportFilter, month: Number(e.target.value) })} className="h-10 px-3 rounded-xl border border-border bg-background text-sm text-foreground font-medium">{Array.from({ length: 12 }, (_, i) => (<option key={i} value={i}>{new Date(0, i).toLocaleString("default", { month: "long" })}</option>))}</select></div>)}
-                  <div className="flex flex-col gap-1"><Label className="text-xs font-bold text-muted-foreground">Year</Label><select value={reportFilter.year} onChange={(e) => setReportFilter({ ...reportFilter, year: Number(e.target.value) })} className="h-10 px-3 rounded-xl border border-border bg-background text-sm text-foreground font-medium">{[2025, 2026, 2027].map(y => (<option key={y} value={y}>{y}</option>))}</select></div>
+            <div className="space-y-6 sm:space-y-8">
+              <div className="bg-card border border-border rounded-2xl p-4 sm:p-6 flex flex-col lg:flex-row lg:items-center justify-between gap-4 shadow-sm">
+                <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-3 sm:gap-4 w-full lg:w-auto">
+                  <div className="flex flex-col gap-1 w-full sm:w-auto"><Label className="text-xs font-bold text-muted-foreground">Reporting Period</Label><select value={reportFilter.period} onChange={(e) => setReportFilter({ ...reportFilter, period: e.target.value as any })} className="h-10 px-3 rounded-xl border border-border bg-background text-xs sm:text-sm text-foreground font-medium w-full"><option value="monthly">Monthly Statement</option><option value="halfyearly">Half Yearly (H1/H2)</option><option value="yearly">Yearly Statement</option></select></div>
+                  {reportFilter.period === "monthly" && (<div className="flex flex-col gap-1 w-full sm:w-auto"><Label className="text-xs font-bold text-muted-foreground">Month</Label><select value={reportFilter.month} onChange={(e) => setReportFilter({ ...reportFilter, month: Number(e.target.value) })} className="h-10 px-3 rounded-xl border border-border bg-background text-xs sm:text-sm text-foreground font-medium w-full">{Array.from({ length: 12 }, (_, i) => (<option key={i} value={i}>{new Date(0, i).toLocaleString("default", { month: "long" })}</option>))}</select></div>)}
+                  <div className="flex flex-col gap-1 w-full sm:w-auto"><Label className="text-xs font-bold text-muted-foreground">Year</Label><select value={reportFilter.year} onChange={(e) => setReportFilter({ ...reportFilter, year: Number(e.target.value) })} className="h-10 px-3 rounded-xl border border-border bg-background text-xs sm:text-sm text-foreground font-medium w-full">{[2025, 2026, 2027].map(y => (<option key={y} value={y}>{y}</option>))}</select></div>
                 </div>
-                <div className="flex items-center gap-3 self-end"><Button onClick={downloadExcelReport} className="bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl h-10 font-bold shadow-md shadow-indigo-500/20"><Download className="w-4 h-4 mr-2" /> Audit Excel</Button><Button onClick={downloadPDFReport} className="bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl h-10 font-bold shadow-md shadow-emerald-500/20"><Download className="w-4 h-4 mr-2" /> Audit PDF</Button></div>
+                <div className="flex items-center gap-2 w-full lg:w-auto sm:grid sm:grid-cols-2 lg:flex mt-2 lg:mt-0">
+                  <Button onClick={downloadExcelReport} className="bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl h-10 font-bold shadow-md shadow-indigo-500/20 text-xs w-full"><Download className="w-4 h-4 mr-1.5 shrink-0" /> Audit Excel</Button>
+                  <Button onClick={downloadPDFReport} className="bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl h-10 font-bold shadow-md shadow-emerald-500/20 text-xs w-full"><Download className="w-4 h-4 mr-1.5 shrink-0" /> Audit PDF</Button>
+                </div>
               </div>
               {loadingReport ? (<div className="flex items-center justify-center py-20"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500"></div></div>) : reportData ? (
-                <div className="space-y-8">
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    <div className="bg-card border border-border rounded-2xl p-6 space-y-6 shadow-sm">
-                      <div className="flex items-center justify-between border-b border-border pb-4"><h3 className="font-bold text-lg text-indigo-500 uppercase tracking-wider">Profit & Loss Statement</h3><TrendingUp className="w-5 h-5 text-indigo-500" /></div>
+                <div className="space-y-6 sm:space-y-8">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
+                    <div className="bg-card border border-border rounded-2xl p-4 sm:p-6 space-y-6 shadow-sm">
+                      <div className="flex items-center justify-between border-b border-border pb-4"><h3 className="font-bold text-base sm:text-lg text-indigo-500 uppercase tracking-wider">Profit & Loss</h3><TrendingUp className="w-5 h-5 text-indigo-500" /></div>
                       <div className="space-y-4">
-                        <div><h4 className="text-xs font-black text-muted-foreground uppercase mb-2">Revenue Streams</h4><div className="space-y-1">{renderCollapsibleAccountRows(reportData.profitAndLoss?.revenues, "REVENUE", "text-emerald-500")}</div><div className="flex justify-between py-3 font-bold text-sm border-b-2 border-border/80 mt-1"><span>Total Revenue</span><span className="text-emerald-500 underline decoration-double">₹{Number(reportData.profitAndLoss?.totalRevenue || 0).toLocaleString()}</span></div></div>
-                        <div className="pt-4"><h4 className="text-xs font-black text-muted-foreground uppercase mb-2">Operating Expenses</h4><div className="space-y-1">{renderCollapsibleAccountRows(reportData.profitAndLoss?.expenses, "EXPENSE", "text-rose-500")}</div><div className="flex justify-between py-3 font-bold text-sm border-b-2 border-border/80 mt-1"><span>Total Expenses</span><span className="text-rose-500">₹{Number(reportData.profitAndLoss?.totalExpense || 0).toLocaleString()}</span></div></div>
-                        <div className="p-4 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex justify-between items-center mt-6"><span className="font-black text-base uppercase text-indigo-500">Net Business Profit</span><span className={cn("font-black text-xl underline decoration-double", Number(reportData.profitAndLoss?.netProfit || 0) >= 0 ? "text-emerald-500" : "text-rose-500")}>₹{Number(reportData.profitAndLoss?.netProfit || 0).toLocaleString()}</span></div>
+                        <div><h4 className="text-[10px] sm:text-xs font-black text-muted-foreground uppercase mb-2">Revenue Streams</h4><div className="space-y-1">{renderCollapsibleAccountRows(reportData.profitAndLoss?.revenues, "REVENUE", "text-emerald-500")}</div><div className="flex justify-between py-3 font-bold text-xs sm:text-sm border-b-2 border-border/80 mt-1"><span>Total Revenue</span><span className="text-emerald-500 underline decoration-double">₹{Number(reportData.profitAndLoss?.totalRevenue || 0).toLocaleString()}</span></div></div>
+                        <div className="pt-4"><h4 className="text-[10px] sm:text-xs font-black text-muted-foreground uppercase mb-2">Operating Expenses</h4><div className="space-y-1">{renderCollapsibleAccountRows(reportData.profitAndLoss?.expenses, "EXPENSE", "text-rose-500")}</div><div className="flex justify-between py-3 font-bold text-xs sm:text-sm border-b-2 border-border/80 mt-1"><span>Total Expenses</span><span className="text-rose-500">₹{Number(reportData.profitAndLoss?.totalExpense || 0).toLocaleString()}</span></div></div>
+                        <div className="p-3 sm:p-4 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex justify-between items-center mt-6"><span className="font-black text-xs sm:text-sm uppercase text-indigo-500">Net Business Profit</span><span className={cn("font-black text-sm sm:text-base underline decoration-double", Number(reportData.profitAndLoss?.netProfit || 0) >= 0 ? "text-emerald-500" : "text-rose-500")}>₹{Number(reportData.profitAndLoss?.netProfit || 0).toLocaleString()}</span></div>
                       </div>
                     </div>
-                    <div className="bg-card border border-border rounded-2xl p-6 space-y-6 shadow-sm">
-                      <div className="flex items-center justify-between border-b border-border pb-4"><h3 className="font-bold text-lg text-teal-500 uppercase tracking-wider">Balance Sheet Summary</h3><DollarSign className="w-5 h-5 text-teal-500" /></div>
+                    <div className="bg-card border border-border rounded-2xl p-4 sm:p-6 space-y-6 shadow-sm">
+                      <div className="flex items-center justify-between border-b border-border pb-4"><h3 className="font-bold text-base sm:text-lg text-teal-500 uppercase tracking-wider">Balance Sheet Summary</h3><DollarSign className="w-5 h-5 text-teal-500" /></div>
                       <div className="space-y-4">
-                        <div><h4 className="text-xs font-black text-muted-foreground uppercase mb-2">Assets (Dr.)</h4><div className="space-y-1">{renderCollapsibleAccountRows(reportData.balanceSheet?.assets, "ASSET", "text-emerald-500")}</div><div className="flex justify-between py-3 font-bold text-sm border-b-2 border-border/80 mt-1"><span>Total Assets</span><span className="text-emerald-500 underline decoration-double">₹{Number(reportData.balanceSheet?.totalAssets || 0).toLocaleString()}</span></div></div>
-                        <div className="pt-4"><h4 className="text-xs font-black text-muted-foreground uppercase mb-2">Liabilities & Equity (Cr.)</h4><div className="space-y-1">{renderCollapsibleAccountRows(reportData.balanceSheet?.liabilities, "LIABILITY", "text-rose-500")}{renderCollapsibleAccountRows(reportData.balanceSheet?.equity, "EQUITY", "text-purple-500")}</div><div className="flex justify-between py-3 font-bold text-sm border-b-2 border-border/80 mt-1"><span>Total Liabilities & Equity</span><span className="text-teal-500 underline decoration-double">₹{(Number(reportData.balanceSheet?.totalLiabilities || 0) + Number(reportData.balanceSheet?.totalEquity || 0)).toLocaleString()}</span></div></div>
+                        <div><h4 className="text-[10px] sm:text-xs font-black text-muted-foreground uppercase mb-2">Assets (Dr.)</h4><div className="space-y-1">{renderCollapsibleAccountRows(reportData.balanceSheet?.assets, "ASSET", "text-emerald-500")}</div><div className="flex justify-between py-3 font-bold text-xs sm:text-sm border-b-2 border-border/80 mt-1"><span>Total Assets</span><span className="text-emerald-500 underline decoration-double">₹{Number(reportData.balanceSheet?.totalAssets || 0).toLocaleString()}</span></div></div>
+                        <div className="pt-4"><h4 className="text-[10px] sm:text-xs font-black text-muted-foreground uppercase mb-2">Liabilities & Equity (Cr.)</h4><div className="space-y-1">{renderCollapsibleAccountRows(reportData.balanceSheet?.liabilities, "LIABILITY", "text-rose-500")}{renderCollapsibleAccountRows(reportData.balanceSheet?.equity, "EQUITY", "text-purple-500")}</div><div className="flex justify-between py-3 font-bold text-xs sm:text-sm border-b-2 border-border/80 mt-1"><span>Total Liabilities & Equity</span><span className="text-teal-500 underline decoration-double">₹{(Number(reportData.balanceSheet?.totalLiabilities || 0) + Number(reportData.balanceSheet?.totalEquity || 0)).toLocaleString()}</span></div></div>
                       </div>
                     </div>
                   </div>
-                  <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
-                    <div className="flex items-center justify-between border-b border-border pb-4 mb-6"><h3 className="font-bold text-lg text-cyan-500 uppercase tracking-wider">Cash Flow Statement</h3><Waves className="w-5 h-5 text-cyan-500" /></div>
+                  <div className="bg-card border border-border rounded-2xl p-4 sm:p-6 shadow-sm">
+                    <div className="flex items-center justify-between border-b border-border pb-4 mb-6"><h3 className="font-bold text-base sm:text-lg text-cyan-500 uppercase tracking-wider">Cash Flow Statement</h3><Waves className="w-5 h-5 text-cyan-500" /></div>
                     {cashFlowLoading ? (<div className="flex items-center justify-center py-10"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-cyan-500"></div></div>) : cashFlowData ? (
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         {[{ key: "operating", label: "Operating Activities", color: "text-emerald-500", bg: "bg-emerald-500/5 border-emerald-500/20", data: cashFlowData.operating }, { key: "investing", label: "Investing Activities", color: "text-blue-500", bg: "bg-blue-500/5 border-blue-500/20", data: cashFlowData.investing }, { key: "financing", label: "Financing Activities", color: "text-purple-500", bg: "bg-purple-500/5 border-purple-500/20", data: cashFlowData.financing }].map(section => (
-                          <div key={section.key} className={cn("rounded-xl p-5 border flex flex-col justify-between h-full backdrop-blur-sm transition-all duration-300 hover:shadow-md", section.bg)}>
+                          <div key={section.key} className={cn("rounded-xl p-4 sm:p-5 border flex flex-col justify-between h-full backdrop-blur-sm transition-all duration-300 hover:shadow-md", section.bg)}>
                             <div>
-                              <h4 className={cn("text-xs font-black uppercase tracking-wider mb-4 pb-2 border-b border-current/10", section.color)}>{section.label}</h4>
+                              <h4 className={cn("text-[10px] sm:text-xs font-black uppercase tracking-wider mb-4 pb-2 border-b border-current/10", section.color)}>{section.label}</h4>
                               <div className="space-y-3">
                                 {(!section.data || !section.data.items || section.data.items.length === 0) ? (
                                   <div className="py-6 text-center">
@@ -714,8 +729,8 @@ export default function AccountingPage() {
                                 ) : section.data.items.map((item: any, i: number) => (
                                   <div key={i} className="group flex justify-between items-start text-xs py-2 border-b border-border/20 last:border-0 hover:bg-black/5 dark:hover:bg-white/5 px-2 rounded-lg transition-colors">
                                     <div className="flex-1 pr-3 min-w-0">
-                                      <p className="font-semibold text-foreground truncate" title={item.description}>{item.description}</p>
-                                      <p className="text-[10px] font-medium text-muted-foreground mt-0.5 tracking-wide uppercase">{item.opposite_account}</p>
+                                      <p className="font-semibold text-foreground truncate text-xs" title={item.description}>{item.description}</p>
+                                      <p className="text-[9px] sm:text-[10px] font-medium text-muted-foreground mt-0.5 tracking-wide uppercase">{item.opposite_account}</p>
                                     </div>
                                     <span className={cn("font-bold shrink-0 text-xs tabular-nums mt-0.5", item.amount >= 0 ? "text-emerald-500" : "text-rose-500")}>
                                       {item.amount >= 0 ? "+" : "-"}₹{Math.abs(item.amount).toLocaleString()}
@@ -724,18 +739,18 @@ export default function AccountingPage() {
                                 ))}
                               </div>
                             </div>
-                            <div className={cn("flex justify-between items-center font-bold text-sm mt-6 pt-3 border-t border-border/60", section.color)}>
-                              <span className="uppercase tracking-wider text-xs">Total Net Flow</span>
-                              <span className="text-base tabular-nums">₹{Number(section.data?.total || 0).toLocaleString()}</span>
+                            <div className={cn("flex justify-between items-center font-bold text-xs sm:text-sm mt-6 pt-3 border-t border-border/60", section.color)}>
+                              <span className="uppercase tracking-wider text-[10px] sm:text-xs">Total Net Flow</span>
+                              <span className="text-sm sm:text-base tabular-nums">₹{Number(section.data?.total || 0).toLocaleString()}</span>
                             </div>
                           </div>
                         ))}
-                        <div className="md:col-span-3 p-5 rounded-xl bg-gradient-to-r from-cyan-500/5 to-cyan-500/10 border border-cyan-500/20 flex justify-between items-center shadow-inner">
-                          <div className="flex items-center gap-2.5">
-                            <div className="w-2.5 h-2.5 rounded-full bg-cyan-500 animate-pulse" />
-                            <span className="font-black text-xs md:text-sm uppercase tracking-wider text-cyan-600 dark:text-cyan-400">Net Cash Flow (Period)</span>
+                        <div className="md:col-span-3 p-4 sm:p-5 rounded-xl bg-gradient-to-r from-cyan-500/5 to-cyan-500/10 border border-cyan-500/20 flex justify-between items-center shadow-inner">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-cyan-500 animate-pulse" />
+                            <span className="font-black text-[10px] sm:text-xs md:text-sm uppercase tracking-wider text-cyan-600 dark:text-cyan-400">Net Cash Flow (Period)</span>
                           </div>
-                          <span className={cn("font-black text-xl md:text-2xl tracking-tight tabular-nums", Number(cashFlowData.netCashFlow || 0) >= 0 ? "text-emerald-500" : "text-rose-500")}>
+                          <span className={cn("font-black text-base sm:text-xl md:text-2xl tracking-tight tabular-nums", Number(cashFlowData.netCashFlow || 0) >= 0 ? "text-emerald-500" : "text-rose-500")}>
                             ₹{Number(cashFlowData.netCashFlow || 0).toLocaleString()}
                           </span>
                         </div>
@@ -749,26 +764,30 @@ export default function AccountingPage() {
 
           {activeTab === "trialbalance" && (
             <div className="space-y-6">
-              <div className="bg-card border border-border rounded-2xl p-6 flex flex-wrap items-center gap-4 shadow-sm">
-                <div className="flex flex-col gap-1"><Label className="text-xs font-bold text-muted-foreground">Reporting Period</Label><select value={reportFilter.period} onChange={(e) => setReportFilter({ ...reportFilter, period: e.target.value as any })} className="h-10 px-3 rounded-xl border border-border bg-background text-sm text-foreground font-medium"><option value="monthly">Monthly</option><option value="halfyearly">Half Yearly</option><option value="yearly">Yearly</option></select></div>
-                {reportFilter.period === "monthly" && (<div className="flex flex-col gap-1"><Label className="text-xs font-bold text-muted-foreground">Month</Label><select value={reportFilter.month} onChange={(e) => setReportFilter({ ...reportFilter, month: Number(e.target.value) })} className="h-10 px-3 rounded-xl border border-border bg-background text-sm text-foreground font-medium">{Array.from({ length: 12 }, (_, i) => (<option key={i} value={i}>{new Date(0, i).toLocaleString("default", { month: "long" })}</option>))}</select></div>)}
-                <div className="flex flex-col gap-1"><Label className="text-xs font-bold text-muted-foreground">Year</Label><select value={reportFilter.year} onChange={(e) => setReportFilter({ ...reportFilter, year: Number(e.target.value) })} className="h-10 px-3 rounded-xl border border-border bg-background text-sm text-foreground font-medium">{[2025, 2026, 2027].map(y => (<option key={y} value={y}>{y}</option>))}</select></div>
-                <div className="flex-1 flex justify-end"><Button onClick={fetchReport} className="bg-orange-600 hover:bg-orange-500 text-white rounded-xl h-10 font-bold">Generate Trial Balance</Button></div>
+              <div className="bg-card border border-border rounded-2xl p-4 sm:p-6 flex flex-col sm:flex-row sm:items-center gap-4 shadow-sm">
+                <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-3 sm:gap-4 w-full sm:w-auto">
+                  <div className="flex flex-col gap-1 w-full sm:w-auto"><Label className="text-xs font-bold text-muted-foreground">Reporting Period</Label><select value={reportFilter.period} onChange={(e) => setReportFilter({ ...reportFilter, period: e.target.value as any })} className="h-10 px-3 rounded-xl border border-border bg-background text-xs sm:text-sm text-foreground font-medium w-full"><option value="monthly">Monthly</option><option value="halfyearly">Half Yearly</option><option value="yearly">Yearly</option></select></div>
+                  {reportFilter.period === "monthly" && (<div className="flex flex-col gap-1 w-full sm:w-auto"><Label className="text-xs font-bold text-muted-foreground">Month</Label><select value={reportFilter.month} onChange={(e) => setReportFilter({ ...reportFilter, month: Number(e.target.value) })} className="h-10 px-3 rounded-xl border border-border bg-background text-xs sm:text-sm text-foreground font-medium w-full">{Array.from({ length: 12 }, (_, i) => (<option key={i} value={i}>{new Date(0, i).toLocaleString("default", { month: "long" })}</option>))}</select></div>)}
+                  <div className="flex flex-col gap-1 w-full sm:w-auto"><Label className="text-xs font-bold text-muted-foreground">Year</Label><select value={reportFilter.year} onChange={(e) => setReportFilter({ ...reportFilter, year: Number(e.target.value) })} className="h-10 px-3 rounded-xl border border-border bg-background text-xs sm:text-sm text-foreground font-medium w-full">{[2025, 2026, 2027].map(y => (<option key={y} value={y}>{y}</option>))}</select></div>
+                </div>
+                <div className="w-full sm:w-auto flex justify-end">
+                  <Button onClick={fetchReport} className="bg-orange-600 hover:bg-orange-500 text-white rounded-xl h-10 font-bold w-full sm:w-auto text-xs sm:text-sm">Generate Trial Balance</Button>
+                </div>
               </div>
               {loadingReport ? (<div className="flex items-center justify-center py-20"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div></div>) : reportData?.trialBalance ? (
                 <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
-                  <div className="p-6 border-b border-border flex items-center justify-between">
+                  <div className="p-4 sm:p-6 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
-                      <h3 className="font-bold text-lg">Trial Balance</h3>
+                      <h3 className="font-bold text-base sm:text-lg">Trial Balance</h3>
                       <p className="text-xs text-muted-foreground mt-0.5">In a balanced system, Total Debits = Total Credits</p>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Button onClick={downloadTrialBalanceExcel} size="sm" variant="outline" className="h-9 rounded-xl border-border hover:bg-indigo-500/10 hover:text-indigo-500 font-bold"><Download className="w-3.5 h-3.5 mr-1.5" /> Excel</Button>
-                      <Button onClick={downloadTrialBalancePDF} size="sm" variant="outline" className="h-9 rounded-xl border-border hover:bg-emerald-500/10 hover:text-emerald-500 font-bold"><Download className="w-3.5 h-3.5 mr-1.5" /> PDF</Button>
+                    <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                      <Button onClick={downloadTrialBalanceExcel} size="sm" variant="outline" className="h-9 rounded-xl border-border hover:bg-indigo-500/10 hover:text-indigo-500 font-bold text-xs w-full sm:w-auto"><Download className="w-3.5 h-3.5 mr-1.5" /> Excel</Button>
+                      <Button onClick={downloadTrialBalancePDF} size="sm" variant="outline" className="h-9 rounded-xl border-border hover:bg-emerald-500/10 hover:text-emerald-500 font-bold text-xs w-full sm:w-auto"><Download className="w-3.5 h-3.5 mr-1.5" /> PDF</Button>
                     </div>
                   </div>
                   <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
+                    <table className="w-full text-left border-collapse min-w-[600px]">
                       <thead><tr className="bg-accent/5 border-b border-border text-muted-foreground text-xs font-black uppercase tracking-wider"><th className="py-4 px-6">Code</th><th className="py-4 px-6">Account Name</th><th className="py-4 px-6">Type</th><th className="py-4 px-6 text-right">Debit (Dr)</th><th className="py-4 px-6 text-right">Credit (Cr)</th></tr></thead>
                       <tbody className="divide-y divide-border/60 text-sm">
                         {(reportData.trialBalance || []).map((t: any) => (<tr key={t.id} className="hover:bg-accent/5 transition-colors"><td className="py-3 px-6 font-mono font-bold text-indigo-500">{t.code}</td><td className="py-3 px-6 font-medium">{t.name}</td><td className="py-3 px-6"><span className={cn("text-xs px-2.5 py-1 rounded-full font-bold", accountTypeColor(t.type))}>{t.type}</span></td><td className="py-3 px-6 text-right font-bold text-emerald-500">{t.debit > 0 ? `₹${Number(t.debit).toLocaleString()}` : "—"}</td><td className="py-3 px-6 text-right font-bold text-rose-500">{t.credit > 0 ? `₹${Number(t.credit).toLocaleString()}` : "—"}</td></tr>))}
@@ -783,10 +802,16 @@ export default function AccountingPage() {
 
           {activeTab === "audit" && (
             <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
-              <div className="p-6 border-b border-border flex items-center justify-between"><div><h3 className="font-bold text-lg">Audit Trail</h3><p className="text-xs text-muted-foreground mt-0.5">Complete log of all financial actions performed by staff</p></div><Button onClick={fetchAuditLog} variant="outline" className="rounded-xl h-9 text-sm font-bold border-border">Refresh</Button></div>
+              <div className="p-4 sm:p-6 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h3 className="font-bold text-base sm:text-lg">Audit Trail</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">Complete log of all financial actions performed by staff</p>
+                </div>
+                <Button onClick={fetchAuditLog} variant="outline" className="rounded-xl h-9 text-xs sm:text-sm font-bold border-border w-full sm:w-auto">Refresh</Button>
+              </div>
               {auditLoading ? (<div className="flex items-center justify-center py-20"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500"></div></div>) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse">
+                  <table className="w-full text-left border-collapse min-w-[700px]">
                     <thead><tr className="bg-accent/5 border-b border-border text-muted-foreground text-xs font-black uppercase tracking-wider"><th className="py-4 px-6">Timestamp</th><th className="py-4 px-6">Action</th><th className="py-4 px-6">Entity</th><th className="py-4 px-6">Staff (Who)</th><th className="py-4 px-6">Details</th></tr></thead>
                     <tbody className="divide-y divide-border/60 text-sm">
                       {auditLogs.length === 0 ? (<tr><td colSpan={5} className="py-10 text-center text-muted-foreground italic">No audit logs recorded yet.</td></tr>) : auditLogs.map((log: any) => {
