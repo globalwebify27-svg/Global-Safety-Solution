@@ -1,0 +1,79 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+
+jobs:
+  # Job 1: Lint, Build, and Test (CI)
+  ci-pipeline:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-size: 18
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: npm run generate --workspace=@repo/database
+
+      - name: Lint Code
+        run: npm run lint
+
+      - name: Build Application (Next.js & NestJS)
+        run: npm run build
+
+      # If you have unit/integration tests configured, you would run them here:
+      # - name: Run Backend Tests
+      #   run: npm run test --workspace=backend
+
+  # Job 2: Build Docker Images and Publish (CD / Package stage)
+  docker-pipeline:
+    needs: ci-pipeline
+    runs-on: ubuntu-latest
+    # Run only on pushes to main/master, not on PRs
+    if: github.event_name == 'push'
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Optional: In a real-world scenario, you would log into a container registry like Docker Hub or GitHub Packages:
+      # - name: Login to Docker Hub
+      #   uses: docker/login-action@v3
+      #   with:
+      #     username: ${{ secrets.DOCKERHUB_USERNAME }}
+      #     password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build Backend Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: apps/backend/Dockerfile
+          push: false # Set to true once logged into a registry
+          tags: |
+            global-safety-backend:latest
+            global-safety-backend:${{ github.sha }}
+
+      - name: Build Frontend Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: apps/frontend/Dockerfile
+          push: false # Set to true once logged into a registry
+          tags: |
+            global-safety-frontend:latest
+            global-safety-frontend:${{ github.sha }}

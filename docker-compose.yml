@@ -1,6 +1,5 @@
-version: '3.8'
-
 services:
+  # 1. MySQL Database Service
   db:
     image: mysql:8.0
     container_name: gss_erp_mysql
@@ -12,6 +11,49 @@ services:
       - "3307:3306"
     volumes:
       - db_data:/var/lib/mysql
+    networks:
+      - gss-network
+
+  # 2. Backend Service (NestJS)
+  backend:
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
+    container_name: gss_backend
+    restart: always
+    environment:
+      # We reference the database container service name 'db' instead of localhost inside Docker network
+      DATABASE_URL: "mysql://root:@db:3306/global_safety_erp"
+      PORT: 3001
+      JWT_SECRET: "super_secret_key_for_global_safety_solution_12345"
+      FRONTEND_URL: "http://localhost:3000"
+    ports:
+      - "3001:3001"
+    depends_on:
+      - db
+    networks:
+      - gss-network
+
+  # 3. Frontend Service (Next.js)
+  frontend:
+    build:
+      context: .
+      dockerfile: apps/frontend/Dockerfile
+    container_name: gss_frontend
+    restart: always
+    environment:
+      NEXT_PUBLIC_API_URL: "http://localhost:3001"
+      PORT: 3000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    networks:
+      - gss-network
 
 volumes:
   db_data:
+
+networks:
+  gss-network:
+    driver: bridge
