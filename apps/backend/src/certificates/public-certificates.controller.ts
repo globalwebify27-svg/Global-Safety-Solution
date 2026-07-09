@@ -59,6 +59,9 @@ export class PublicCertificatesController {
       );
     }
 
-    return cert;
+    return {
+      ...cert,
+      certificate_number: cert.certificate_no,
+    };
   }
 }

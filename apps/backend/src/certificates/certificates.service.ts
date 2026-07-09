@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import * as QRCode from 'qrcode';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   CreateCertificateDto,
@@ -218,12 +219,12 @@ export class CertificatesService {
     try {
       const frontendUrl = process.env.FRONTEND_URL || 'https://globalsafetysolution.in';
       const qrUrl = `${frontendUrl}/verify/certificate/${certificate.id}`;
-      const response = await fetch(`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(qrUrl)}`);
-      if (response.ok) {
-        qrCodeBuffer = Buffer.from(await response.arrayBuffer());
-      }
+      qrCodeBuffer = await QRCode.toBuffer(qrUrl, {
+        width: 150,
+        margin: 1,
+      });
     } catch (err) {
-      console.error('Failed to generate QR Code:', err);
+      console.error('Failed to generate QR Code locally:', err);
     }
 
     // 4. Logo loading
