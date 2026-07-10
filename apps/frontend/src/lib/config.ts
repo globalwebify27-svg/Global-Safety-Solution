@@ -1,3 +1,4 @@
+// Trigger Vercel build to apply environment variables update
 // Hardcoded for production to ensure Vercel doesn't fall back to localhost,
 // but dynamically checks hostname to allow local development testing.
 const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://global-safety-solution.onrender.com';

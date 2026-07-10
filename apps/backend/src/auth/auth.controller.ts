@@ -1,11 +1,16 @@
-import { Controller, Post, Body, UnauthorizedException, Get } from '@nestjs/common';
+import { Controller, Post, Body, UnauthorizedException, Get, UseGuards, Request } from '@nestjs/common';
 import { AuthService } from './auth.service';
+import { UsersService } from '../users/users.service';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private authService: AuthService) {}
+  constructor(
+    private authService: AuthService,
+    private usersService: UsersService,
+  ) {}
 
   @Get('reset-amit')
   async resetAmit() {
@@ -41,5 +46,12 @@ export class AuthController {
       }
       throw e;
     }
+  }
+
+  @Post('change-password')
+  @UseGuards(JwtAuthGuard)
+  changePassword(@Request() req: any, @Body() body: any) {
+    const { currentPassword, newPassword } = body;
+    return this.usersService.changePassword(req.user.userId, currentPassword, newPassword);
   }
 }
