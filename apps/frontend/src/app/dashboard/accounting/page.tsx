@@ -53,6 +53,8 @@ export default function AccountingPage() {
   const token = useAuthStore((state) => state.token);
   const [ledgerStart, setLedgerStart] = useState("");
   const [ledgerEnd, setLedgerEnd] = useState("");
+  const [debitParentId, setDebitParentId] = useState("");
+  const [creditParentId, setCreditParentId] = useState("");
 
   const toggleAccountExpand = (id: string) => setExpandedAccounts(prev => ({ ...prev, [id]: !prev[id] }));
   const accountTypeColor = (type: string) => { if (type === "ASSET") return "bg-blue-500/10 text-blue-500"; if (type === "LIABILITY") return "bg-amber-500/10 text-amber-500"; if (type === "EQUITY") return "bg-purple-500/10 text-purple-500"; if (type === "REVENUE") return "bg-emerald-500/10 text-emerald-500"; return "bg-rose-500/10 text-rose-500"; };
@@ -83,30 +85,8 @@ export default function AccountingPage() {
     });
   };
 
-  const renderVoucherAccountOptions = () => {
-    const options: React.ReactNode[] = [];
-    const topLevel = (accounts || []).filter(a => !a.parent_id || !(accounts || []).some(p => p.id === a.parent_id));
-    
-    topLevel.forEach(parent => {
-      const children = (accounts || []).filter(a => a.parent_id === parent.id);
-      const hasChildren = children.length > 0;
-      
-      options.push(
-        <option key={parent.id} value={parent.code} disabled={hasChildren} className={hasChildren ? "font-bold text-muted-foreground" : ""}>
-          {parent.name} ({parent.code}) {hasChildren ? "— (Group)" : ""}
-        </option>
-      );
-      
-      children.forEach(child => {
-        options.push(
-          <option key={child.id} value={child.code}>
-            &nbsp;&nbsp;↳ {child.name} ({child.code})
-          </option>
-        );
-      });
-    });
-    
-    return options;
+  const getChildrenOf = (parentId: string) => {
+    return (accounts || []).filter(a => a.parent_id === parentId);
   };
 
   const filteredVouchers = (vouchers || []).filter(v => {
@@ -179,11 +159,19 @@ export default function AccountingPage() {
   useEffect(() => { if (activeTab === "audit") fetchAuditLog(); }, [activeTab]);
   useEffect(() => { if (drillAccount) fetchAccountLedger(drillAccount); }, [drillAccount, drillStart, drillEnd]);
 
+  useEffect(() => {
+    if (!openVoucherDialog) {
+      setDebitParentId("");
+      setCreditParentId("");
+      setVoucherForm({ debit_code: "", credit_code: "", amount: "", description: "", transaction_date: new Date().toISOString().split("T")[0] });
+    }
+  }, [openVoucherDialog]);
+
   const handleCreateVoucher = async (e: React.FormEvent) => {
     e.preventDefault(); if (!token || !voucherForm.debit_code || !voucherForm.credit_code || !voucherForm.amount || !voucherForm.description) { toast.error("Fill all fields."); return; }
     try {
       const res = await fetch(`${API_BASE_URL}/accounting/vouchers`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ debit_code: voucherForm.debit_code, credit_code: voucherForm.credit_code, amount: parseFloat(voucherForm.amount), description: voucherForm.description, transaction_date: voucherForm.transaction_date }) });
-      if (res.ok) { toast.success("Voucher posted!"); setOpenVoucherDialog(false); setVoucherForm({ debit_code: "", credit_code: "", amount: "", description: "", transaction_date: new Date().toISOString().split("T")[0] }); fetchAccountsAndVouchers(); }
+      if (res.ok) { toast.success("Voucher posted!"); setOpenVoucherDialog(false); setVoucherForm({ debit_code: "", credit_code: "", amount: "", description: "", transaction_date: new Date().toISOString().split("T")[0] }); setDebitParentId(""); setCreditParentId(""); fetchAccountsAndVouchers(); }
       else { const err = await res.json(); toast.error(err.message || "Failed."); }
     } catch { toast.error("Network error."); }
   };
@@ -524,17 +512,81 @@ export default function AccountingPage() {
               <DialogHeader><DialogTitle className="text-lg sm:text-xl font-bold">New Journal Voucher (JV)</DialogTitle><DialogDescription className="text-xs sm:text-sm">Record a custom double-entry ledger voucher.</DialogDescription></DialogHeader>
               <form onSubmit={handleCreateVoucher} className="space-y-3 sm:space-y-4 py-2 sm:py-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                  <div className="space-y-1"><Label className="text-xs sm:text-sm">Debit Account (Dr.)</Label>
-                    <select value={voucherForm.debit_code} onChange={(e) => setVoucherForm({ ...voucherForm, debit_code: e.target.value })} className="w-full h-9 sm:h-10 px-3 rounded-lg border border-border bg-background text-foreground text-xs sm:text-sm">
-                      <option value="">Select Account</option>
-                      {renderVoucherAccountOptions()}
+                  <div className="space-y-1">
+                    <Label className="text-xs sm:text-sm">Debit Account (Dr.)</Label>
+                    <select
+                      value={debitParentId}
+                      onChange={(e) => {
+                        const pId = e.target.value;
+                        setDebitParentId(pId);
+                        const acc = (accounts || []).find(a => a.id === pId);
+                        const kids = getChildrenOf(pId);
+                        if (kids.length === 0) {
+                          setVoucherForm({ ...voucherForm, debit_code: acc ? acc.code : "" });
+                        } else {
+                          setVoucherForm({ ...voucherForm, debit_code: "" });
+                        }
+                      }}
+                      className="w-full h-9 sm:h-10 px-3 rounded-lg border border-border bg-background text-foreground text-xs sm:text-sm"
+                    >
+                      <option value="">Select Account Head</option>
+                      {(accounts || []).filter(a => !a.parent_id || !(accounts || []).some(p => p.id === a.parent_id)).map(a => (
+                        <option key={a.id} value={a.id}>{a.name} ({a.code})</option>
+                      ))}
                     </select>
+                    {debitParentId && getChildrenOf(debitParentId).length > 0 && (
+                      <div className="space-y-1 mt-2">
+                        <Label className="text-xs sm:text-sm text-indigo-500">Select Debit Sub-head</Label>
+                        <select
+                          value={voucherForm.debit_code}
+                          onChange={(e) => setVoucherForm({ ...voucherForm, debit_code: e.target.value })}
+                          className="w-full h-9 sm:h-10 px-3 rounded-lg border border-indigo-500/50 bg-background text-foreground text-xs sm:text-sm font-medium"
+                        >
+                          <option value="">Select Sub-head</option>
+                          {getChildrenOf(debitParentId).map(a => (
+                            <option key={a.id} value={a.code}>↳ {a.name} ({a.code})</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
                   </div>
-                  <div className="space-y-1"><Label className="text-xs sm:text-sm">Credit Account (Cr.)</Label>
-                    <select value={voucherForm.credit_code} onChange={(e) => setVoucherForm({ ...voucherForm, credit_code: e.target.value })} className="w-full h-9 sm:h-10 px-3 rounded-lg border border-border bg-background text-foreground text-xs sm:text-sm">
-                      <option value="">Select Account</option>
-                      {renderVoucherAccountOptions()}
+                  <div className="space-y-1">
+                    <Label className="text-xs sm:text-sm">Credit Account (Cr.)</Label>
+                    <select
+                      value={creditParentId}
+                      onChange={(e) => {
+                        const pId = e.target.value;
+                        setCreditParentId(pId);
+                        const acc = (accounts || []).find(a => a.id === pId);
+                        const kids = getChildrenOf(pId);
+                        if (kids.length === 0) {
+                          setVoucherForm({ ...voucherForm, credit_code: acc ? acc.code : "" });
+                        } else {
+                          setVoucherForm({ ...voucherForm, credit_code: "" });
+                        }
+                      }}
+                      className="w-full h-9 sm:h-10 px-3 rounded-lg border border-border bg-background text-foreground text-xs sm:text-sm"
+                    >
+                      <option value="">Select Account Head</option>
+                      {(accounts || []).filter(a => !a.parent_id || !(accounts || []).some(p => p.id === a.parent_id)).map(a => (
+                        <option key={a.id} value={a.id}>{a.name} ({a.code})</option>
+                      ))}
                     </select>
+                    {creditParentId && getChildrenOf(creditParentId).length > 0 && (
+                      <div className="space-y-1 mt-2">
+                        <Label className="text-xs sm:text-sm text-indigo-500">Select Credit Sub-head</Label>
+                        <select
+                          value={voucherForm.credit_code}
+                          onChange={(e) => setVoucherForm({ ...voucherForm, credit_code: e.target.value })}
+                          className="w-full h-9 sm:h-10 px-3 rounded-lg border border-indigo-500/50 bg-background text-foreground text-xs sm:text-sm font-medium"
+                        >
+                          <option value="">Select Sub-head</option>
+                          {getChildrenOf(creditParentId).map(a => (
+                            <option key={a.id} value={a.code}>↳ {a.name} ({a.code})</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
