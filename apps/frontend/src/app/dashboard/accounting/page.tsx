@@ -83,6 +83,32 @@ export default function AccountingPage() {
     });
   };
 
+  const renderVoucherAccountOptions = () => {
+    const options: React.ReactNode[] = [];
+    const topLevel = (accounts || []).filter(a => !a.parent_id || !(accounts || []).some(p => p.id === a.parent_id));
+    
+    topLevel.forEach(parent => {
+      const children = (accounts || []).filter(a => a.parent_id === parent.id);
+      const hasChildren = children.length > 0;
+      
+      options.push(
+        <option key={parent.id} value={parent.code} disabled={hasChildren} className={hasChildren ? "font-bold text-muted-foreground" : ""}>
+          {parent.name} ({parent.code}) {hasChildren ? "— (Group)" : ""}
+        </option>
+      );
+      
+      children.forEach(child => {
+        options.push(
+          <option key={child.id} value={child.code}>
+            &nbsp;&nbsp;↳ {child.name} ({child.code})
+          </option>
+        );
+      });
+    });
+    
+    return options;
+  };
+
   const filteredVouchers = (vouchers || []).filter(v => {
     const textMatch = v.voucher_no.toLowerCase().includes(searchQuery.toLowerCase()) || 
                       v.description.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -501,13 +527,13 @@ export default function AccountingPage() {
                   <div className="space-y-1"><Label className="text-xs sm:text-sm">Debit Account (Dr.)</Label>
                     <select value={voucherForm.debit_code} onChange={(e) => setVoucherForm({ ...voucherForm, debit_code: e.target.value })} className="w-full h-9 sm:h-10 px-3 rounded-lg border border-border bg-background text-foreground text-xs sm:text-sm">
                       <option value="">Select Account</option>
-                      {(accounts || []).map(a => (<option key={a.id} value={a.code}>{a.name} ({a.code})</option>))}
+                      {renderVoucherAccountOptions()}
                     </select>
                   </div>
                   <div className="space-y-1"><Label className="text-xs sm:text-sm">Credit Account (Cr.)</Label>
                     <select value={voucherForm.credit_code} onChange={(e) => setVoucherForm({ ...voucherForm, credit_code: e.target.value })} className="w-full h-9 sm:h-10 px-3 rounded-lg border border-border bg-background text-foreground text-xs sm:text-sm">
                       <option value="">Select Account</option>
-                      {(accounts || []).map(a => (<option key={a.id} value={a.code}>{a.name} ({a.code})</option>))}
+                      {renderVoucherAccountOptions()}
                     </select>
                   </div>
                 </div>
