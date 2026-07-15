@@ -71,19 +71,44 @@ export default function AccountingPage() {
           <div onClick={() => hasChildren && toggleAccountExpand(parent.id)} className={cn("flex justify-between items-center py-2.5 text-sm border-b border-border/40 font-semibold select-none", hasChildren ? "cursor-pointer hover:bg-accent/5 px-2 -mx-2 rounded-lg transition-colors" : "")}>
             <div className="flex items-center gap-1.5">
               {hasChildren ? (isExpanded ? <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" /> : <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />) : <div className="w-4 h-4 shrink-0" />}
-              <span>{parent.name} ({parent.code})</span>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setDrillAccount(parent);
+                  setDrillStart("");
+                  setDrillEnd("");
+                }}
+                className="hover:text-indigo-500 hover:underline transition-colors text-left"
+              >
+                {parent.name} ({parent.code})
+              </button>
             </div>
             <span className={cn("font-bold shrink-0", colorClass)}>₹{Number(parent.periodBalance || 0).toLocaleString()}</span>
           </div>
           {hasChildren && isExpanded && (
             <div className="pl-6 border-l border-border/60 ml-2 space-y-1 mt-1">
-              {children.map((child: any) => (<div key={child.id} className="flex justify-between items-center py-1.5 text-xs text-muted-foreground border-b border-border/20"><span>{child.name} ({child.code})</span><span className="font-semibold">₹{Number(child.periodBalance || 0).toLocaleString()}</span></div>))}
+              {children.map((child: any) => (
+                <div key={child.id} className="flex justify-between items-center py-1.5 text-xs text-muted-foreground border-b border-border/20">
+                  <button
+                    onClick={() => {
+                      setDrillAccount(child);
+                      setDrillStart("");
+                      setDrillEnd("");
+                    }}
+                    className="hover:text-indigo-500 hover:underline transition-colors text-left font-medium"
+                  >
+                    {child.name} ({child.code})
+                  </button>
+                  <span className="font-semibold">₹{Number(child.periodBalance || 0).toLocaleString()}</span>
+                </div>
+              ))}
             </div>
           )}
         </div>
       );
     });
   };
+
 
   const getChildrenOf = (parentId: string) => {
     return (accounts || []).filter(a => a.parent_id === parentId);
@@ -155,7 +180,7 @@ export default function AccountingPage() {
   }, [token, drillStart, drillEnd]);
 
   useEffect(() => { fetchAccountsAndVouchers(); }, [token]);
-  useEffect(() => { if (activeTab === "reports") { fetchReport(); fetchCashFlow(); } }, [activeTab, reportFilter]);
+  useEffect(() => { if (activeTab === "reports") { fetchReport(); } if (activeTab === "reports" || activeTab === "accounts") { fetchCashFlow(); } }, [activeTab, reportFilter]);
   useEffect(() => { if (activeTab === "audit") fetchAuditLog(); }, [activeTab]);
   useEffect(() => { if (drillAccount) fetchAccountLedger(drillAccount); }, [drillAccount, drillStart, drillEnd]);
 
@@ -189,7 +214,7 @@ export default function AccountingPage() {
     e.preventDefault(); if (!token || !transactionForm.category_id || !transactionForm.bank_account_id || !transactionForm.amount || !transactionForm.description) { toast.error("Fill all fields."); return; }
     try {
       const res = await fetch(`${API_BASE_URL}/accounting/transactions`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ type: transactionForm.type, category_id: transactionForm.category_id, bank_account_id: transactionForm.bank_account_id, amount: parseFloat(transactionForm.amount), description: transactionForm.description, transaction_date: transactionForm.transaction_date }) });
-      if (res.ok) { toast.success("Transaction saved!"); setOpenTransactionDialog(false); setTransactionForm({ type: "EXPENSE", category_id: "", bank_account_id: "", amount: "", description: "", transaction_date: new Date().toISOString().split("T")[0] }); fetchAccountsAndVouchers(); if (activeTab === "reports") { fetchReport(); fetchCashFlow(); } }
+      if (res.ok) { toast.success("Transaction saved!"); setOpenTransactionDialog(false); setTransactionForm({ type: "EXPENSE", category_id: "", bank_account_id: "", amount: "", description: "", transaction_date: new Date().toISOString().split("T")[0] }); fetchAccountsAndVouchers(); if (activeTab === "reports") { fetchReport(); } if (activeTab === "reports" || activeTab === "accounts") { fetchCashFlow(); } }
       else { const err = await res.json(); toast.error(err.message || "Failed."); }
     } catch { toast.error("Network error."); }
   };
@@ -677,10 +702,10 @@ export default function AccountingPage() {
                         {(accounts || []).map(a => (
                           <tr key={a.id} className="hover:bg-accent/5 transition-colors">
                             <td className={cn("py-4 px-6 font-mono font-bold text-indigo-500", a.parent_id ? "pl-8 text-indigo-500/70" : "")}>{a.parent_id && <span className="text-muted-foreground mr-1">↳</span>}{a.code}</td>
-                            <td className={cn("py-4 px-6 font-medium", a.parent_id ? "pl-8 text-muted-foreground text-xs" : "")}><button onClick={() => { setDrillAccount(a); setDrillStart(""); setDrillEnd(""); }} className="hover:text-indigo-500 hover:underline transition-colors text-left">{a.name}</button></td>
+                            <td className={cn("py-4 px-6 font-medium", a.parent_id ? "pl-8 text-muted-foreground text-xs" : "")}>{a.name}</td>
                             <td className="py-4 px-6"><span className={cn("text-xs px-2.5 py-1 rounded-full font-bold", accountTypeColor(a.type))}>{a.type}</span></td>
                             <td className={cn("py-4 px-6 text-right font-black text-base", Number(a.balance) >= 0 ? "text-emerald-500" : "text-rose-500")}>₹{Number(a.balance).toLocaleString()}</td>
-                            <td className="py-4 px-6 text-center"><button onClick={() => { setEditOBAccount(a); setEditOBAmount(String(a.balance)); }} title="Edit Opening Balance" className="p-1.5 rounded-lg hover:bg-indigo-500/10 text-muted-foreground hover:text-indigo-500 transition-colors"><Pencil className="w-3.5 h-3.5" /></button></td>
+                            <td className="py-4 px-6 text-center"><button onClick={() => { setEditOBAccount(a); setEditOBAmount(String(a.balance)); }} title="Edit Opening Balance" className="p-1.5 rounded-lg hover:bg-indigo-500/10 text-muted-foreground hover:text-rose-500 transition-colors"><Pencil className="w-3.5 h-3.5" /></button></td>
                           </tr>
                         ))}
                       </tbody>
@@ -698,7 +723,105 @@ export default function AccountingPage() {
                   </div>
                 </div>
               </div>
-              {drillAccount && (
+              <div className="mt-8">
+                <div className="bg-card border border-border rounded-2xl p-4 sm:p-6 shadow-sm">
+                  <div className="flex items-center justify-between border-b border-border pb-4 mb-6"><h3 className="font-bold text-base sm:text-lg text-cyan-500 uppercase tracking-wider">Cash Flow Statement</h3><Waves className="w-5 h-5 text-cyan-500" /></div>
+                  {cashFlowLoading ? (<div className="flex items-center justify-center py-10"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-cyan-500"></div></div>) : cashFlowData ? (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      {[{ key: "operating", label: "Operating Activities", color: "text-emerald-500", bg: "bg-emerald-500/5 border-emerald-500/20", data: cashFlowData.operating }, { key: "investing", label: "Investing Activities", color: "text-blue-500", bg: "bg-blue-500/5 border-blue-500/20", data: cashFlowData.investing }, { key: "financing", label: "Financing Activities", color: "text-purple-500", bg: "bg-purple-500/5 border-purple-500/20", data: cashFlowData.financing }].map(section => (
+                        <div key={section.key} className={cn("rounded-xl p-4 sm:p-5 border flex flex-col justify-between h-full backdrop-blur-sm transition-all duration-300 hover:shadow-md", section.bg)}>
+                          <div>
+                            <h4 className={cn("text-[10px] sm:text-xs font-black uppercase tracking-wider mb-4 pb-2 border-b border-current/10", section.color)}>{section.label}</h4>
+                            <div className="space-y-3">
+                              {(!section.data || !section.data.items || section.data.items.length === 0) ? (
+                                <div className="py-6 text-center">
+                                  <p className="text-xs text-muted-foreground italic">No activity recorded for this period</p>
+                                </div>
+                              ) : section.data.items.map((item: any, i: number) => (
+                                <div key={i} className="group flex justify-between items-start text-xs py-2 border-b border-border/20 last:border-0 hover:bg-black/5 dark:hover:bg-white/5 px-2 rounded-lg transition-colors">
+                                  <div className="flex-1 pr-3 min-w-0">
+                                    <p className="font-semibold text-foreground truncate text-xs" title={item.description}>{item.description}</p>
+                                    <p className="text-[9px] sm:text-[10px] font-medium text-muted-foreground mt-0.5 tracking-wide uppercase">{item.opposite_account}</p>
+                                  </div>
+                                  <span className={cn("font-bold shrink-0 text-xs tabular-nums mt-0.5", item.amount >= 0 ? "text-emerald-500" : "text-rose-500")}>
+                                    {item.amount >= 0 ? "+" : "-"}₹{Math.abs(item.amount).toLocaleString()}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                          <div className={cn("flex justify-between items-center font-bold text-xs sm:text-sm mt-6 pt-3 border-t border-border/60", section.color)}>
+                            <span className="uppercase tracking-wider text-[10px] sm:text-xs">Total Net Flow</span>
+                            <span className="text-sm sm:text-base tabular-nums">₹{Number(section.data?.total || 0).toLocaleString()}</span>
+                          </div>
+                        </div>
+                      ))}
+                      <div className="md:col-span-3 p-4 sm:p-5 rounded-xl bg-gradient-to-r from-cyan-500/5 to-cyan-500/10 border border-cyan-500/20 flex justify-between items-center shadow-inner">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full bg-cyan-500 animate-pulse" />
+                          <span className="font-black text-[10px] sm:text-xs md:text-sm uppercase tracking-wider text-cyan-600 dark:text-cyan-400">Net Cash Flow (Period)</span>
+                        </div>
+                        <span className={cn("font-black text-base sm:text-xl md:text-2xl tracking-tight tabular-nums", Number(cashFlowData.netCashFlow || 0) >= 0 ? "text-emerald-500" : "text-rose-500")}>
+                          ₹{Number(cashFlowData.netCashFlow || 0).toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+              {editOBAccount && (
+                <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center backdrop-blur-sm px-4" onClick={() => setEditOBAccount(null)}>
+                  <div className="bg-card border border-border rounded-2xl p-4 sm:p-6 w-full max-w-md shadow-2xl" onClick={e => e.stopPropagation()}>
+                    <div className="flex items-center justify-between mb-4"><div><h3 className="font-bold text-base sm:text-lg">Edit Opening Balance</h3><p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">{editOBAccount.name} ({editOBAccount.code})</p></div><button onClick={() => setEditOBAccount(null)} className="p-1.5 rounded-lg hover:bg-rose-500/10 text-muted-foreground hover:text-rose-500 transition-colors"><X className="w-4 h-4" /></button></div>
+                    <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 mb-4"><p className="text-[10px] sm:text-xs text-amber-500 font-medium">Warning: This will reverse the old opening balance entry and create a new one. Both account balance and the ledger entry will be updated.</p></div>
+                    <form onSubmit={handleUpdateOpeningBalance} className="space-y-4">
+                      <div className="space-y-1"><Label className="text-xs sm:text-sm">New Opening Balance (INR)</Label><Input type="number" step="0.01" placeholder="0.00" value={editOBAmount} onChange={e => setEditOBAmount(e.target.value)} className="bg-background border-border h-9 sm:h-10 text-xs sm:text-sm" autoFocus /></div>
+                      <Button type="submit" disabled={editOBLoading} className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold w-full rounded-xl h-10 text-xs sm:text-sm">{editOBLoading ? "Updating..." : "Update Opening Balance"}</Button>
+                    </form>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {activeTab === "reports" && (
+            <>
+              {!drillAccount ? (
+                <div className="space-y-6 sm:space-y-8">
+                  <div className="bg-card border border-border rounded-2xl p-4 sm:p-6 flex flex-col xl:flex-row xl:items-center justify-between gap-4 shadow-sm">
+                    <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-3 sm:gap-4 w-full xl:w-auto">
+                      <div className="flex flex-col gap-1 w-full sm:w-auto"><Label className="text-xs font-bold text-muted-foreground">Reporting Period</Label><select value={reportFilter.period} onChange={(e) => setReportFilter({ ...reportFilter, period: e.target.value as any })} className="h-10 px-3 rounded-xl border border-border bg-background text-xs sm:text-sm text-foreground font-medium w-full"><option value="monthly">Monthly Statement</option><option value="halfyearly">Half Yearly (H1/H2)</option><option value="yearly">Yearly Statement</option></select></div>
+                      {reportFilter.period === "monthly" && (<div className="flex flex-col gap-1 w-full sm:w-auto"><Label className="text-xs font-bold text-muted-foreground">Month</Label><select value={reportFilter.month} onChange={(e) => setReportFilter({ ...reportFilter, month: Number(e.target.value) })} className="h-10 px-3 rounded-xl border border-border bg-background text-xs sm:text-sm text-foreground font-medium w-full">{Array.from({ length: 12 }, (_, i) => (<option key={i} value={i}>{new Date(0, i).toLocaleString("default", { month: "long" })}</option>))}</select></div>)}
+                      <div className="flex flex-col gap-1 w-full sm:w-auto"><Label className="text-xs font-bold text-muted-foreground">Year</Label><select value={reportFilter.year} onChange={(e) => setReportFilter({ ...reportFilter, year: Number(e.target.value) })} className="h-10 px-3 rounded-xl border border-border bg-background text-xs sm:text-sm text-foreground font-medium w-full">{[2025, 2026, 2027].map(y => (<option key={y} value={y}>{y}</option>))}</select></div>
+                    </div>
+                    <div className="flex flex-col sm:grid sm:grid-cols-2 xl:flex xl:flex-row gap-2 w-full xl:w-auto mt-2 xl:mt-0">
+                      <Button onClick={downloadExcelReport} className="bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl h-10 font-bold shadow-md shadow-indigo-500/20 text-xs w-full xl:w-auto"><Download className="w-4 h-4 mr-1.5 shrink-0" /> Audit Excel</Button>
+                      <Button onClick={downloadPDFReport} className="bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl h-10 font-bold shadow-md shadow-emerald-500/20 text-xs w-full xl:w-auto"><Download className="w-4 h-4 mr-1.5 shrink-0" /> Audit PDF</Button>
+                    </div>
+                  </div>
+                  {loadingReport ? (<div className="flex items-center justify-center py-20"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500"></div></div>) : reportData ? (
+                    <div className="space-y-6 sm:space-y-8">
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
+                        <div className="bg-card border border-border rounded-2xl p-4 sm:p-6 space-y-6 shadow-sm">
+                          <div className="flex items-center justify-between border-b border-border pb-4"><h3 className="font-bold text-base sm:text-lg text-indigo-500 uppercase tracking-wider">Profit & Loss</h3><TrendingUp className="w-5 h-5 text-indigo-500" /></div>
+                          <div className="space-y-4">
+                            <div><h4 className="text-[10px] sm:text-xs font-black text-muted-foreground uppercase mb-2">Revenue Streams</h4><div className="space-y-1">{renderCollapsibleAccountRows(reportData.profitAndLoss?.revenues, "REVENUE", "text-emerald-500")}</div><div className="flex justify-between py-3 font-bold text-xs sm:text-sm border-b-2 border-border/80 mt-1"><span>Total Revenue</span><span className="text-emerald-500 underline decoration-double">₹{Number(reportData.profitAndLoss?.totalRevenue || 0).toLocaleString()}</span></div></div>
+                            <div className="pt-4"><h4 className="text-[10px] sm:text-xs font-black text-muted-foreground uppercase mb-2">Operating Expenses</h4><div className="space-y-1">{renderCollapsibleAccountRows(reportData.profitAndLoss?.expenses, "EXPENSE", "text-rose-500")}</div><div className="flex justify-between py-3 font-bold text-xs sm:text-sm border-b-2 border-border/80 mt-1"><span>Total Expenses</span><span className="text-rose-500">₹{Number(reportData.profitAndLoss?.totalExpense || 0).toLocaleString()}</span></div></div>
+                            <div className="p-3 sm:p-4 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex justify-between items-center mt-6"><span className="font-black text-xs sm:text-sm uppercase text-indigo-500">Net Business Profit</span><span className={cn("font-black text-sm sm:text-base underline decoration-double", Number(reportData.profitAndLoss?.netProfit || 0) >= 0 ? "text-emerald-500" : "text-rose-500")}>₹{Number(reportData.profitAndLoss?.netProfit || 0).toLocaleString()}</span></div>
+                          </div>
+                        </div>
+                        <div className="bg-card border border-border rounded-2xl p-4 sm:p-6 space-y-6 shadow-sm">
+                          <div className="flex items-center justify-between border-b border-border pb-4"><h3 className="font-bold text-base sm:text-lg text-teal-500 uppercase tracking-wider">Balance Sheet Summary</h3><DollarSign className="w-5 h-5 text-teal-500" /></div>
+                          <div className="space-y-4">
+                            <div><h4 className="text-[10px] sm:text-xs font-black text-muted-foreground uppercase mb-2">Assets (Dr.)</h4><div className="space-y-1">{renderCollapsibleAccountRows(reportData.balanceSheet?.assets, "ASSET", "text-emerald-500")}</div><div className="flex justify-between py-3 font-bold text-xs sm:text-sm border-b-2 border-border/80 mt-1"><span>Total Assets</span><span className="text-emerald-500 underline decoration-double">₹{Number(reportData.balanceSheet?.totalAssets || 0).toLocaleString()}</span></div></div>
+                            <div className="pt-4"><h4 className="text-[10px] sm:text-xs font-black text-muted-foreground uppercase mb-2">Liabilities & Equity (Cr.)</h4><div className="space-y-1">{renderCollapsibleAccountRows(reportData.balanceSheet?.liabilities, "LIABILITY", "text-rose-500")}{renderCollapsibleAccountRows(reportData.balanceSheet?.equity, "EQUITY", "text-purple-500")}</div><div className="flex justify-between py-3 font-bold text-xs sm:text-sm border-b-2 border-border/80 mt-1"><span>Total Liabilities & Equity</span><span className="text-teal-500 underline decoration-double">₹{(Number(reportData.balanceSheet?.totalLiabilities || 0) + Number(reportData.balanceSheet?.totalEquity || 0)).toLocaleString()}</span></div></div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              ) : (
                 <div className="bg-card border border-indigo-500/30 rounded-2xl shadow-lg overflow-hidden mt-6 sm:mt-8">
                   <div className="p-4 sm:p-5 border-b border-border flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-indigo-500/5">
                     <div><h3 className="font-bold text-sm sm:text-base text-indigo-500">{drillAccount.name} ({drillAccount.code})</h3><p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">Individual account ledger — date-filtered transaction history</p></div>
@@ -744,100 +867,7 @@ export default function AccountingPage() {
                   )}
                 </div>
               )}
-              {editOBAccount && (
-                <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center backdrop-blur-sm px-4" onClick={() => setEditOBAccount(null)}>
-                  <div className="bg-card border border-border rounded-2xl p-4 sm:p-6 w-full max-w-md shadow-2xl" onClick={e => e.stopPropagation()}>
-                    <div className="flex items-center justify-between mb-4"><div><h3 className="font-bold text-base sm:text-lg">Edit Opening Balance</h3><p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">{editOBAccount.name} ({editOBAccount.code})</p></div><button onClick={() => setEditOBAccount(null)} className="p-1.5 rounded-lg hover:bg-rose-500/10 text-muted-foreground hover:text-rose-500 transition-colors"><X className="w-4 h-4" /></button></div>
-                    <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 mb-4"><p className="text-[10px] sm:text-xs text-amber-500 font-medium">Warning: This will reverse the old opening balance entry and create a new one. Both account balance and the ledger entry will be updated.</p></div>
-                    <form onSubmit={handleUpdateOpeningBalance} className="space-y-4">
-                      <div className="space-y-1"><Label className="text-xs sm:text-sm">New Opening Balance (INR)</Label><Input type="number" step="0.01" placeholder="0.00" value={editOBAmount} onChange={e => setEditOBAmount(e.target.value)} className="bg-background border-border h-9 sm:h-10 text-xs sm:text-sm" autoFocus /></div>
-                      <Button type="submit" disabled={editOBLoading} className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold w-full rounded-xl h-10 text-xs sm:text-sm">{editOBLoading ? "Updating..." : "Update Opening Balance"}</Button>
-                    </form>
-                  </div>
-                </div>
-              )}
             </>
-          )}
-
-          {activeTab === "reports" && (
-            <div className="space-y-6 sm:space-y-8">
-              <div className="bg-card border border-border rounded-2xl p-4 sm:p-6 flex flex-col xl:flex-row xl:items-center justify-between gap-4 shadow-sm">
-                <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-3 sm:gap-4 w-full xl:w-auto">
-                  <div className="flex flex-col gap-1 w-full sm:w-auto"><Label className="text-xs font-bold text-muted-foreground">Reporting Period</Label><select value={reportFilter.period} onChange={(e) => setReportFilter({ ...reportFilter, period: e.target.value as any })} className="h-10 px-3 rounded-xl border border-border bg-background text-xs sm:text-sm text-foreground font-medium w-full"><option value="monthly">Monthly Statement</option><option value="halfyearly">Half Yearly (H1/H2)</option><option value="yearly">Yearly Statement</option></select></div>
-                  {reportFilter.period === "monthly" && (<div className="flex flex-col gap-1 w-full sm:w-auto"><Label className="text-xs font-bold text-muted-foreground">Month</Label><select value={reportFilter.month} onChange={(e) => setReportFilter({ ...reportFilter, month: Number(e.target.value) })} className="h-10 px-3 rounded-xl border border-border bg-background text-xs sm:text-sm text-foreground font-medium w-full">{Array.from({ length: 12 }, (_, i) => (<option key={i} value={i}>{new Date(0, i).toLocaleString("default", { month: "long" })}</option>))}</select></div>)}
-                  <div className="flex flex-col gap-1 w-full sm:w-auto"><Label className="text-xs font-bold text-muted-foreground">Year</Label><select value={reportFilter.year} onChange={(e) => setReportFilter({ ...reportFilter, year: Number(e.target.value) })} className="h-10 px-3 rounded-xl border border-border bg-background text-xs sm:text-sm text-foreground font-medium w-full">{[2025, 2026, 2027].map(y => (<option key={y} value={y}>{y}</option>))}</select></div>
-                </div>
-                <div className="flex flex-col sm:grid sm:grid-cols-2 xl:flex xl:flex-row gap-2 w-full xl:w-auto mt-2 xl:mt-0">
-                  <Button onClick={downloadExcelReport} className="bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl h-10 font-bold shadow-md shadow-indigo-500/20 text-xs w-full xl:w-auto"><Download className="w-4 h-4 mr-1.5 shrink-0" /> Audit Excel</Button>
-                  <Button onClick={downloadPDFReport} className="bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl h-10 font-bold shadow-md shadow-emerald-500/20 text-xs w-full xl:w-auto"><Download className="w-4 h-4 mr-1.5 shrink-0" /> Audit PDF</Button>
-                </div>
-              </div>
-              {loadingReport ? (<div className="flex items-center justify-center py-20"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500"></div></div>) : reportData ? (
-                <div className="space-y-6 sm:space-y-8">
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
-                    <div className="bg-card border border-border rounded-2xl p-4 sm:p-6 space-y-6 shadow-sm">
-                      <div className="flex items-center justify-between border-b border-border pb-4"><h3 className="font-bold text-base sm:text-lg text-indigo-500 uppercase tracking-wider">Profit & Loss</h3><TrendingUp className="w-5 h-5 text-indigo-500" /></div>
-                      <div className="space-y-4">
-                        <div><h4 className="text-[10px] sm:text-xs font-black text-muted-foreground uppercase mb-2">Revenue Streams</h4><div className="space-y-1">{renderCollapsibleAccountRows(reportData.profitAndLoss?.revenues, "REVENUE", "text-emerald-500")}</div><div className="flex justify-between py-3 font-bold text-xs sm:text-sm border-b-2 border-border/80 mt-1"><span>Total Revenue</span><span className="text-emerald-500 underline decoration-double">₹{Number(reportData.profitAndLoss?.totalRevenue || 0).toLocaleString()}</span></div></div>
-                        <div className="pt-4"><h4 className="text-[10px] sm:text-xs font-black text-muted-foreground uppercase mb-2">Operating Expenses</h4><div className="space-y-1">{renderCollapsibleAccountRows(reportData.profitAndLoss?.expenses, "EXPENSE", "text-rose-500")}</div><div className="flex justify-between py-3 font-bold text-xs sm:text-sm border-b-2 border-border/80 mt-1"><span>Total Expenses</span><span className="text-rose-500">₹{Number(reportData.profitAndLoss?.totalExpense || 0).toLocaleString()}</span></div></div>
-                        <div className="p-3 sm:p-4 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex justify-between items-center mt-6"><span className="font-black text-xs sm:text-sm uppercase text-indigo-500">Net Business Profit</span><span className={cn("font-black text-sm sm:text-base underline decoration-double", Number(reportData.profitAndLoss?.netProfit || 0) >= 0 ? "text-emerald-500" : "text-rose-500")}>₹{Number(reportData.profitAndLoss?.netProfit || 0).toLocaleString()}</span></div>
-                      </div>
-                    </div>
-                    <div className="bg-card border border-border rounded-2xl p-4 sm:p-6 space-y-6 shadow-sm">
-                      <div className="flex items-center justify-between border-b border-border pb-4"><h3 className="font-bold text-base sm:text-lg text-teal-500 uppercase tracking-wider">Balance Sheet Summary</h3><DollarSign className="w-5 h-5 text-teal-500" /></div>
-                      <div className="space-y-4">
-                        <div><h4 className="text-[10px] sm:text-xs font-black text-muted-foreground uppercase mb-2">Assets (Dr.)</h4><div className="space-y-1">{renderCollapsibleAccountRows(reportData.balanceSheet?.assets, "ASSET", "text-emerald-500")}</div><div className="flex justify-between py-3 font-bold text-xs sm:text-sm border-b-2 border-border/80 mt-1"><span>Total Assets</span><span className="text-emerald-500 underline decoration-double">₹{Number(reportData.balanceSheet?.totalAssets || 0).toLocaleString()}</span></div></div>
-                        <div className="pt-4"><h4 className="text-[10px] sm:text-xs font-black text-muted-foreground uppercase mb-2">Liabilities & Equity (Cr.)</h4><div className="space-y-1">{renderCollapsibleAccountRows(reportData.balanceSheet?.liabilities, "LIABILITY", "text-rose-500")}{renderCollapsibleAccountRows(reportData.balanceSheet?.equity, "EQUITY", "text-purple-500")}</div><div className="flex justify-between py-3 font-bold text-xs sm:text-sm border-b-2 border-border/80 mt-1"><span>Total Liabilities & Equity</span><span className="text-teal-500 underline decoration-double">₹{(Number(reportData.balanceSheet?.totalLiabilities || 0) + Number(reportData.balanceSheet?.totalEquity || 0)).toLocaleString()}</span></div></div>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="bg-card border border-border rounded-2xl p-4 sm:p-6 shadow-sm">
-                    <div className="flex items-center justify-between border-b border-border pb-4 mb-6"><h3 className="font-bold text-base sm:text-lg text-cyan-500 uppercase tracking-wider">Cash Flow Statement</h3><Waves className="w-5 h-5 text-cyan-500" /></div>
-                    {cashFlowLoading ? (<div className="flex items-center justify-center py-10"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-cyan-500"></div></div>) : cashFlowData ? (
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        {[{ key: "operating", label: "Operating Activities", color: "text-emerald-500", bg: "bg-emerald-500/5 border-emerald-500/20", data: cashFlowData.operating }, { key: "investing", label: "Investing Activities", color: "text-blue-500", bg: "bg-blue-500/5 border-blue-500/20", data: cashFlowData.investing }, { key: "financing", label: "Financing Activities", color: "text-purple-500", bg: "bg-purple-500/5 border-purple-500/20", data: cashFlowData.financing }].map(section => (
-                          <div key={section.key} className={cn("rounded-xl p-4 sm:p-5 border flex flex-col justify-between h-full backdrop-blur-sm transition-all duration-300 hover:shadow-md", section.bg)}>
-                            <div>
-                              <h4 className={cn("text-[10px] sm:text-xs font-black uppercase tracking-wider mb-4 pb-2 border-b border-current/10", section.color)}>{section.label}</h4>
-                              <div className="space-y-3">
-                                {(!section.data || !section.data.items || section.data.items.length === 0) ? (
-                                  <div className="py-6 text-center">
-                                    <p className="text-xs text-muted-foreground italic">No activity recorded for this period</p>
-                                  </div>
-                                ) : section.data.items.map((item: any, i: number) => (
-                                  <div key={i} className="group flex justify-between items-start text-xs py-2 border-b border-border/20 last:border-0 hover:bg-black/5 dark:hover:bg-white/5 px-2 rounded-lg transition-colors">
-                                    <div className="flex-1 pr-3 min-w-0">
-                                      <p className="font-semibold text-foreground truncate text-xs" title={item.description}>{item.description}</p>
-                                      <p className="text-[9px] sm:text-[10px] font-medium text-muted-foreground mt-0.5 tracking-wide uppercase">{item.opposite_account}</p>
-                                    </div>
-                                    <span className={cn("font-bold shrink-0 text-xs tabular-nums mt-0.5", item.amount >= 0 ? "text-emerald-500" : "text-rose-500")}>
-                                      {item.amount >= 0 ? "+" : "-"}₹{Math.abs(item.amount).toLocaleString()}
-                                    </span>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                            <div className={cn("flex justify-between items-center font-bold text-xs sm:text-sm mt-6 pt-3 border-t border-border/60", section.color)}>
-                              <span className="uppercase tracking-wider text-[10px] sm:text-xs">Total Net Flow</span>
-                              <span className="text-sm sm:text-base tabular-nums">₹{Number(section.data?.total || 0).toLocaleString()}</span>
-                            </div>
-                          </div>
-                        ))}
-                        <div className="md:col-span-3 p-4 sm:p-5 rounded-xl bg-gradient-to-r from-cyan-500/5 to-cyan-500/10 border border-cyan-500/20 flex justify-between items-center shadow-inner">
-                          <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full bg-cyan-500 animate-pulse" />
-                            <span className="font-black text-[10px] sm:text-xs md:text-sm uppercase tracking-wider text-cyan-600 dark:text-cyan-400">Net Cash Flow (Period)</span>
-                          </div>
-                          <span className={cn("font-black text-base sm:text-xl md:text-2xl tracking-tight tabular-nums", Number(cashFlowData.netCashFlow || 0) >= 0 ? "text-emerald-500" : "text-rose-500")}>
-                            ₹{Number(cashFlowData.netCashFlow || 0).toLocaleString()}
-                          </span>
-                        </div>
-                      </div>
-                    ) : null}
-                  </div>
-                </div>
-              ) : null}
-            </div>
           )}
 
           {activeTab === "trialbalance" && (
