@@ -210,11 +210,17 @@ export default function AssetsPage() {
         resetForm();
         fetchData();
       } else {
-        toast.error("Failed to register asset.");
+        const errData = await res.json().catch(() => ({}));
+        const msg = errData.message || "Failed to register asset.";
+        if (res.status === 409) {
+          toast.error(`Duplicate Asset: An asset with this Tag or Serial Number already exists. Please use a unique Asset Tag and Serial Number.`);
+        } else {
+          toast.error(msg);
+        }
       }
     } catch (e) {
       console.error(e);
-      toast.error("Error creating asset.");
+      toast.error("Network error. Please try again.");
     } finally {
       setSubmitting(false);
     }
