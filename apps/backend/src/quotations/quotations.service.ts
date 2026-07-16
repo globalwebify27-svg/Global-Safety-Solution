@@ -132,24 +132,32 @@ export class QuotationsService {
 
     // Auto-update the Lead to PROPOSAL status and update expected_value
     if (quotation.lead_id) {
-      const lead = await this.prisma.lead.findUnique({ where: { id: quotation.lead_id } });
-      if (lead) {
-        await this.prisma.lead.update({
-          where: { id: lead.id },
-          data: {
-            status: lead.status === 'NEW' || lead.status === 'CONTACTED' || lead.status === 'QUALIFIED' ? 'PROPOSAL' : lead.status,
-            expected_value: Number(lead.expected_value) < totalAmount ? totalAmount : lead.expected_value
-          }
-        });
+      try {
+        const lead = await this.prisma.lead.findUnique({ where: { id: quotation.lead_id } });
+        if (lead) {
+          await this.prisma.lead.update({
+            where: { id: lead.id },
+            data: {
+              status: lead.status === 'NEW' || lead.status === 'CONTACTED' || lead.status === 'QUALIFIED' ? 'PROPOSAL' : lead.status,
+              expected_value: Number(lead.expected_value) < totalAmount ? totalAmount : lead.expected_value
+            }
+          });
+        }
+      } catch (err) {
+        console.warn('[QuoteCreate] Failed to update lead status:', err?.message);
       }
     }
 
-    await this.notificationsService.notifyAdmins(
-      'New Quotation Created',
-      `Quotation ${quoteNumber} has been generated for ${totalAmount.toLocaleString()} INR.`,
-      'INFO',
-      `/dashboard/quotations`,
-    );
+    try {
+      await this.notificationsService.notifyAdmins(
+        'New Quotation Created',
+        `Quotation ${quoteNumber} has been generated for ${totalAmount.toLocaleString()} INR.`,
+        'INFO',
+        `/dashboard/quotations`,
+      );
+    } catch (err) {
+      console.warn('[QuoteCreate] Failed to send admin notification:', err?.message);
+    }
 
     return quotation;
   }
