@@ -10,19 +10,20 @@ import {
   Monitor, 
   Smartphone, 
   Plus, 
-  Search, 
-  Filter, 
   UserPlus, 
   Wrench, 
-  ShieldCheck, 
-  Calendar,
   AlertCircle,
   MoreVertical,
   ArrowRightLeft,
-  Truck,
-  HardDrive,
   Hash,
-  Tag
+  Tag,
+  FileText,
+  Upload,
+  Eye,
+  CheckCircle2,
+  XCircle,
+  Loader2,
+  BanIcon
 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -40,10 +41,13 @@ interface Asset {
   asset_tag: string;
   name: string;
   serial_number?: string;
+  model_number?: string;
   status: string;
   assigned_to?: string;
   assignee?: { name: string; designation?: string };
   purchase_date?: string;
+  calibration_cert_url?: string;
+  invoice_url?: string;
 }
 
 interface User {
@@ -61,8 +65,17 @@ export default function AssetsPage() {
   const [reassignOpen, setReassignOpen] = useState(false);
   const [maintenanceOpen, setMaintenanceOpen] = useState(false);
   const [missingOpen, setMissingOpen] = useState(false);
+  const [notInUseOpen, setNotInUseOpen] = useState(false);
   const [newAssigneeId, setNewAssigneeId] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
+
+  // File upload states
+  const [calibFile, setCalibFile] = useState<File | null>(null);
+  const [invoiceFile, setInvoiceFile] = useState<File | null>(null);
+  const [calibUploading, setCalibUploading] = useState(false);
+  const [invoiceUploading, setInvoiceUploading] = useState(false);
+  const [calibUrl, setCalibUrl] = useState("");
+  const [invoiceUrl, setInvoiceUrl] = useState("");
   
   const token = useAuthStore((state) => state.token);
 
@@ -105,9 +118,78 @@ export default function AssetsPage() {
     }
   };
 
+  const uploadFile = async (
+    file: File,
+    category: string,
+    setUploading: (v: boolean) => void,
+    setUrl: (v: string) => void
+  ) => {
+    if (!token) return;
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("name", file.name);
+      fd.append("category", category);
+      fd.append("file_type", "PDF");
+      fd.append("file_size", String(file.size));
+      const res = await fetch(`${API_BASE_URL}/documents`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: fd,
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setUrl(data.file_url || data.url || "");
+        toast.success("File uploaded successfully!");
+      } else {
+        const errText = await res.text();
+        console.error("Upload error response:", errText);
+        toast.error("File upload failed.");
+      }
+    } catch (e) {
+      console.error(e);
+      toast.error("Upload error.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleCalibFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setCalibFile(file);
+    uploadFile(file, "CALIBRATION_CERT", setCalibUploading, setCalibUrl);
+  };
+
+  const handleInvoiceFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setInvoiceFile(file);
+    uploadFile(file, "ASSET_INVOICE", setInvoiceUploading, setInvoiceUrl);
+  };
+
+  const resetForm = () => {
+    setFormData({ asset_tag: "", name: "", serial_number: "", model_number: "", purchase_date: "", purchase_value: 0, status: "AVAILABLE", assigned_to: "" });
+    setCalibFile(null);
+    setInvoiceFile(null);
+    setCalibUrl("");
+    setInvoiceUrl("");
+  };
+
   const handleCreateAsset = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token) return;
+
+    if (!calibUrl) {
+      toast.error("Calibration Certificate PDF is required.");
+      return;
+    }
+    if (!invoiceUrl) {
+      toast.error("Invoice PDF is required.");
+      return;
+    }
+
     setSubmitting(true);
     try {
       const res = await fetch(`${API_BASE_URL}/assets`, {
@@ -116,15 +198,23 @@ export default function AssetsPage() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify(formData)
+        body: JSON.stringify({
+          ...formData,
+          calibration_cert_url: calibUrl,
+          invoice_url: invoiceUrl,
+        })
       });
       if (res.ok) {
+        toast.success("Asset registered successfully!");
         setOpen(false);
-        setFormData({ asset_tag: "", name: "", serial_number: "", model_number: "", purchase_date: "", purchase_value: 0, status: "AVAILABLE", assigned_to: "" });
+        resetForm();
         fetchData();
+      } else {
+        toast.error("Failed to register asset.");
       }
     } catch (e) {
       console.error(e);
+      toast.error("Error creating asset.");
     } finally {
       setSubmitting(false);
     }
@@ -221,15 +311,111 @@ export default function AssetsPage() {
     }
   };
 
+  const handleMarkNotInUse = async () => {
+    if (!selectedAsset || !token) return;
+    setActionLoading(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/assets/${selectedAsset.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          status: 'NOT_IN_USE',
+          assigned_to: null
+        })
+      });
+      if (res.ok) {
+        toast.success(`Asset marked as Not In Use.`);
+        setNotInUseOpen(false);
+        fetchData();
+      } else {
+        toast.error("Failed to update status.");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Error updating asset.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const getStatusStyle = (status: string) => {
     switch (status) {
       case 'AVAILABLE': return 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 ring-emerald-500/20 shadow-emerald-500/10';
       case 'IN_USE': return 'bg-blue-500/10 text-blue-600 dark:text-blue-400 ring-blue-500/20 shadow-blue-500/10';
       case 'MAINTENANCE': return 'bg-amber-500/10 text-amber-600 dark:text-amber-400 ring-amber-500/20 shadow-amber-500/10';
       case 'RETIRED': return 'bg-rose-500/10 text-rose-600 dark:text-rose-400 ring-rose-500/20 shadow-rose-500/10';
+      case 'NOT_IN_USE': return 'bg-slate-500/10 text-slate-500 dark:text-slate-400 ring-slate-500/20 shadow-slate-500/10';
       default: return 'bg-muted text-muted-foreground ring-border';
     }
   };
+
+  // File upload field component
+  const FileUploadField = ({
+    label,
+    required,
+    file,
+    uploading,
+    uploadedUrl,
+    onChange,
+    accept = ".pdf",
+    icon,
+    color,
+  }: {
+    label: string;
+    required?: boolean;
+    file: File | null;
+    uploading: boolean;
+    uploadedUrl: string;
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+    accept?: string;
+    icon: React.ReactNode;
+    color: string;
+  }) => (
+    <div className="space-y-2">
+      <Label className="flex items-center gap-1.5 text-sm font-semibold">
+        {icon}
+        {label} {required && <span className="text-rose-500">*</span>}
+      </Label>
+      <label className={cn(
+        "relative flex flex-col items-center justify-center w-full h-24 rounded-xl border-2 border-dashed cursor-pointer transition-all",
+        uploadedUrl
+          ? "border-emerald-500/50 bg-emerald-500/5 hover:bg-emerald-500/10"
+          : "border-border bg-background hover:border-primary/40 hover:bg-accent/5"
+      )}>
+        <input
+          type="file"
+          accept={accept}
+          onChange={onChange}
+          className="absolute inset-0 opacity-0 cursor-pointer"
+        />
+        {uploading ? (
+          <div className="flex flex-col items-center gap-1.5">
+            <Loader2 className={`w-6 h-6 animate-spin ${color}`} />
+            <span className="text-xs text-muted-foreground font-medium">Uploading...</span>
+          </div>
+        ) : uploadedUrl ? (
+          <div className="flex flex-col items-center gap-1.5">
+            <CheckCircle2 className="w-6 h-6 text-emerald-500" />
+            <span className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold">
+              {file?.name || "Uploaded"}
+            </span>
+            <span className="text-[10px] text-muted-foreground">Click to replace</span>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center gap-1.5">
+            <Upload className={`w-5 h-5 ${color}`} />
+            <span className="text-xs font-semibold text-muted-foreground">
+              {file ? file.name : "Click to upload PDF"}
+            </span>
+            <span className="text-[10px] text-muted-foreground uppercase tracking-widest">PDF only</span>
+          </div>
+        )}
+      </label>
+    </div>
+  );
 
   return (
     <div className="space-y-8 pb-10">
@@ -241,13 +427,13 @@ export default function AssetsPage() {
           <p className="text-muted-foreground font-medium">Track high-value equipment, IT assets, and operational hardware.</p>
         </div>
 
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) resetForm(); }}>
           <DialogTrigger asChild>
             <Button className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold shadow-xl shadow-indigo-500/20 px-8 h-12 transition-all active:scale-95 border-0">
               <Plus className="w-5 h-5 mr-2" /> Register Asset
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[600px] bg-card border-border text-foreground rounded-[2rem]">
+          <DialogContent className="sm:max-w-[640px] bg-card border-border text-foreground rounded-[2rem] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="text-2xl font-bold">New Enterprise Asset</DialogTitle>
               <DialogDescription className="text-muted-foreground">Record a new physical asset and assign it to personnel.</DialogDescription>
@@ -269,20 +455,18 @@ export default function AssetsPage() {
                   <Input value={formData.serial_number} onChange={(e) => setFormData({...formData, serial_number: e.target.value})} placeholder="SN: 8XJ2K92" className="bg-background border-border text-foreground" />
                 </div>
                 <div className="space-y-2">
+                  <Label>Model Number</Label>
+                  <Input value={formData.model_number} onChange={(e) => setFormData({...formData, model_number: e.target.value})} placeholder="DL-LAT-5520" className="bg-background border-border text-foreground" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
                   <Label>Initial Status</Label>
                   <select value={formData.status} onChange={(e) => setFormData({...formData, status: e.target.value})} className="w-full bg-background border border-border rounded-md h-10 px-3 text-sm text-foreground">
                     <option value="AVAILABLE">AVAILABLE</option>
                     <option value="IN_USE">IN USE</option>
                     <option value="MAINTENANCE">MAINTENANCE</option>
-                  </select>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Assign to Personnel</Label>
-                  <select value={formData.assigned_to} onChange={(e) => setFormData({...formData, assigned_to: e.target.value})} className="w-full bg-background border border-border rounded-md h-10 px-3 text-sm text-foreground">
-                    <option value="">Keep in Central Pool</option>
-                    {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                    <option value="NOT_IN_USE">NOT IN USE</option>
                   </select>
                 </div>
                 <div className="space-y-2">
@@ -290,9 +474,61 @@ export default function AssetsPage() {
                   <Input type="date" value={formData.purchase_date} onChange={(e) => setFormData({...formData, purchase_date: e.target.value})} className="bg-background border-border text-foreground" />
                 </div>
               </div>
-              <DialogFooter className="pt-4">
-                <Button type="submit" disabled={submitting} className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold w-full h-12 shadow-xl shadow-indigo-500/20 border-0">
-                  {submitting ? "Processing..." : "Authorize Registry"}
+              <div className="space-y-2">
+                <Label>Assign to Personnel</Label>
+                <select value={formData.assigned_to} onChange={(e) => setFormData({...formData, assigned_to: e.target.value})} className="w-full bg-background border border-border rounded-md h-10 px-3 text-sm text-foreground">
+                  <option value="">Keep in Central Pool</option>
+                  {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                </select>
+              </div>
+
+              {/* PDF Upload Section */}
+              <div className="border border-border rounded-xl p-4 space-y-4 bg-muted/20">
+                <p className="text-xs font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                  <FileText className="w-3.5 h-3.5" /> Required Documents
+                </p>
+                <div className="grid grid-cols-2 gap-4">
+                  <FileUploadField
+                    label="Calibration Certificate"
+                    required
+                    file={calibFile}
+                    uploading={calibUploading}
+                    uploadedUrl={calibUrl}
+                    onChange={handleCalibFileChange}
+                    icon={<FileText className="w-3.5 h-3.5 text-indigo-500" />}
+                    color="text-indigo-500"
+                  />
+                  <FileUploadField
+                    label="Invoice / Bill"
+                    required
+                    file={invoiceFile}
+                    uploading={invoiceUploading}
+                    uploadedUrl={invoiceUrl}
+                    onChange={handleInvoiceFileChange}
+                    icon={<FileText className="w-3.5 h-3.5 text-violet-500" />}
+                    color="text-violet-500"
+                  />
+                </div>
+                {(!calibUrl || !invoiceUrl) && (
+                  <p className="text-[10px] text-rose-500 font-medium flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3" /> Both PDFs must be uploaded before registering the asset.
+                  </p>
+                )}
+              </div>
+
+              <DialogFooter className="pt-2">
+                <Button
+                  type="submit"
+                  disabled={submitting || calibUploading || invoiceUploading || !calibUrl || !invoiceUrl}
+                  className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold w-full h-12 shadow-xl shadow-indigo-500/20 border-0 disabled:opacity-50"
+                >
+                  {submitting ? (
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Processing...</>
+                  ) : (calibUploading || invoiceUploading) ? (
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Uploading Files...</>
+                  ) : (
+                    "Authorize Registry"
+                  )}
                 </Button>
               </DialogFooter>
             </form>
@@ -300,11 +536,12 @@ export default function AssetsPage() {
         </Dialog>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         {[
           { label: "Tracked Assets", value: assets.length, icon: Tag, color: "text-blue-600 dark:text-blue-400", bg: "bg-blue-500/10" },
           { label: "Currently Assigned", value: assets.filter(a => a.status === 'IN_USE').length, icon: UserPlus, color: "text-indigo-600 dark:text-indigo-400", bg: "bg-indigo-500/10" },
-          { label: "Maintenance Required", value: assets.filter(a => a.status === 'MAINTENANCE').length, icon: Wrench, color: "text-rose-600 dark:text-rose-400", bg: "bg-rose-500/10" }
+          { label: "Maintenance Required", value: assets.filter(a => a.status === 'MAINTENANCE').length, icon: Wrench, color: "text-rose-600 dark:text-rose-400", bg: "bg-rose-500/10" },
+          { label: "Not In Use", value: assets.filter(a => a.status === 'NOT_IN_USE').length, icon: BanIcon, color: "text-slate-500 dark:text-slate-400", bg: "bg-slate-500/10" },
         ].map((stat, i) => (
           <div key={i} className="bg-card/40 border border-border rounded-2xl p-6 flex items-center justify-between shadow-sm backdrop-blur-md hover:border-primary/20 transition-all group">
             <div className="space-y-1">
@@ -328,17 +565,18 @@ export default function AssetsPage() {
                 <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-widest">Assignment</th>
                 <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-widest">Status</th>
                 <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-widest">Purchase Date</th>
+                <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-widest">Documents</th>
                 <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-widest text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {loading ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-muted-foreground italic font-medium">Syncing with hardware registry...</td>
+                  <td colSpan={7} className="px-6 py-12 text-center text-muted-foreground italic font-medium">Syncing with hardware registry...</td>
                 </tr>
               ) : assets.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-muted-foreground italic text-[10px] uppercase font-bold tracking-widest">No assets currently registered.</td>
+                  <td colSpan={7} className="px-6 py-12 text-center text-muted-foreground italic text-[10px] uppercase font-bold tracking-widest">No assets currently registered.</td>
                 </tr>
               ) : assets.map((asset) => (
                 <tr key={asset.id} className="hover:bg-accent/5 transition-colors group">
@@ -375,19 +613,53 @@ export default function AssetsPage() {
                   </td>
                   <td className="px-6 py-5">
                     <span className={cn("px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter ring-1", getStatusStyle(asset.status))}>
-                      {asset.status.replace('_', ' ')}
+                      {asset.status.replace(/_/g, ' ')}
                     </span>
                   </td>
                   <td className="px-6 py-5 text-sm font-medium text-foreground">
                     {asset.purchase_date ? new Date(asset.purchase_date).toLocaleDateString() : 'N/A'}
                   </td>
+                  <td className="px-6 py-5">
+                    <div className="flex items-center gap-2">
+                      {asset.calibration_cert_url ? (
+                        <a
+                          href={asset.calibration_cert_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="View Calibration Certificate"
+                          className="flex items-center gap-1 px-2 py-1 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 text-[10px] font-black uppercase tracking-wider transition-colors"
+                        >
+                          <Eye className="w-3 h-3" /> Calib.
+                        </a>
+                      ) : (
+                        <span className="flex items-center gap-1 px-2 py-1 rounded-lg bg-muted text-muted-foreground text-[10px] font-black uppercase tracking-wider">
+                          <XCircle className="w-3 h-3" /> Calib.
+                        </span>
+                      )}
+                      {asset.invoice_url ? (
+                        <a
+                          href={asset.invoice_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="View Invoice"
+                          className="flex items-center gap-1 px-2 py-1 rounded-lg bg-violet-500/10 hover:bg-violet-500/20 text-violet-600 dark:text-violet-400 text-[10px] font-black uppercase tracking-wider transition-colors"
+                        >
+                          <Eye className="w-3 h-3" /> Invoice
+                        </a>
+                      ) : (
+                        <span className="flex items-center gap-1 px-2 py-1 rounded-lg bg-muted text-muted-foreground text-[10px] font-black uppercase tracking-wider">
+                          <XCircle className="w-3 h-3" /> Invoice
+                        </span>
+                      )}
+                    </div>
+                  </td>
                   <td className="px-6 py-5 text-right">
                     <div className="flex items-center justify-end gap-2">
-                       <DropdownMenu>
+                      <DropdownMenu>
                         <DropdownMenuTrigger render={<Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground hover:bg-accent/10 rounded-xl" />}>
-                             <MoreVertical className="w-4 h-4" />
+                          <MoreVertical className="w-4 h-4" />
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent className="bg-card border-border text-foreground min-w-[180px] shadow-2xl rounded-xl p-2">
+                        <DropdownMenuContent className="bg-card border-border text-foreground min-w-[190px] shadow-2xl rounded-xl p-2">
                           <DropdownMenuItem 
                             onClick={() => {
                               setSelectedAsset(asset);
@@ -410,9 +682,18 @@ export default function AssetsPage() {
                           <DropdownMenuItem 
                             onClick={() => {
                               setSelectedAsset(asset);
+                              setNotInUseOpen(true);
+                            }}
+                            className="hover:bg-slate-500/10 text-slate-500 dark:text-slate-400 cursor-pointer flex items-center gap-3 py-3 rounded-xl font-bold text-sm mt-1 border-t border-border"
+                          >
+                            <BanIcon className="w-4 h-4" /> Mark Not In Use
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            onClick={() => {
+                              setSelectedAsset(asset);
                               setMissingOpen(true);
                             }}
-                            className="hover:bg-rose-500/10 text-rose-600 dark:text-rose-400 cursor-pointer flex items-center gap-3 py-3 rounded-xl font-bold text-sm mt-1 border-t border-border"
+                            className="hover:bg-rose-500/10 text-rose-600 dark:text-rose-400 cursor-pointer flex items-center gap-3 py-3 rounded-xl font-bold text-sm border-t border-border"
                           >
                             <AlertCircle className="w-4 h-4" /> Report Missing
                           </DropdownMenuItem>
@@ -486,6 +767,35 @@ export default function AssetsPage() {
             </Button>
             <Button type="button" onClick={handleScheduleMaintenance} disabled={actionLoading} className="bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl px-6 border-0 shadow-lg shadow-amber-500/20">
               {actionLoading ? "Scheduling..." : "Proceed with Maintenance"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Not In Use Dialog */}
+      <Dialog open={notInUseOpen} onOpenChange={setNotInUseOpen}>
+        <DialogContent className="sm:max-w-[480px] bg-card border-border text-foreground rounded-[2rem] p-6 z-[9999] transform-gpu isolate">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold flex items-center gap-2">
+              <BanIcon className="w-5 h-5 text-slate-500" /> Mark as Not In Use
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground">
+              Set <strong className="text-foreground">{selectedAsset?.name}</strong> to Not In Use status?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4 text-sm text-muted-foreground">
+            <p>This action will:</p>
+            <ul className="list-disc pl-5 space-y-1">
+              <li>Set status to <span className="text-slate-500 font-bold">NOT IN USE</span>.</li>
+              <li>Revoke current personnel assignment and return to Central Pool.</li>
+            </ul>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button type="button" variant="ghost" onClick={() => setNotInUseOpen(false)} className="rounded-xl font-bold border-0">
+              Cancel
+            </Button>
+            <Button type="button" onClick={handleMarkNotInUse} disabled={actionLoading} className="bg-slate-600 hover:bg-slate-500 text-white font-bold rounded-xl px-6 border-0 shadow-lg shadow-slate-500/20">
+              {actionLoading ? "Updating..." : "Confirm Not In Use"}
             </Button>
           </DialogFooter>
         </DialogContent>

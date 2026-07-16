@@ -598,6 +598,8 @@ model Asset {
   last_maintenance DateTime? @db.DateTime(6)
   created_at       DateTime  @default(now()) @db.DateTime(6)
   updated_at       DateTime  @updatedAt @db.DateTime(6)
+  calibration_cert_url String?   @db.Text
+  invoice_url          String?   @db.Text
   assignee         User?     @relation("AssetAssignee", fields: [assigned_to], references: [id])
 
   @@index([assigned_to], map: "assets_assigned_to_fkey")

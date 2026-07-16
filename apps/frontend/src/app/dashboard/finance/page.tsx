@@ -61,6 +61,21 @@ interface InvoiceItem {
   total: number;
 }
 
+interface Quotation {
+  id: string;
+  quote_number: string;
+  total_amount: number;
+  status: string;
+  date: string;
+  lead_id?: string;
+  client_id?: string;
+  lead?: { company_name: string; contact_person?: string; client_id?: string };
+  client?: { name: string };
+  items?: any[];
+  notes?: string | null;
+  invoice?: any;
+}
+
 interface Invoice {
   id: string;
   invoice_number: string;
@@ -91,13 +106,16 @@ export default function FinancePage() {
   const [openPaymentDialog, setOpenPaymentDialog] = useState(false);
   const [openNewInvoiceDialog, setOpenNewInvoiceDialog] = useState(false);
   const [clients, setClients] = useState<Client[]>([]);
+  const [quotations, setQuotations] = useState<Quotation[]>([]);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [openViewDetailsDialog, setOpenViewDetailsDialog] = useState(false);
   const [openModifyInvoiceDialog, setOpenModifyInvoiceDialog] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [error, setError] = useState<string | null>(null);
   
   const [invoiceForm, setInvoiceForm] = useState({
     client_id: "",
+    quotation_id: "",
     invoice_number: "",
     invoice_date: new Date().toISOString().split('T')[0],
     due_date: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
@@ -127,6 +145,7 @@ export default function FinancePage() {
   useEffect(() => {
     fetchInvoices();
     fetchClients();
+    fetchQuotations();
   }, [token]);
 
   const fetchClients = async () => {
@@ -137,6 +156,19 @@ export default function FinancePage() {
       });
       const data = await res.json();
       if (Array.isArray(data)) setClients(data);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const fetchQuotations = async () => {
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/quotations`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (Array.isArray(data)) setQuotations(data);
     } catch (e) {
       console.error(e);
     }
@@ -451,6 +483,7 @@ export default function FinancePage() {
 
       const payload: any = {
         client_id: invoiceForm.client_id,
+        quotation_id: invoiceForm.quotation_id || undefined,
         due_date: new Date(invoiceForm.due_date).toISOString(),
         subtotal: totalAmount,
         total_amount: totalAmount,
@@ -478,10 +511,12 @@ export default function FinancePage() {
           inv.status !== 'VOID'
         );
         if (duplicateInvoice) {
-          alert(`Duplicate Invoice Found!\n\nA similar invoice (${duplicateInvoice.invoice_number}) for ₹${totalAmount.toLocaleString()} already exists for this client.`);
+          setError(`A similar invoice (${duplicateInvoice.invoice_number}) for Rs.${totalAmount.toLocaleString()} already exists for this client.`);
           return;
         }
       }
+
+      setError(null);
 
       const res = await fetch(`${API_BASE_URL}/invoices`, {
         method: 'POST',
@@ -491,8 +526,10 @@ export default function FinancePage() {
 
       if (res.ok) {
         setOpenNewInvoiceDialog(false);
+        setError(null);
         setInvoiceForm({
           client_id: "",
+          quotation_id: "",
           invoice_number: "",
           invoice_date: new Date().toISOString().split('T')[0],
           due_date: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
@@ -502,6 +539,9 @@ export default function FinancePage() {
           items: [{ description: "", quantity: 1, unit_price: 0 }]
         });
         fetchInvoices();
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        setError(errData.message || "Failed to generate invoice");
       }
     } catch (err) {
       console.error(err);
@@ -799,6 +839,7 @@ export default function FinancePage() {
                                  setSelectedInvoice(invoice);
                                  setInvoiceForm({
                                    client_id: invoice.client_id,
+                                   quotation_id: (invoice as any).quotation_id || "",
                                    invoice_number: invoice.invoice_number,
                                    invoice_date: invoice.date ? new Date(invoice.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
                                    due_date: new Date(invoice.due_date).toISOString().split('T')[0],
@@ -913,8 +954,10 @@ export default function FinancePage() {
         </DialogContent>
       </Dialog>
 
-      {/* New Manual Invoice Dialog */}
-      <Dialog open={openNewInvoiceDialog} onOpenChange={setOpenNewInvoiceDialog}>
+      <Dialog open={openNewInvoiceDialog} onOpenChange={(open) => {
+        setOpenNewInvoiceDialog(open);
+        if (!open) setError(null);
+      }}>
         <DialogContent className="sm:max-w-[700px] bg-card border-border text-foreground shadow-2xl rounded-[2.5rem] max-h-[90vh] overflow-y-auto">
           <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-emerald-500 to-teal-500" />
           <DialogHeader>
@@ -927,6 +970,15 @@ export default function FinancePage() {
           </DialogHeader>
 
           <form onSubmit={handleCreateManualInvoice} className="space-y-6 mt-6">
+            {error && (
+              <div className="bg-rose-500/10 border border-rose-500/20 text-rose-500 p-4 rounded-2xl flex items-start gap-3 animate-in fade-in slide-in-from-top-4 duration-300">
+                <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <p className="text-sm font-bold">Duplicate Invoice Blocked</p>
+                  <p className="text-xs font-medium leading-relaxed">{error}</p>
+                </div>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Select Client *</Label>
@@ -953,6 +1005,47 @@ export default function FinancePage() {
                 />
               </div>
             </div>
+
+            {invoiceForm.client_id && (
+              <div className="space-y-2">
+                <Label className="text-xs font-black uppercase tracking-widest text-indigo-500">Select Quotation (Auto-fill Items)</Label>
+                <select 
+                  value={invoiceForm.quotation_id}
+                  onChange={(e) => {
+                    const qid = e.target.value;
+                    const selectedQ = quotations.find(q => q.id === qid);
+                    if (selectedQ) {
+                      setInvoiceForm({
+                        ...invoiceForm,
+                        quotation_id: qid,
+                        notes: selectedQ.notes || "",
+                        items: selectedQ.items && selectedQ.items.length > 0 
+                          ? selectedQ.items.map((item: any) => ({
+                              description: item.description,
+                              quantity: Number(item.quantity),
+                              unit_price: Number(item.unit_price)
+                            }))
+                          : [{ description: "", quantity: 1, unit_price: "" as any }]
+                      });
+                    } else {
+                      setInvoiceForm({
+                        ...invoiceForm,
+                        quotation_id: "",
+                        items: [{ description: "", quantity: 1, unit_price: "" as any }]
+                      });
+                    }
+                  }}
+                  className="w-full h-11 px-4 bg-background border border-indigo-500/30 rounded-xl text-sm font-bold focus:ring-2 focus:ring-indigo-500 focus:outline-none appearance-none"
+                >
+                  <option value="">Choose a quotation...</option>
+                  {quotations
+                    .filter(q => (q.client_id === invoiceForm.client_id || q.lead?.client_id === invoiceForm.client_id) && !q.invoice)
+                    .map(q => (
+                      <option key={q.id} value={q.id}>{q.quote_number} (Rs.{Number(q.total_amount).toLocaleString()}) - {q.status}</option>
+                    ))}
+                </select>
+              </div>
+            )}
 
             {/* Manual Invoice No. & Date */}
             <div className="grid grid-cols-2 gap-4 bg-muted/20 p-4 rounded-2xl border border-border/50">

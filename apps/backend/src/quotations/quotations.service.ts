@@ -53,6 +53,7 @@ export class QuotationsService {
         items: true,
         lead: true,
         client: true,
+        invoice: true,
       },
       orderBy: { created_at: 'desc' },
     });
