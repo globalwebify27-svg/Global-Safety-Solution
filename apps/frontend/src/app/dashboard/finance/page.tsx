@@ -247,187 +247,199 @@ export default function FinancePage() {
 
   const generatePDF = (invoice: Invoice) => {
     const doc = new jsPDF();
+    const img = new Image();
+    img.src = '/logo.png';
     
-    // Header - Left Side: Company Name & Slogan
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(18);
-    doc.setTextColor(0, 0, 0);
-    doc.text("GLOBAL SAFETY SOLUTION", 20, 20);
-    
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8.5);
-    doc.setTextColor(80);
-    doc.text("2nd Floor Shop No. 51 G.E.L. Church shopping Complex Main Road", 20, 26);
-    doc.text("Ranchi, Jharkhand - 834001, India", 20, 31);
-    doc.text("Phone: +91 6201186550 | Email: info@globalsafetysolution.com", 20, 36);
-    doc.text("GSTIN: 20BILPA8494E1ZE | State: 20-Jharkhand", 20, 41);
+    const drawContent = (includeLogo: boolean) => {
+      if (includeLogo) {
+        // Draw Logo on top right (x=160, y=12, width=30, height=30)
+        doc.addImage(img, 'PNG', 160, 12, 30, 30);
+      }
+      
+      // Header - Left Side: Company Name & Slogan
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(18);
+      doc.setTextColor(0, 0, 0);
+      doc.text("GLOBAL SAFETY SOLUTION", 20, 20);
+      
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8.5);
+      doc.setTextColor(80);
+      doc.text("2nd Floor Shop No. 51 G.E.L. Church shopping Complex Main Road", 20, 26);
+      doc.text("Ranchi, Jharkhand - 834001, India", 20, 31);
+      doc.text("Phone: +91 6201186550 | Email: info@globalsafetysolution.com", 20, 36);
+      doc.text("GSTIN: 20BILPA8494E1ZE | State: 20-Jharkhand", 20, 41);
 
-    // Header Divider
-    doc.setDrawColor(3, 105, 161); // Corporate Sky-700 Blue
-    doc.setLineWidth(1.5);
-    doc.line(20, 46, 190, 46);
+      // Header Divider
+      doc.setDrawColor(3, 105, 161); // Corporate Sky-700 Blue
+      doc.setLineWidth(1.5);
+      doc.line(20, 46, 190, 46);
 
-    // Title: Tax Invoice
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(14);
-    doc.setTextColor(3, 105, 161);
-    doc.text("Tax Invoice", 105, 54, { align: "center" });
+      // Title: Tax Invoice
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(14);
+      doc.setTextColor(3, 105, 161);
+      doc.text("Tax Invoice", 105, 54, { align: "center" });
 
-    // Bill To & Invoice Info Grid
-    doc.setDrawColor(220, 220, 220);
-    doc.setLineWidth(0.5);
-    doc.line(20, 58, 190, 58);
+      // Bill To & Invoice Info Grid
+      doc.setDrawColor(220, 220, 220);
+      doc.setLineWidth(0.5);
+      doc.line(20, 58, 190, 58);
 
-    // Bill To (Left side)
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(9);
-    doc.setTextColor(100);
-    doc.text("Bill To:", 20, 64);
-    
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(10.5);
-    doc.setTextColor(0);
-    doc.text(invoice.client?.name || "N/A", 20, 70);
+      // Bill To (Left side)
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9);
+      doc.setTextColor(100);
+      doc.text("Bill To:", 20, 64);
+      
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10.5);
+      doc.setTextColor(0);
+      doc.text(invoice.client?.name || "N/A", 20, 70);
 
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8.5);
-    doc.setTextColor(50);
-    const clientAddress = [
-      invoice.client?.billing_address,
-      invoice.client?.city,
-      invoice.client?.state,
-      invoice.client?.country,
-      invoice.client?.pincode ? `Pin - ${invoice.client?.pincode}` : ""
-    ].filter(Boolean).join(", ");
-    
-    // Split long addresses
-    const splitAddress = doc.splitTextToSize(clientAddress, 85);
-    doc.text(splitAddress, 20, 75);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8.5);
+      doc.setTextColor(50);
+      const clientAddress = [
+        invoice.client?.billing_address,
+        invoice.client?.city,
+        invoice.client?.state,
+        invoice.client?.country,
+        invoice.client?.pincode ? `Pin - ${invoice.client?.pincode}` : ""
+      ].filter(Boolean).join(", ");
+      
+      // Split long addresses
+      const splitAddress = doc.splitTextToSize(clientAddress, 85);
+      doc.text(splitAddress, 20, 75);
 
-    const addressHeight = splitAddress.length * 4.5;
-    doc.text(`Contact: ${invoice.client?.phone || "—"}`, 20, 75 + addressHeight + 2);
-    doc.text(`GSTIN: ${invoice.client?.gst_number || "—"}`, 20, 75 + addressHeight + 7);
-    doc.text(`State: ${invoice.client?.state || "—"}`, 20, 75 + addressHeight + 12);
+      const addressHeight = splitAddress.length * 4.5;
+      doc.text(`Contact: ${invoice.client?.phone || "—"}`, 20, 75 + addressHeight + 2);
+      doc.text(`GSTIN: ${invoice.client?.gst_number || "—"}`, 20, 75 + addressHeight + 7);
+      doc.text(`State: ${invoice.client?.state || "—"}`, 20, 75 + addressHeight + 12);
 
-    // Invoice Details (Right side)
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(9);
-    doc.setTextColor(100);
-    doc.text("Invoice Details:", 120, 64);
+      // Invoice Details (Right side)
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9);
+      doc.setTextColor(100);
+      doc.text("Invoice Details:", 120, 64);
 
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8.5);
-    doc.setTextColor(50);
-    doc.text(`Invoice No.: ${invoice.invoice_number}`, 120, 70);
-    doc.text(`Date: ${new Date(invoice.date).toLocaleDateString()}`, 120, 75);
-    doc.text(`Due Date: ${invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : "—"}`, 120, 80);
-    doc.text(`Place of Supply: ${invoice.client?.state || "—"}`, 120, 85);
-    if (invoice.po_number) {
-      doc.text(`PO Number: ${invoice.po_number}`, 120, 90);
-    }
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8.5);
+      doc.setTextColor(50);
+      doc.text(`Invoice No.: ${invoice.invoice_number}`, 120, 70);
+      doc.text(`Date: ${new Date(invoice.date).toLocaleDateString()}`, 120, 75);
+      doc.text(`Due Date: ${invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : "—"}`, 120, 80);
+      doc.text(`Place of Supply: ${invoice.client?.state || "—"}`, 120, 85);
+      if (invoice.po_number) {
+        doc.text(`PO Number: ${invoice.po_number}`, 120, 90);
+      }
 
-    const tableStartY = Math.max(75 + addressHeight + 20, 100);
+      const tableStartY = Math.max(75 + addressHeight + 20, 100);
 
-    // Table
-    autoTable(doc, {
-      startY: tableStartY,
-      head: [['#', 'Item Name', 'HSN/SAC', 'Quantity', 'Unit', 'Price/Unit', 'GST', 'Amount']],
-      body: invoice.items.map((item, index) => {
-        const rate = Number(item.unit_price);
-        const qty = Number(item.quantity);
-        const total = rate * qty;
-        return [
-          index + 1,
-          item.description,
-          "84241000",
-          qty,
-          "PCS",
-          `Rs.${rate.toLocaleString()}`,
-          "18.0%",
-          `Rs.${total.toLocaleString()}`
-        ];
-      }),
-      headStyles: { fillColor: [3, 105, 161], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
-      bodyStyles: { fontSize: 8 },
-      columnStyles: {
-        0: { cellWidth: 10, halign: 'center' },
-        1: { cellWidth: 60 },
-        2: { cellWidth: 20, halign: 'center' },
-        3: { cellWidth: 15, halign: 'center' },
-        4: { cellWidth: 15, halign: 'center' },
-        5: { cellWidth: 20, halign: 'right' },
-        6: { cellWidth: 15, halign: 'center' },
-        7: { cellWidth: 25, halign: 'right' }
-      },
-      theme: 'grid',
-    });
+      // Table
+      autoTable(doc, {
+        startY: tableStartY,
+        head: [['#', 'Item Name', 'HSN/SAC', 'Quantity', 'Unit', 'Price/Unit', 'GST', 'Amount']],
+        body: invoice.items.map((item, index) => {
+          const rate = Number(item.unit_price);
+          const qty = Number(item.quantity);
+          const total = rate * qty;
+          return [
+            index + 1,
+            item.description,
+            "84241000",
+            qty,
+            "PCS",
+            `Rs.${rate.toLocaleString()}`,
+            "18.0%",
+            `Rs.${total.toLocaleString()}`
+          ];
+        }),
+        headStyles: { fillColor: [3, 105, 161], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
+        bodyStyles: { fontSize: 8 },
+        columnStyles: {
+          0: { cellWidth: 10, halign: 'center' },
+          1: { cellWidth: 60 },
+          2: { cellWidth: 20, halign: 'center' },
+          3: { cellWidth: 15, halign: 'center' },
+          4: { cellWidth: 15, halign: 'center' },
+          5: { cellWidth: 20, halign: 'right' },
+          6: { cellWidth: 15, halign: 'center' },
+          7: { cellWidth: 25, halign: 'right' }
+        },
+        theme: 'grid',
+      });
 
-    const finalY = (doc as any).lastAutoTable.finalY;
+      const finalY = (doc as any).lastAutoTable.finalY;
 
-    // Totals & Bank Payee / Signatory Info
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8.5);
-    doc.setTextColor(50);
+      // Totals & Bank Payee / Signatory Info
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8.5);
+      doc.setTextColor(50);
 
-    // 1. Bank Payee Info (Bottom Left)
-    const bankY = finalY + 15;
-    doc.setFont("helvetica", "bold");
-    doc.text("Pay To:", 20, bankY);
-    doc.setFont("helvetica", "normal");
-    doc.text("Bank Name: INDUSIND BANK, RANCHI", 20, bankY + 6);
-    doc.text("Bank Account No.: 201002019018", 20, bankY + 11);
-    doc.text("Bank IFSC code: INDB0000030", 20, bankY + 16);
-    doc.text("Account Holder's Name: GLOBAL SAFETY SOLUTION", 20, bankY + 21);
+      // 1. Bank Payee Info (Bottom Left)
+      const bankY = finalY + 15;
+      doc.setFont("helvetica", "bold");
+      doc.text("Pay To:", 20, bankY);
+      doc.setFont("helvetica", "normal");
+      doc.text("Bank Name: INDUSIND BANK, RANCHI", 20, bankY + 6);
+      doc.text("Bank Account No.: 201002019018", 20, bankY + 11);
+      doc.text("Bank IFSC code: INDB0000030", 20, bankY + 16);
+      doc.text("Account Holder's Name: GLOBAL SAFETY SOLUTION", 20, bankY + 21);
 
-    // 2. Calculation Breakdown (Bottom Right)
-    const subtotalVal = Number(invoice.subtotal) || (Number(invoice.total_amount) / 1.18);
-    const taxVal = Number(invoice.tax_amount) || (Number(invoice.total_amount) - subtotalVal);
-    const cgstVal = Number(invoice.cgst) || (taxVal / 2);
-    const sgstVal = Number(invoice.sgst) || (taxVal / 2);
-    const discountVal = Number(invoice.discount) || 0;
+      // 2. Calculation Breakdown (Bottom Right)
+      const subtotalVal = Number(invoice.subtotal) || (Number(invoice.total_amount) / 1.18);
+      const taxVal = Number(invoice.tax_amount) || (Number(invoice.total_amount) - subtotalVal);
+      const cgstVal = Number(invoice.cgst) || (taxVal / 2);
+      const sgstVal = Number(invoice.sgst) || (taxVal / 2);
+      const discountVal = Number(invoice.discount) || 0;
 
-    const calcX = 130;
-    const calcValX = 190;
-    
-    doc.setFont("helvetica", "normal");
-    doc.text("Sub Total:", calcX, bankY);
-    doc.text(`Rs.${subtotalVal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`, calcValX, bankY, { align: "right" });
+      const calcX = 130;
+      const calcValX = 190;
+      
+      doc.setFont("helvetica", "normal");
+      doc.text("Sub Total:", calcX, bankY);
+      doc.text(`Rs.${subtotalVal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`, calcValX, bankY, { align: "right" });
 
-    if (discountVal > 0) {
-      doc.text("Discount:", calcX, bankY + 5);
-      doc.text(`-Rs.${discountVal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`, calcValX, bankY + 5, { align: "right" });
-    }
+      if (discountVal > 0) {
+        doc.text("Discount:", calcX, bankY + 5);
+        doc.text(`-Rs.${discountVal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`, calcValX, bankY + 5, { align: "right" });
+      }
 
-    doc.text("SGST @ 9.0%:", calcX, bankY + 10);
-    doc.text(`Rs.${sgstVal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`, calcValX, bankY + 10, { align: "right" });
-    doc.text("CGST @ 9.0%:", calcX, bankY + 15);
-    doc.text(`Rs.${cgstVal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`, calcValX, bankY + 15, { align: "right" });
+      doc.text("SGST @ 9.0%:", calcX, bankY + 10);
+      doc.text(`Rs.${sgstVal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`, calcValX, bankY + 10, { align: "right" });
+      doc.text("CGST @ 9.0%:", calcX, bankY + 15);
+      doc.text(`Rs.${cgstVal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`, calcValX, bankY + 15, { align: "right" });
 
-    // Round off
-    const roundOffVal = Number(invoice.total_amount) - (subtotalVal - discountVal + cgstVal + sgstVal);
-    doc.text("Round off:", calcX, bankY + 20);
-    doc.text(`${roundOffVal >= 0 ? "+" : "-"}Rs.${Math.abs(roundOffVal).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`, calcValX, bankY + 20, { align: "right" });
+      // Round off
+      const roundOffVal = Number(invoice.total_amount) - (subtotalVal - discountVal + cgstVal + sgstVal);
+      doc.text("Round off:", calcX, bankY + 20);
+      doc.text(`${roundOffVal >= 0 ? "+" : "-"}Rs.${Math.abs(roundOffVal).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`, calcValX, bankY + 20, { align: "right" });
 
-    // Total Amount Box
-    doc.setFillColor(3, 105, 161);
-    doc.rect(calcX - 5, bankY + 24, 65, 8, "F");
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(255, 255, 255);
-    doc.text("Total:", calcX, bankY + 29.5);
-    doc.text(`Rs.${Number(invoice.total_amount).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`, calcValX, bankY + 29.5, { align: "right" });
+      // Total Amount Box
+      doc.setFillColor(3, 105, 161);
+      doc.rect(calcX - 5, bankY + 24, 65, 8, "F");
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(255, 255, 255);
+      doc.text("Total:", calcX, bankY + 29.5);
+      doc.text(`Rs.${Number(invoice.total_amount).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`, calcValX, bankY + 29.5, { align: "right" });
 
-    // 3. Authorized Signatory (Bottom Right)
-    const sigY = bankY + 45;
-    doc.setTextColor(0);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8.5);
-    doc.text("For GLOBAL SAFETY SOLUTION", 190, sigY, { align: "right" });
-    doc.line(130, sigY + 15, 190, sigY + 15);
-    doc.setFont("helvetica", "bold");
-    doc.text("Authorized Signatory", 190, sigY + 20, { align: "right" });
+      // 3. Authorized Signatory (Bottom Right)
+      const sigY = bankY + 45;
+      doc.setTextColor(0);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8.5);
+      doc.text("For GLOBAL SAFETY SOLUTION", 190, sigY, { align: "right" });
+      doc.line(130, sigY + 15, 190, sigY + 15);
+      doc.setFont("helvetica", "bold");
+      doc.text("Authorized Signatory", 190, sigY + 20, { align: "right" });
 
-    // Save
-    doc.save(`${invoice.invoice_number}.pdf`);
+      // Save
+      doc.save(`${invoice.invoice_number}.pdf`);
+    };
+
+    img.onload = () => drawContent(true);
+    img.onerror = () => drawContent(false);
   };
 
   const handleCreateManualInvoice = async (e: React.FormEvent) => {
