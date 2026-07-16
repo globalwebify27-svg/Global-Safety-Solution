@@ -6,10 +6,13 @@ import { API_BASE_URL } from "@/lib/config";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   Plus, Calculator, ArrowUpRight, ArrowDownLeft, Search,
   Download, TrendingUp, DollarSign, ShieldAlert, ChevronDown,
-  ChevronRight, Pencil, X, Activity, Scale, Waves, User
+  ChevronRight, Pencil, X, Activity, Scale, Waves, User,
+  FileSpreadsheet, Banknote
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
@@ -19,7 +22,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 interface Account { id: string; name: string; code: string; type: string; balance: number; parent_id?: string | null; }
-interface Voucher { id: string; voucher_no: string; description: string; amount: number; transaction_date: string; debit_account: Account; credit_account: Account; created_by: string; }
+interface Voucher { id: string; voucher_no: string; description: string; amount: number; transaction_date: string; debit_account: Account; credit_account: Account; created_by: string; invoice_id?: string; payment_id?: string; }
 type TabType = "ledgers" | "accounts" | "reports" | "trialbalance" | "audit";
 
 export default function AccountingPage() {
@@ -51,6 +54,20 @@ export default function AccountingPage() {
   const [loadingReport, setLoadingReport] = useState(false);
   const [expandedAccounts, setExpandedAccounts] = useState<Record<string, boolean>>({});
   const token = useAuthStore((state) => state.token);
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const q = searchParams.get("search");
+    if (q) {
+      setSearchQuery(q);
+    }
+  }, [searchParams]);
+
+  const getInvoiceNumber = (description: string) => {
+    const match = /INV-\d{4}-\d{4}/.exec(description);
+    return match ? match[0] : "";
+  };
+
   const [ledgerStart, setLedgerStart] = useState("");
   const [ledgerEnd, setLedgerEnd] = useState("");
   const [debitParentId, setDebitParentId] = useState("");
@@ -665,9 +682,9 @@ export default function AccountingPage() {
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse min-w-[750px]">
-                  <thead><tr className="bg-accent/5 border-b border-border text-muted-foreground text-xs font-black uppercase tracking-wider"><th className="py-4 px-6">Voucher No</th><th className="py-4 px-6">Date</th><th className="py-4 px-6">Particulars (Dr / Cr)</th><th className="py-4 px-6 text-right">Debit (Dr)</th><th className="py-4 px-6 text-right">Credit (Cr)</th><th className="py-4 px-6">Narration</th><th className="py-4 px-6">Audited By</th></tr></thead>
+                  <thead><tr className="bg-accent/5 border-b border-border text-muted-foreground text-xs font-black uppercase tracking-wider"><th className="py-4 px-6">Voucher No</th><th className="py-4 px-6">Date</th><th className="py-4 px-6">Particulars (Dr / Cr)</th><th className="py-4 px-6 text-right">Debit (Dr)</th><th className="py-4 px-6 text-right">Credit (Cr)</th><th className="py-4 px-6">Narration</th><th className="py-4 px-6">Source</th><th className="py-4 px-6">Audited By</th></tr></thead>
                   <tbody className="divide-y divide-border/60 text-sm">
-                    {filteredVouchers.length === 0 ? (<tr><td colSpan={7} className="py-10 text-center text-muted-foreground italic">No vouchers found.</td></tr>) : filteredVouchers.map(v => (
+                    {filteredVouchers.length === 0 ? (<tr><td colSpan={8} className="py-10 text-center text-muted-foreground italic">No vouchers found.</td></tr>) : filteredVouchers.map(v => (
                       <tr key={v.id} className="hover:bg-accent/5 transition-colors">
                         <td className="py-4 px-6 font-bold text-indigo-500">{v.voucher_no}</td>
                         <td className="py-4 px-6 text-muted-foreground">{new Date(v.transaction_date).toLocaleDateString()}</td>
@@ -675,6 +692,19 @@ export default function AccountingPage() {
                         <td className="py-4 px-6 text-right font-bold text-emerald-500">₹{Number(v.amount).toLocaleString()}</td>
                         <td className="py-4 px-6 text-right font-bold text-rose-500">₹{Number(v.amount).toLocaleString()}</td>
                         <td className="py-4 px-6 text-muted-foreground max-w-xs truncate cursor-help" title={v.description}>{v.description}</td>
+                        <td className="py-4 px-6">
+                          {v.invoice_id ? (
+                            <Link href={`/dashboard/finance?search=${getInvoiceNumber(v.description)}`} className="text-xs font-bold text-indigo-500 hover:underline inline-flex items-center gap-1">
+                              <FileSpreadsheet className="w-3.5 h-3.5 text-indigo-400" /> Invoice
+                            </Link>
+                          ) : v.payment_id ? (
+                            <Link href={`/dashboard/finance?search=${getInvoiceNumber(v.description)}`} className="text-xs font-bold text-emerald-500 hover:underline inline-flex items-center gap-1">
+                              <Banknote className="w-3.5 h-3.5 text-emerald-400" /> Payment
+                            </Link>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                        </td>
                         <td className="py-4 px-6"><div className="flex items-center gap-1.5"><User className="w-3.5 h-3.5 text-indigo-400" /><span className="text-xs font-bold text-indigo-400">{v.created_by}</span></div></td>
                       </tr>
                     ))}
@@ -848,9 +878,9 @@ export default function AccountingPage() {
                   {drillLoading ? (<div className="flex items-center justify-center py-10"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-500"></div></div>) : (
                     <div className="overflow-x-auto">
                       <table className="w-full text-left border-collapse min-w-[700px]">
-                        <thead><tr className="bg-accent/5 border-b border-border text-muted-foreground text-xs font-black uppercase tracking-wider"><th className="py-3 px-5">Voucher No</th><th className="py-3 px-5">Date</th><th className="py-3 px-5">Particulars</th><th className="py-3 px-5 text-right">Debit (Dr)</th><th className="py-3 px-5 text-right">Credit (Cr)</th><th className="py-3 px-5 text-right">Running Balance</th><th className="py-3 px-5">Audited By</th></tr></thead>
+                        <thead><tr className="bg-accent/5 border-b border-border text-muted-foreground text-xs font-black uppercase tracking-wider"><th className="py-3 px-5">Voucher No</th><th className="py-3 px-5">Date</th><th className="py-3 px-5">Particulars</th><th className="py-3 px-5 text-right">Debit (Dr)</th><th className="py-3 px-5 text-right">Credit (Cr)</th><th className="py-3 px-5 text-right">Running Balance</th><th className="py-3 px-5">Source</th><th className="py-3 px-5">Audited By</th></tr></thead>
                         <tbody className="divide-y divide-border/60 text-sm">
-                          {drillEntries.length === 0 ? (<tr><td colSpan={7} className="py-8 text-center text-muted-foreground italic">No transactions found for selected range.</td></tr>) : drillEntries.map((e: any) => (
+                          {drillEntries.length === 0 ? (<tr><td colSpan={8} className="py-8 text-center text-muted-foreground italic">No transactions found for selected range.</td></tr>) : drillEntries.map((e: any) => (
                             <tr key={e.id} className="hover:bg-accent/5 transition-colors">
                               <td className="py-3 px-5 font-bold text-indigo-500 text-xs">{e.voucher_no}</td>
                               <td className="py-3 px-5 text-muted-foreground text-xs">{new Date(e.transaction_date).toLocaleDateString()}</td>
@@ -858,6 +888,19 @@ export default function AccountingPage() {
                               <td className="py-3 px-5 text-right text-xs font-bold text-emerald-500">{e.debit > 0 ? `₹${Number(e.debit).toLocaleString()}` : "—"}</td>
                               <td className="py-3 px-5 text-right text-xs font-bold text-rose-500">{e.credit > 0 ? `₹${Number(e.credit).toLocaleString()}` : "—"}</td>
                               <td className={cn("py-3 px-5 text-right text-xs font-black", e.balance >= 0 ? "text-emerald-500" : "text-rose-500")}>₹{Number(e.balance).toLocaleString()}</td>
+                              <td className="py-3 px-5 text-xs">
+                                {e.invoice_id ? (
+                                  <Link href={`/dashboard/finance?search=${getInvoiceNumber(e.description)}`} className="font-bold text-indigo-500 hover:underline inline-flex items-center gap-1">
+                                    <FileSpreadsheet className="w-3.5 h-3.5 text-indigo-400" /> Invoice
+                                  </Link>
+                                ) : e.payment_id ? (
+                                  <Link href={`/dashboard/finance?search=${getInvoiceNumber(e.description)}`} className="font-bold text-emerald-500 hover:underline inline-flex items-center gap-1">
+                                    <Banknote className="w-3.5 h-3.5 text-emerald-400" /> Payment
+                                  </Link>
+                                ) : (
+                                  <span className="text-muted-foreground">—</span>
+                                )}
+                              </td>
                               <td className="py-3 px-5 text-xs text-indigo-400 font-semibold">{e.created_by}</td>
                             </tr>
                           ))}

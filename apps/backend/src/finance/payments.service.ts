@@ -85,6 +85,8 @@ export class PaymentsService {
         debit_code: '1010', // Bank Current Account
         credit_code: '1200', // Accounts Receivable
         created_by: 'System',
+        invoice_id: invoice.id,
+        payment_id: payment.id,
       });
     } catch (err) {
       console.warn('[Auto-Accounting] Failed to post payment voucher:', err.message);

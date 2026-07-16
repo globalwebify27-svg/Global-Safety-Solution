@@ -77,6 +77,7 @@ function QuotationsContent() {
     lead_id: "",
     client_id: "",
     notes: "",
+    billing_address: "",
     apply_gst: true,
     discount_type: "flat", // "flat" or "percent"
     discount_value: 0,
@@ -114,6 +115,7 @@ function QuotationsContent() {
       lead_id: quote.lead_id || "",
       client_id: quote.client_id || "",
       notes: quote.notes || "",
+      billing_address: quote.billing_address || "",
       apply_gst: Number(quote.tax_amount) > 0,
       discount_type: discountType,
       discount_value: discountValue,
@@ -326,6 +328,7 @@ function QuotationsContent() {
       lead_id: formData.lead_id || undefined,
       client_id: formData.client_id || undefined,
       notes: formData.notes,
+      billing_address: formData.billing_address,
       apply_gst: formData.apply_gst,
       discount: calculateDiscountAmount(),
       items: formData.items
@@ -347,7 +350,7 @@ function QuotationsContent() {
       });
       if (res.ok) {
         setOpen(false);
-        setFormData({ lead_id: "", client_id: "", notes: "", apply_gst: true, discount_type: "flat", discount_value: 0, items: [{ description: "", quantity: 1, unit_price: 0 }] });
+        setFormData({ lead_id: "", client_id: "", notes: "", billing_address: "", apply_gst: true, discount_type: "flat", discount_value: 0, items: [{ description: "", quantity: 1, unit_price: 0 }] });
         setEditMode(false);
         setEditQuoteId(null);
         toast.success(editMode ? "Proposal updated successfully!" : "Quotation generated successfully!");
@@ -391,7 +394,7 @@ function QuotationsContent() {
           <Dialog open={open} onOpenChange={(isOpen) => {
             setOpen(isOpen);
             if (!isOpen) {
-              setFormData({ lead_id: "", client_id: "", notes: "", apply_gst: true, discount_type: "flat", discount_value: 0, items: [{ description: "", quantity: 1, unit_price: 0 }] });
+              setFormData({ lead_id: "", client_id: "", notes: "", billing_address: "", apply_gst: true, discount_type: "flat", discount_value: 0, items: [{ description: "", quantity: 1, unit_price: 0 }] });
               setEditMode(false);
               setEditQuoteId(null);
             }
@@ -412,7 +415,7 @@ function QuotationsContent() {
                       className="w-full bg-background border border-border rounded-xl h-11 px-3 text-sm focus:ring-2 focus:ring-emerald-500 text-foreground"
                       value={formData.lead_id}
                       onChange={(e) => {
-                        setFormData({...formData, lead_id: e.target.value, client_id: ""});
+                        setFormData({...formData, lead_id: e.target.value, client_id: "", billing_address: ""});
                       }}
                       disabled={!!formData.client_id}
                     >
@@ -431,7 +434,20 @@ function QuotationsContent() {
                       className="w-full bg-background border border-border rounded-xl h-11 px-3 text-sm focus:ring-2 focus:ring-emerald-500 text-foreground"
                       value={formData.client_id}
                       onChange={(e) => {
-                        setFormData({...formData, client_id: e.target.value, lead_id: ""});
+                        const cid = e.target.value;
+                        const client = clients.find(c => c.id === cid);
+                        let addr = "";
+                        if (client) {
+                          const parts = [
+                            client.billing_address,
+                            client.city,
+                            client.state,
+                            client.country,
+                            client.pincode
+                          ].filter(Boolean);
+                          addr = parts.join(", ");
+                        }
+                        setFormData({...formData, client_id: cid, lead_id: "", billing_address: addr});
                       }}
                       disabled={!!formData.lead_id}
                     >
@@ -441,6 +457,16 @@ function QuotationsContent() {
                       ))}
                     </select>
                   </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-foreground/80">Billing Address</Label>
+                  <textarea 
+                    placeholder="Enter client billing address..."
+                    className="w-full bg-background border border-border rounded-xl p-3 text-sm focus:ring-2 focus:ring-emerald-500 text-foreground min-h-[80px]"
+                    value={formData.billing_address}
+                    onChange={(e) => setFormData({...formData, billing_address: e.target.value})}
+                  />
                 </div>
   
                 <div className="space-y-4">
@@ -729,6 +755,9 @@ function QuotationsContent() {
                     <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Recipient</p>
                     <div className="text-sm font-bold text-foreground">{selectedQuote.lead?.company_name || selectedQuote.client?.name}</div>
                     <p className="text-xs text-muted-foreground leading-relaxed">{selectedQuote.lead?.contact_person || "Authorized Representative"}</p>
+                    {selectedQuote.billing_address && (
+                      <p className="text-xs text-muted-foreground leading-relaxed whitespace-pre-line mt-1">{selectedQuote.billing_address}</p>
+                    )}
                   </div>
                 </div>
 
@@ -819,6 +848,9 @@ function QuotationsContent() {
                         <h3 style={{ fontSize: '12px', textTransform: 'uppercase', color: '#666', marginBottom: '10px' }}>To:</h3>
                         <p style={{ margin: 0, fontWeight: 'bold' }}>{selectedQuote.lead?.company_name || selectedQuote.client?.name}</p>
                         <p style={{ margin: '5px 0', fontSize: '13px' }}>{selectedQuote.lead?.contact_person || "Authorized Representative"}</p>
+                        {selectedQuote.billing_address && (
+                            <p style={{ margin: '3px 0', fontSize: '12px', color: '#555', whiteSpace: 'pre-line' }}>{selectedQuote.billing_address}</p>
+                        )}
                     </div>
                 </div>
 

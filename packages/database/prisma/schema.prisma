@@ -461,6 +461,7 @@ model Quotation {
   igst         Decimal     @default(0.00) @db.Decimal(15, 2)
   status       String      @default("DRAFT") @db.VarChar(50)
   notes        String?
+  billing_address String?
   created_at   DateTime    @default(now()) @db.DateTime(6)
   updated_at   DateTime    @updatedAt @db.DateTime(6)
   discount     Decimal     @default(0.00) @db.Decimal(15, 2)
@@ -1007,8 +1008,13 @@ model LedgerEntry {
   debit_account     Account  @relation("DebitAccount", fields: [debit_account_id], references: [id])
   credit_account    Account  @relation("CreditAccount", fields: [credit_account_id], references: [id])
 
+  invoice_id        String?  @db.VarChar(36)
+  payment_id        String?  @db.VarChar(36)
+
   @@index([debit_account_id], map: "ledger_entries_debit_account_id_fkey")
   @@index([credit_account_id], map: "ledger_entries_credit_account_id_fkey")
+  @@index([invoice_id], map: "ledger_entries_invoice_id_fkey")
+  @@index([payment_id], map: "ledger_entries_payment_id_fkey")
   @@map("ledger_entries")
 }
 

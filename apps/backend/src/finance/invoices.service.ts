@@ -44,10 +44,18 @@ export class InvoicesService {
       (sum, p) => sum + Number(p.amount),
       0,
     );
+
+    const ledgerEntries = await this.prisma.ledgerEntry.findMany({
+      where: { OR: [{ invoice_id: id }, { payment_id: { in: invoice.payments.map(p => p.id) } }] },
+      include: { debit_account: true, credit_account: true },
+      orderBy: { transaction_date: 'asc' },
+    });
+
     return {
       ...invoice,
       total_paid: totalPaid,
       balance_due: Number(invoice.total_amount) - totalPaid,
+      ledger_entries: ledgerEntries,
     };
   }
 
@@ -128,41 +136,7 @@ export class InvoicesService {
       include: { items: true, client: true },
     });
 
-    try {
-      const clientName = invoice.client?.name || 'Unknown Client';
-      const sub = Number(subtotal);
-      const tax = Number(taxAmount);
-
-      if (tax > 0) {
-        // 1. Post voucher for subtotal (Revenue)
-        await this.accountingService.postVoucher({
-          description: `Auto-generated: Invoice subtotal for ${invoice.invoice_number} (${clientName})`,
-          amount: sub,
-          debit_code: '1200', // Accounts Receivable
-          credit_code: '4000', // Sales Revenue
-          created_by: 'System',
-        });
-
-        // 2. Post voucher for tax (GST / Indirect Tax Payable)
-        await this.accountingService.postVoucher({
-          description: `Auto-generated: GST (Tax) for ${invoice.invoice_number} (${clientName})`,
-          amount: tax,
-          debit_code: '1200', // Accounts Receivable
-          credit_code: '2200', // GST / Indirect Tax Payable
-          created_by: 'System',
-        });
-      } else {
-        await this.accountingService.postVoucher({
-          description: `Auto-generated: Invoice created for ${invoice.invoice_number} (${clientName})`,
-          amount: totalAmount,
-          debit_code: '1200', // Accounts Receivable
-          credit_code: '4000', // Sales Revenue
-          created_by: 'System',
-        });
-      }
-    } catch (err) {
-      console.warn('[Auto-Accounting] Failed to post invoice voucher:', err.message);
-    }
+    await this.syncInvoiceVouchers(invoice.id);
 
     return invoice;
   }
@@ -171,7 +145,7 @@ export class InvoicesService {
     const { items, ...invoiceData } = data;
 
     // Use a transaction to update invoice and its items
-    return this.prisma.$transaction(async (tx) => {
+    const invoice = await this.prisma.$transaction(async (tx) => {
       // 1. Update main invoice data
       const updatedInvoice = await tx.invoice.update({
         where: { id },
@@ -197,16 +171,79 @@ export class InvoicesService {
         include: { items: true },
       });
     });
+
+    await this.syncInvoiceVouchers(id);
+
+    return invoice;
   }
 
   async remove(id: string) {
+    await this.accountingService.deleteVouchersForInvoice(id).catch(console.error);
     return this.prisma.invoice.delete({ where: { id } });
   }
 
   async updateStatus(id: string, status: string) {
-    return this.prisma.invoice.update({
+    const invoice = await this.prisma.invoice.update({
       where: { id },
       data: { status },
     });
+
+    if (status === 'VOID') {
+      await this.accountingService.deleteVouchersForInvoice(id).catch(console.error);
+    } else {
+      await this.syncInvoiceVouchers(id);
+    }
+
+    return invoice;
+  }
+
+  async syncInvoiceVouchers(invoiceId: string) {
+    try {
+      await this.accountingService.deleteVouchersForInvoice(invoiceId);
+
+      const invoice = await this.prisma.invoice.findUnique({
+        where: { id: invoiceId },
+        include: { client: true, items: true },
+      });
+
+      if (!invoice || invoice.status === 'VOID') {
+        return;
+      }
+
+      const clientName = invoice.client?.name || 'Unknown Client';
+      const sub = Number(invoice.subtotal);
+      const tax = Number(invoice.tax_amount);
+
+      if (tax > 0) {
+        await this.accountingService.postVoucher({
+          description: `Auto-generated: Invoice subtotal for ${invoice.invoice_number} (${clientName})`,
+          amount: sub,
+          debit_code: '1200', // Accounts Receivable
+          credit_code: '4000', // Sales Revenue
+          created_by: 'System',
+          invoice_id: invoice.id,
+        });
+
+        await this.accountingService.postVoucher({
+          description: `Auto-generated: GST (Tax) for ${invoice.invoice_number} (${clientName})`,
+          amount: tax,
+          debit_code: '1200', // Accounts Receivable
+          credit_code: '2200', // GST / Indirect Tax Payable
+          created_by: 'System',
+          invoice_id: invoice.id,
+        });
+      } else {
+        await this.accountingService.postVoucher({
+          description: `Auto-generated: Invoice created for ${invoice.invoice_number} (${clientName})`,
+          amount: Number(invoice.total_amount),
+          debit_code: '1200', // Accounts Receivable
+          credit_code: '4000', // Sales Revenue
+          created_by: 'System',
+          invoice_id: invoice.id,
+        });
+      }
+    } catch (err) {
+      console.warn('[Auto-Accounting] Failed to sync invoice vouchers:', err.message);
+    }
   }
 }

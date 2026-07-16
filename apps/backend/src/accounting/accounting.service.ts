@@ -44,7 +44,7 @@ export class AccountingService {
     return this.prisma.account.findUnique({ where: { id: account.id } });
   }
 
-  async postVoucher(data: { description: string; amount: number; debit_code: string; credit_code: string; created_by?: string; transaction_date?: string; }) {
+  async postVoucher(data: { description: string; amount: number; debit_code: string; credit_code: string; created_by?: string; transaction_date?: string; invoice_id?: string; payment_id?: string; }) {
     const amt = Number(data.amount);
     if (isNaN(amt) || amt <= 0) throw new BadRequestException("Invalid amount");
     const debitAcc = await this.prisma.account.findUnique({ where: { code: data.debit_code } });
@@ -57,7 +57,17 @@ export class AccountingService {
       const count = await tx.ledgerEntry.count();
       const voucherNo = `JV-${year}-${String(count + 1).padStart(4, "0")}`;
       const entry = await tx.ledgerEntry.create({
-        data: { voucher_no: voucherNo, description: data.description, amount: amt, debit_account_id: debitAcc.id, credit_account_id: creditAcc.id, created_by: data.created_by || "System", transaction_date: data.transaction_date ? new Date(data.transaction_date) : new Date() },
+        data: { 
+          voucher_no: voucherNo, 
+          description: data.description, 
+          amount: amt, 
+          debit_account_id: debitAcc.id, 
+          credit_account_id: creditAcc.id, 
+          created_by: data.created_by || "System", 
+          transaction_date: data.transaction_date ? new Date(data.transaction_date) : new Date(),
+          invoice_id: data.invoice_id || null,
+          payment_id: data.payment_id || null
+        },
       });
       const debitMult = (debitAcc.type === "ASSET" || debitAcc.type === "EXPENSE") ? 1 : -1;
       await tx.account.update({ where: { id: debitAcc.id }, data: { balance: { increment: amt * debitMult } } });
@@ -89,7 +99,7 @@ export class AccountingService {
       const amt = Number(e.amount);
       const isNormalDebit = account.type === "ASSET" || account.type === "EXPENSE";
       runningBalance += isDebit ? (isNormalDebit ? amt : -amt) : (isNormalDebit ? -amt : amt);
-      return { id: e.id, voucher_no: e.voucher_no, transaction_date: e.transaction_date, description: e.description, debit: isDebit ? amt : 0, credit: !isDebit ? amt : 0, balance: runningBalance, created_by: e.created_by, particulars: isDebit ? e.credit_account.name : e.debit_account.name, particulars_code: isDebit ? e.credit_account.code : e.debit_account.code };
+      return { id: e.id, voucher_no: e.voucher_no, transaction_date: e.transaction_date, description: e.description, debit: isDebit ? amt : 0, credit: !isDebit ? amt : 0, balance: runningBalance, created_by: e.created_by, particulars: isDebit ? e.credit_account.name : e.debit_account.name, particulars_code: isDebit ? e.credit_account.code : e.debit_account.code, invoice_id: e.invoice_id, payment_id: e.payment_id };
     });
     // Reverse the rows so that the newest transaction appears at the top of the UI list
     const newestFirstRows = [...rows].reverse();
@@ -248,5 +258,46 @@ export class AccountingService {
     const debit_code = data.type === "EXPENSE" ? categoryAcc.code : bankAcc.code;
     const credit_code = data.type === "EXPENSE" ? bankAcc.code : categoryAcc.code;
     return this.postVoucher({ description: data.description, amount: data.amount, debit_code, credit_code, created_by: data.created_by, transaction_date: data.transaction_date });
+  }
+
+  async deleteVouchersForInvoice(invoiceId: string) {
+    const entries = await this.prisma.ledgerEntry.findMany({
+      where: { invoice_id: invoiceId },
+      include: { debit_account: true, credit_account: true }
+    });
+    
+    for (const entry of entries) {
+      await this.reverseVoucher(entry);
+    }
+  }
+
+  async deleteVouchersForPayment(paymentId: string) {
+    const entries = await this.prisma.ledgerEntry.findMany({
+      where: { payment_id: paymentId },
+      include: { debit_account: true, credit_account: true }
+    });
+    
+    for (const entry of entries) {
+      await this.reverseVoucher(entry);
+    }
+  }
+
+  private async reverseVoucher(entry: any) {
+    const amt = Number(entry.amount);
+    const debitAcc = entry.debit_account;
+    const creditAcc = entry.credit_account;
+    
+    await this.prisma.$transaction(async (tx) => {
+      // Revert debit account balance change
+      const debitMult = (debitAcc.type === "ASSET" || debitAcc.type === "EXPENSE") ? 1 : -1;
+      await tx.account.update({ where: { id: debitAcc.id }, data: { balance: { decrement: amt * debitMult } } });
+      
+      // Revert credit account balance change
+      const creditMult = (creditAcc.type === "ASSET" || creditAcc.type === "EXPENSE") ? -1 : 1;
+      await tx.account.update({ where: { id: creditAcc.id }, data: { balance: { decrement: amt * creditMult } } });
+      
+      // Delete the entry
+      await tx.ledgerEntry.delete({ where: { id: entry.id } });
+    });
   }
 }
