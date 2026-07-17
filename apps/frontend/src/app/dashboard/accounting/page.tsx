@@ -762,7 +762,7 @@ export default function AccountingPage() {
                         <div key={section.key} className={cn("rounded-xl p-4 sm:p-5 border flex flex-col justify-between h-full backdrop-blur-sm transition-all duration-300 hover:shadow-md", section.bg)}>
                           <div>
                             <h4 className={cn("text-[10px] sm:text-xs font-black uppercase tracking-wider mb-4 pb-2 border-b border-current/10", section.color)}>{section.label}</h4>
-                            <div className="space-y-3">
+                            <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
                               {(!section.data || !section.data.items || section.data.items.length === 0) ? (
                                 <div className="py-6 text-center">
                                   <p className="text-xs text-muted-foreground italic">No activity recorded for this period</p>
