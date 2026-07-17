@@ -59,6 +59,7 @@ interface InvoiceItem {
   quantity: number;
   unit_price: number;
   total: number;
+  uom?: string;
 }
 
 interface Quotation {
@@ -122,7 +123,7 @@ export default function FinancePage() {
     po_number: "",
     po_date: "",
     notes: "",
-    items: [{ description: "", quantity: 1, unit_price: "" as any }]
+    items: [{ description: "", quantity: 1, unit_price: "" as any, uom: "PCS" }]
   });
 
   const [paymentForm, setPaymentForm] = useState({
@@ -381,7 +382,7 @@ export default function FinancePage() {
             item.description,
             "84241000",
             qty,
-            "PCS",
+            item.uom || "PCS",
             `Rs.${rate.toLocaleString()}`,
             "18.0%",
             `Rs.${total.toLocaleString()}`
@@ -536,7 +537,7 @@ export default function FinancePage() {
           po_number: "",
           po_date: "",
           notes: "",
-          items: [{ description: "", quantity: 1, unit_price: 0 }]
+          items: [{ description: "", quantity: 1, unit_price: 0, uom: "PCS" }]
         });
         fetchInvoices();
       } else {
@@ -551,13 +552,13 @@ export default function FinancePage() {
   const addInvoiceItem = () => {
     setInvoiceForm({
       ...invoiceForm,
-      items: [...invoiceForm.items, { description: "", quantity: 1, unit_price: "" as any }]
+      items: [...invoiceForm.items, { description: "", quantity: 1, unit_price: "" as any, uom: "PCS" }]
     });
   };
 
   const updateInvoiceItem = (index: number, field: string, value: any) => {
     const newItems = [...invoiceForm.items];
-    if (field === 'description') {
+    if (field === 'description' || field === 'uom') {
       (newItems[index] as any)[field] = value;
     } else {
       (newItems[index] as any)[field] = value === "" ? "" : Number(value);
@@ -849,7 +850,8 @@ export default function FinancePage() {
                                    items: invoice.items.map(i => ({
                                      description: i.description,
                                      quantity: i.quantity,
-                                     unit_price: i.unit_price
+                                     unit_price: i.unit_price,
+                                     uom: i.uom || "PCS"
                                    }))
                                  });
                                  setOpenModifyInvoiceDialog(true);
@@ -1023,15 +1025,16 @@ export default function FinancePage() {
                           ? selectedQ.items.map((item: any) => ({
                               description: item.description,
                               quantity: Number(item.quantity),
-                              unit_price: Number(item.unit_price)
+                              unit_price: Number(item.unit_price),
+                              uom: item.uom || "PCS"
                             }))
-                          : [{ description: "", quantity: 1, unit_price: "" as any }]
+                          : [{ description: "", quantity: 1, unit_price: "" as any, uom: "PCS" }]
                       });
                     } else {
                       setInvoiceForm({
                         ...invoiceForm,
                         quotation_id: "",
-                        items: [{ description: "", quantity: 1, unit_price: "" as any }]
+                        items: [{ description: "", quantity: 1, unit_price: "" as any, uom: "PCS" }]
                       });
                     }
                   }}
@@ -1116,7 +1119,7 @@ export default function FinancePage() {
               <div className="space-y-3">
                 {invoiceForm.items.map((item, idx) => (
                   <div key={idx} className="grid grid-cols-12 gap-3 items-end bg-muted/20 p-4 rounded-xl border border-border">
-                    <div className="col-span-6 space-y-1">
+                    <div className="col-span-5 space-y-1">
                       <Input 
                         placeholder="Description"
                         value={item.description}
@@ -1135,7 +1138,16 @@ export default function FinancePage() {
                         required
                       />
                     </div>
-                    <div className="col-span-3">
+                    <div className="col-span-2">
+                      <Input 
+                        placeholder="UOM"
+                        value={(item as any).uom || ""}
+                        onChange={(e) => updateInvoiceItem(idx, 'uom', e.target.value)}
+                        className="h-10 bg-background border-border text-sm font-medium"
+                        required
+                      />
+                    </div>
+                    <div className="col-span-2">
                       <Input 
                         type="number"
                         placeholder="Rate"
@@ -1229,6 +1241,8 @@ export default function FinancePage() {
                   <tr>
                     <th className="px-4 py-3 font-black uppercase tracking-widest text-muted-foreground">Description</th>
                     <th className="px-4 py-3 font-black uppercase tracking-widest text-muted-foreground text-center">Qty</th>
+                    <th className="px-4 py-3 font-black uppercase tracking-widest text-muted-foreground text-center">UOM</th>
+                    <th className="px-4 py-3 font-black uppercase tracking-widest text-muted-foreground text-right">Rate</th>
                     <th className="px-4 py-3 font-black uppercase tracking-widest text-muted-foreground text-right">Amount</th>
                   </tr>
                 </thead>
@@ -1237,14 +1251,42 @@ export default function FinancePage() {
                     <tr key={i}>
                       <td className="px-4 py-3 font-medium text-foreground">{item.description}</td>
                       <td className="px-4 py-3 font-bold text-foreground text-center">{item.quantity}</td>
+                      <td className="px-4 py-3 text-muted-foreground text-center">{(item as any).uom || "PCS"}</td>
+                      <td className="px-4 py-3 text-muted-foreground text-right">₹{Number(item.unit_price).toLocaleString()}</td>
                       <td className="px-4 py-3 font-black text-foreground text-right">₹{Number(item.total).toLocaleString()}</td>
                     </tr>
                   ))}
                 </tbody>
-                <tfoot className="bg-muted/20">
+                <tfoot className="bg-muted/20 font-black text-right">
                   <tr>
-                    <td colSpan={2} className="px-4 py-4 font-black uppercase tracking-widest text-muted-foreground">Total Payable</td>
-                    <td className="px-4 py-4 font-black text-lg text-foreground text-right">₹{Number(selectedInvoice?.total_amount || 0).toLocaleString()}</td>
+                    <td colSpan={4} className="px-4 py-2 text-muted-foreground uppercase tracking-widest text-[10px]">Gross Subtotal</td>
+                    <td className="px-4 py-2 text-foreground tabular-nums">₹{Number(selectedInvoice?.subtotal || (Number(selectedInvoice?.total_amount || 0) / 1.18)).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                  </tr>
+                  {Number(selectedInvoice?.discount) > 0 && (
+                    <tr className="text-rose-600">
+                      <td colSpan={4} className="px-4 py-2 uppercase tracking-widest text-[10px]">Discount Applied</td>
+                      <td className="px-4 py-2 tabular-nums">-₹{Number(selectedInvoice?.discount).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                    </tr>
+                  )}
+                  <tr>
+                    <td colSpan={4} className="px-4 py-2 text-muted-foreground uppercase tracking-widest text-[10px]">Taxable Value</td>
+                    <td className="px-4 py-2 text-foreground tabular-nums">₹{(Math.max(0, (Number(selectedInvoice?.subtotal || (Number(selectedInvoice?.total_amount || 0) / 1.18)) - Number(selectedInvoice?.discount || 0)))).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                  </tr>
+                  {Number(selectedInvoice?.tax_amount || 0) > 0 && (
+                    <>
+                      <tr>
+                        <td colSpan={4} className="px-4 py-2 text-muted-foreground uppercase tracking-widest text-[10px]">CGST (9%)</td>
+                        <td className="px-4 py-2 text-foreground tabular-nums">₹{Number(selectedInvoice?.cgst || (Number(selectedInvoice?.tax_amount || 0) / 2)).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                      </tr>
+                      <tr>
+                        <td colSpan={4} className="px-4 py-2 text-muted-foreground uppercase tracking-widest text-[10px]">SGST (9%)</td>
+                        <td className="px-4 py-2 text-foreground tabular-nums">₹{Number(selectedInvoice?.sgst || (Number(selectedInvoice?.tax_amount || 0) / 2)).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                      </tr>
+                    </>
+                  )}
+                  <tr className="border-t border-border/80 bg-emerald-500/5 text-base font-black">
+                    <td colSpan={4} className="px-4 py-4 uppercase tracking-widest text-[10px] text-emerald-600 dark:text-emerald-400">Total Payable</td>
+                    <td className="px-4 py-4 text-emerald-600 dark:text-emerald-400 text-xl tabular-nums">₹{Number(selectedInvoice?.total_amount || 0).toLocaleString()}</td>
                   </tr>
                 </tfoot>
               </table>
@@ -1404,7 +1446,7 @@ export default function FinancePage() {
               <div className="space-y-3">
                 {invoiceForm.items.map((item, idx) => (
                   <div key={idx} className="grid grid-cols-12 gap-3 items-end bg-muted/20 p-4 rounded-xl border border-border">
-                    <div className="col-span-6 space-y-1">
+                    <div className="col-span-5 space-y-1">
                       <Input 
                         placeholder="Description"
                         value={item.description}
@@ -1423,7 +1465,16 @@ export default function FinancePage() {
                         required
                       />
                     </div>
-                    <div className="col-span-3">
+                    <div className="col-span-2">
+                      <Input 
+                        placeholder="UOM"
+                        value={(item as any).uom || ""}
+                        onChange={(e) => updateInvoiceItem(idx, 'uom', e.target.value)}
+                        className="h-10 bg-background border-border text-sm font-medium"
+                        required
+                      />
+                    </div>
+                    <div className="col-span-2">
                       <Input 
                         type="number"
                         placeholder="Rate"

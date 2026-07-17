@@ -484,6 +484,7 @@ model QuoteItem {
   quantity     Int       @default(1)
   unit_price   Decimal   @db.Decimal(15, 2)
   total        Decimal   @db.Decimal(15, 2)
+  uom          String?   @db.VarChar(50)
   quotation    Quotation @relation(fields: [quotation_id], references: [id], onDelete: Cascade)
 
   @@index([quotation_id], map: "quote_items_quotation_id_fkey")
@@ -531,6 +532,7 @@ model InvoiceItem {
   quantity    Int
   unit_price  Decimal @db.Decimal(15, 2)
   total       Decimal @db.Decimal(15, 2)
+  uom         String? @db.VarChar(50)
   invoice     Invoice @relation(fields: [invoice_id], references: [id], onDelete: Cascade)
 
   @@index([invoice_id], map: "invoice_items_invoice_id_fkey")

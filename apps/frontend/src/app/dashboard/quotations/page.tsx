@@ -39,6 +39,7 @@ interface QuoteItem {
   description: string;
   quantity: number;
   unit_price: number;
+  uom?: string;
 }
 
 interface Quotation {
@@ -81,7 +82,7 @@ function QuotationsContent() {
     apply_gst: true,
     discount_type: "flat", // "flat" or "percent"
     discount_value: 0,
-    items: [{ description: "", quantity: 1, unit_price: 0 }] as QuoteItem[]
+    items: [{ description: "", quantity: 1, unit_price: 0, uom: "PCS" }] as QuoteItem[]
   });
 
   const calculateDiscountAmount = () => {
@@ -163,7 +164,7 @@ function QuotationsContent() {
   const addItem = () => {
     setFormData({
       ...formData,
-      items: [...formData.items, { description: "", quantity: 1, unit_price: 0 }]
+      items: [...formData.items, { description: "", quantity: 1, unit_price: 0, uom: "PCS" }]
     });
   };
 
@@ -182,7 +183,7 @@ function QuotationsContent() {
     if (field === 'quantity') parsedValue = parseInt(value) || 0;
     if (field === 'unit_price') parsedValue = parseFloat(value) || 0;
     
-    newItems[index] = { ...item, [field]: field === 'description' ? value : parsedValue };
+    newItems[index] = { ...item, [field]: field === 'description' || field === 'uom' ? value : parsedValue };
     setFormData({ ...formData, items: newItems });
   };
 
@@ -477,7 +478,7 @@ function QuotationsContent() {
                   <div className="space-y-3">
                     {formData.items.map((item, idx) => (
                       <div key={idx} className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end bg-muted/50 p-4 rounded-2xl border border-border group">
-                        <div className="col-span-1 md:col-span-6 space-y-1.5">
+                        <div className="col-span-1 md:col-span-5 space-y-1.5">
                           <Label className="text-[10px] uppercase font-black text-muted-foreground">Description</Label>
                           <Input 
                             value={item.description}
@@ -497,7 +498,17 @@ function QuotationsContent() {
                             required
                           />
                         </div>
-                        <div className="col-span-1 md:col-span-3 space-y-1.5">
+                        <div className="col-span-1 md:col-span-2 space-y-1.5">
+                          <Label className="text-[10px] uppercase font-black text-muted-foreground">UOM</Label>
+                          <Input 
+                            value={item.uom || ""}
+                            onChange={(e) => updateItem(idx, 'uom', e.target.value)}
+                            placeholder="e.g. PCS, Nos"
+                            className="bg-background border-border h-10 text-sm rounded-lg text-foreground"
+                            required
+                          />
+                        </div>
+                        <div className="col-span-1 md:col-span-2 space-y-1.5">
                           <Label className="text-[10px] uppercase font-black text-muted-foreground">Rate (₹)</Label>
                           <Input 
                             type="number"
@@ -767,6 +778,7 @@ function QuotationsContent() {
                       <tr>
                         <th className="px-4 py-3 font-bold text-muted-foreground">Description</th>
                         <th className="px-4 py-3 font-bold text-muted-foreground text-center">Qty</th>
+                        <th className="px-4 py-3 font-bold text-muted-foreground text-center">UOM</th>
                         <th className="px-4 py-3 font-bold text-muted-foreground text-right">Rate</th>
                         <th className="px-4 py-3 font-bold text-muted-foreground text-right">Total</th>
                       </tr>
@@ -776,6 +788,7 @@ function QuotationsContent() {
                         <tr key={i} className="hover:bg-accent/5 transition-colors">
                           <td className="px-4 py-3 text-foreground/80 font-medium">{item.description}</td>
                           <td className="px-4 py-3 text-muted-foreground text-center">{item.quantity}</td>
+                          <td className="px-4 py-3 text-muted-foreground text-center">{item.uom || "PCS"}</td>
                           <td className="px-4 py-3 text-muted-foreground text-right">₹{Number(item.unit_price).toLocaleString()}</td>
                           <td className="px-4 py-3 text-foreground font-bold text-right">₹{Number(item.total).toLocaleString()}</td>
                         </tr>
@@ -783,27 +796,27 @@ function QuotationsContent() {
                     </tbody>
                     <tfoot className="bg-muted/50 font-black text-right">
                       <tr>
-                        <td colSpan={3} className="px-4 py-2 text-muted-foreground uppercase tracking-widest text-[10px]">Gross Subtotal</td>
+                        <td colSpan={4} className="px-4 py-2 text-muted-foreground uppercase tracking-widest text-[10px]">Gross Subtotal</td>
                         <td className="px-4 py-2 text-foreground tabular-nums">₹{Number(selectedQuote.subtotal).toLocaleString()}</td>
                       </tr>
                       {Number(selectedQuote.discount) > 0 && (
                         <tr className="text-rose-600">
-                          <td colSpan={3} className="px-4 py-2 uppercase tracking-widest text-[10px]">Discount Applied</td>
+                          <td colSpan={4} className="px-4 py-2 uppercase tracking-widest text-[10px]">Discount Applied</td>
                           <td className="px-4 py-2 tabular-nums">-₹{Number(selectedQuote.discount).toLocaleString()}</td>
                         </tr>
                       )}
                       <tr>
-                        <td colSpan={3} className="px-4 py-2 text-muted-foreground uppercase tracking-widest text-[10px]">Taxable Value</td>
+                        <td colSpan={4} className="px-4 py-2 text-muted-foreground uppercase tracking-widest text-[10px]">Taxable Value</td>
                         <td className="px-4 py-2 text-foreground tabular-nums">₹{Math.max(0, Number(selectedQuote.subtotal) - Number(selectedQuote.discount)).toLocaleString()}</td>
                       </tr>
                       {Number(selectedQuote.tax_amount) > 0 && (
                         <tr>
-                          <td colSpan={3} className="px-4 py-2 text-muted-foreground uppercase tracking-widest text-[10px]">GST (18%)</td>
+                          <td colSpan={4} className="px-4 py-2 text-muted-foreground uppercase tracking-widest text-[10px]">GST (18%)</td>
                           <td className="px-4 py-2 text-foreground tabular-nums">₹{Number(selectedQuote.tax_amount).toLocaleString()}</td>
                         </tr>
                       )}
                       <tr className="border-t border-border/80 bg-emerald-500/5 text-base font-black">
-                        <td colSpan={3} className="px-4 py-4 uppercase tracking-widest text-[10px] text-emerald-600 dark:text-emerald-400">Grand Total</td>
+                        <td colSpan={4} className="px-4 py-4 uppercase tracking-widest text-[10px] text-emerald-600 dark:text-emerald-400">Grand Total</td>
                         <td className="px-4 py-4 text-emerald-600 dark:text-emerald-400 text-xl tabular-nums">₹{Number(selectedQuote.total_amount).toLocaleString()}</td>
                       </tr>
                     </tfoot>
@@ -859,6 +872,7 @@ function QuotationsContent() {
                         <tr style={{ backgroundColor: '#f5f5f5' }}>
                             <th style={{ padding: '10px', textAlign: 'left', border: '1px solid #ddd' }}>Description</th>
                             <th style={{ padding: '10px', textAlign: 'center', border: '1px solid #ddd' }}>Qty</th>
+                            <th style={{ padding: '10px', textAlign: 'center', border: '1px solid #ddd' }}>UOM</th>
                             <th style={{ padding: '10px', textAlign: 'right', border: '1px solid #ddd' }}>Rate</th>
                             <th style={{ padding: '10px', textAlign: 'right', border: '1px solid #ddd' }}>Total</th>
                         </tr>
@@ -868,6 +882,7 @@ function QuotationsContent() {
                             <tr key={i}>
                                 <td style={{ padding: '10px', border: '1px solid #ddd' }}>{item.description}</td>
                                 <td style={{ padding: '10px', textAlign: 'center', border: '1px solid #ddd' }}>{item.quantity}</td>
+                                <td style={{ padding: '10px', textAlign: 'center', border: '1px solid #ddd' }}>{item.uom || "PCS"}</td>
                                 <td style={{ padding: '10px', textAlign: 'right', border: '1px solid #ddd' }}>₹{Number(item.unit_price).toLocaleString()}</td>
                                 <td style={{ padding: '10px', textAlign: 'right', border: '1px solid #ddd', fontWeight: 'bold' }}>₹{Number(item.total).toLocaleString()}</td>
                             </tr>
@@ -875,27 +890,27 @@ function QuotationsContent() {
                     </tbody>
                     <tfoot>
                         <tr>
-                            <td colSpan={3} style={{ padding: '8px 10px', textAlign: 'right', color: '#555', fontSize: '12px' }}>Gross Subtotal</td>
+                            <td colSpan={4} style={{ padding: '8px 10px', textAlign: 'right', color: '#555', fontSize: '12px' }}>Gross Subtotal</td>
                             <td style={{ padding: '8px 10px', textAlign: 'right', fontSize: '13px' }}>₹{Number(selectedQuote.subtotal).toLocaleString()}</td>
                         </tr>
                         {Number(selectedQuote.discount) > 0 && (
                             <tr style={{ color: '#b91c1c' }}>
-                                <td colSpan={3} style={{ padding: '8px 10px', textAlign: 'right', fontSize: '12px' }}>Discount Applied</td>
+                                <td colSpan={4} style={{ padding: '8px 10px', textAlign: 'right', fontSize: '12px' }}>Discount Applied</td>
                                 <td style={{ padding: '8px 10px', textAlign: 'right', fontSize: '13px', fontWeight: 'bold' }}>-₹{Number(selectedQuote.discount).toLocaleString()}</td>
                             </tr>
                         )}
                         <tr style={{ fontWeight: 'bold' }}>
-                            <td colSpan={3} style={{ padding: '8px 10px', textAlign: 'right', color: '#000', fontSize: '12px' }}>Taxable Value</td>
+                            <td colSpan={4} style={{ padding: '8px 10px', textAlign: 'right', color: '#000', fontSize: '12px' }}>Taxable Value</td>
                             <td style={{ padding: '8px 10px', textAlign: 'right', fontSize: '13px' }}>₹{Math.max(0, Number(selectedQuote.subtotal) - Number(selectedQuote.discount)).toLocaleString()}</td>
                         </tr>
                         {Number(selectedQuote.tax_amount) > 0 && (
                             <tr>
-                                <td colSpan={3} style={{ padding: '8px 10px', textAlign: 'right', color: '#555', fontSize: '12px' }}>GST (18%)</td>
+                                <td colSpan={4} style={{ padding: '8px 10px', textAlign: 'right', color: '#555', fontSize: '12px' }}>GST (18%)</td>
                                 <td style={{ padding: '8px 10px', textAlign: 'right', fontSize: '13px' }}>₹{Number(selectedQuote.tax_amount).toLocaleString()}</td>
                             </tr>
                         )}
                         <tr style={{ fontWeight: 'bold', fontSize: '15px', backgroundColor: '#f3f4f6' }}>
-                            <td colSpan={3} style={{ padding: '12px 10px', textAlign: 'right', textTransform: 'uppercase' }}>Grand Total</td>
+                            <td colSpan={4} style={{ padding: '12px 10px', textAlign: 'right', textTransform: 'uppercase' }}>Grand Total</td>
                             <td style={{ padding: '12px 10px', textAlign: 'right', color: '#059669', fontSize: '16px' }}>₹{Number(selectedQuote.total_amount).toLocaleString()}</td>
                         </tr>
                     </tfoot>

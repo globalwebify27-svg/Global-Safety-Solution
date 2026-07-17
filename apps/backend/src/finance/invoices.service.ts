@@ -129,6 +129,7 @@ export class InvoicesService {
             description: item.description,
             quantity: Number(item.quantity),
             unit_price: Number(item.unit_price),
+            uom: item.uom || 'PCS',
             total: Number(item.quantity) * Number(item.unit_price),
           })),
         },
@@ -160,7 +161,11 @@ export class InvoicesService {
 
         await tx.invoiceItem.createMany({
           data: items.map((item: any) => ({
-            ...item,
+            description: item.description,
+            quantity: Number(item.quantity),
+            unit_price: Number(item.unit_price),
+            uom: item.uom || 'PCS',
+            total: Number(item.quantity) * Number(item.unit_price),
             invoice_id: id,
           })),
         });
