@@ -618,7 +618,7 @@ export default function AssetsPage() {
                     )}
                   </td>
                   <td className="px-6 py-5">
-                    <span className={cn("px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter ring-1", getStatusStyle(asset.status))}>
+                    <span className={cn("px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter ring-1 whitespace-nowrap inline-block", getStatusStyle(asset.status))}>
                       {asset.status.replace(/_/g, ' ')}
                     </span>
                   </td>
