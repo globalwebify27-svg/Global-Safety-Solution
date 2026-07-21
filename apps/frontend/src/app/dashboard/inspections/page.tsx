@@ -1643,10 +1643,10 @@ export default function InspectionsPage() {
                                      onChange={(e) => handleValidityChange(item.id, item, e.target.value)}
                                      className="w-full h-9 px-3 bg-background border border-border rounded-xl text-xs focus:outline-none text-foreground"
                                    >
-                                     <option value="1y" className="text-slate-900">1 Year</option>
-                                     <option value="2y" className="text-slate-900">2 Years</option>
-                                     <option value="3y" className="text-slate-900">3 Years</option>
-                                     <option value="1/2y" className="text-slate-900">6 Months</option>
+                                     <option value="1y">1 Year</option>
+                                     <option value="2y">2 Years</option>
+                                     <option value="3y">3 Years</option>
+                                     <option value="1/2y">6 Months</option>
                                    </select>
                                  </div>
                               </div>
@@ -1664,9 +1664,9 @@ export default function InspectionsPage() {
                                       }}
                                       className="w-full h-9 px-3 bg-background border border-border rounded-xl text-xs focus:outline-none text-foreground"
                                     >
-                                      <option value="" className="text-slate-900">Select a template...</option>
+                                      <option value="">Select a template...</option>
                                       {templates.map(t => (
-                                        <option key={t.id} value={t.id} className="text-slate-900">{t.name}</option>
+                                        <option key={t.id} value={t.id}>{t.name}</option>
                                       ))}
                                     </select>
                                   </div>
