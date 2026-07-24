@@ -1,0 +1,48 @@
+name: Deploy Backend to Hostinger
+
+on:
+  push:
+    branches: [ "update", "main" ] # Runs when pushing/merging into these branches
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: npm run generate --workspace=@repo/database
+
+      - name: Build Application
+        run: npm run build --workspace=backend
+
+      - name: Prepare Deployment Files
+        run: |
+          mkdir deploy-temp
+          cp -r apps/backend/dist deploy-temp/dist
+          cp apps/backend/package.json deploy-temp/package.json
+          cp apps/backend/main.js deploy-temp/main.js
+          # Create tmp directory and restart.txt to tell Hostinger to restart the Node app
+          mkdir -p deploy-temp/tmp
+          touch deploy-temp/tmp/restart.txt
+
+      - name: Sync Files to Hostinger via FTP/SFTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          local-dir: ./deploy-temp/
+          server-dir: ${{ secrets.FTP_REMOTE_DIR }} # e.g. /public_html/backend/ or similar
+          dangerous-clean-slate: false # Set to false to avoid deleting files not in deployment package (e.g. storage, .env)
