@@ -43,6 +43,7 @@ jobs:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
+          port: 65002 # Hostinger SSH/SFTP port
           local-dir: ./deploy-temp/
           server-dir: ${{ secrets.FTP_REMOTE_DIR }} # e.g. /public_html/backend/ or similar
           dangerous-clean-slate: false # Set to false to avoid deleting files not in deployment package (e.g. storage, .env)
