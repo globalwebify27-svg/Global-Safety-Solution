@@ -1,2 +1,2 @@
 // Hostinger Node.js Entry point
-require('./dist/main.js');
+require('./dist/src/main.js');
