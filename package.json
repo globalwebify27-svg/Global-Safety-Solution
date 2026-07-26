@@ -15,7 +15,7 @@
     "apps/*",
     "packages/*"
   ],
-  "devDependencies": {
+  "dependencies": {
     "turbo": "latest"
   }
 }
