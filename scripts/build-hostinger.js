@@ -43,13 +43,7 @@ const destPackage = path.join(__dirname, '../dist/package.json');
 fs.copyFileSync(srcPackage, destPackage);
 console.log('Copied package.json to root-level dist/');
 
-// 5. Copy main.js to root-level dist/
-const srcMain = path.join(__dirname, '../apps/backend/main.js');
-const destMain = path.join(__dirname, '../dist/main.js');
-fs.copyFileSync(srcMain, destMain);
-console.log('Copied main.js to root-level dist/');
-
-// 6. Copy prisma folder to root-level dist/
+// 5. Copy prisma folder to root-level dist/
 const srcPrisma = path.join(__dirname, '../apps/backend/prisma');
 const destPrisma = path.join(__dirname, '../dist/prisma');
 if (fs.existsSync(srcPrisma)) {
