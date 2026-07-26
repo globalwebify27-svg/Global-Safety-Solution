@@ -5,7 +5,7 @@
   "packageManager": "npm@10.8.2",
   "scripts": {
     "dev": "turbo run dev",
-    "build": "npm run build --workspace=backend",
+    "build": "node scripts/build-hostinger.js",
     "start": "turbo run start",
     "lint": "turbo run lint",
     "postinstall": "npm run generate --workspace=@repo/database",
