@@ -4,30 +4,57 @@ const path = require('path');
 
 console.log('Starting Hostinger optimized build...');
 
-// 1. Build the NestJS backend
+// 1. Build the NestJS backend (outputs to apps/backend/dist)
 execSync('npm run build --workspace=backend', { stdio: 'inherit' });
 
-// 2. Copy package.json to the dist directory
-const srcPackage = path.join(__dirname, '../apps/backend/package.json');
-const destPackage = path.join(__dirname, '../apps/backend/dist/package.json');
-fs.copyFileSync(srcPackage, destPackage);
-console.log('Copied package.json to dist/');
+// 2. Prepare the root-level dist/ folder
+const rootDist = path.join(__dirname, '../dist');
+if (fs.existsSync(rootDist)) {
+  fs.rmSync(rootDist, { recursive: true, force: true });
+}
+fs.mkdirSync(rootDist, { recursive: true });
+console.log('Created root-level dist/ folder');
 
-// 3. Copy main.js to the dist directory
-const srcMain = path.join(__dirname, '../apps/backend/main.js');
-const destMain = path.join(__dirname, '../apps/backend/dist/main.js');
-fs.copyFileSync(srcMain, destMain);
-console.log('Copied main.js to dist/');
+// Helper function to recursively copy directories
+function copyDirSync(src, dest) {
+  fs.mkdirSync(dest, { recursive: true });
+  const entries = fs.readdirSync(src, { withFileTypes: true });
 
-// 4. Copy prisma folder to the dist directory (so Prisma Client can be generated on startup)
-const srcPrisma = path.join(__dirname, '../apps/backend/prisma');
-const destPrisma = path.join(__dirname, '../apps/backend/dist/prisma');
-if (fs.existsSync(srcPrisma)) {
-  fs.mkdirSync(destPrisma, { recursive: true });
-  fs.readdirSync(srcPrisma).forEach(file => {
-    fs.copyFileSync(path.join(srcPrisma, file), path.join(destPrisma, file));
-  });
-  console.log('Copied prisma schema folder to dist/');
+  for (let entry of entries) {
+    const srcPath = path.join(src, entry.name);
+    const destPath = path.join(dest, entry.name);
+
+    if (entry.isDirectory()) {
+      copyDirSync(srcPath, destPath);
+    } else {
+      fs.copyFileSync(srcPath, destPath);
+    }
+  }
 }
 
-console.log('Hostinger build completed successfully!');
+// 3. Copy the compiled backend files to root-level dist/
+const backendDist = path.join(__dirname, '../apps/backend/dist');
+copyDirSync(backendDist, rootDist);
+console.log('Successfully copied all backend build files to root-level dist/');
+
+// 4. Copy backend package.json to root-level dist/
+const srcPackage = path.join(__dirname, '../apps/backend/package.json');
+const destPackage = path.join(__dirname, '../dist/package.json');
+fs.copyFileSync(srcPackage, destPackage);
+console.log('Copied package.json to root-level dist/');
+
+// 5. Copy main.js to root-level dist/
+const srcMain = path.join(__dirname, '../apps/backend/main.js');
+const destMain = path.join(__dirname, '../dist/main.js');
+fs.copyFileSync(srcMain, destMain);
+console.log('Copied main.js to root-level dist/');
+
+// 6. Copy prisma folder to root-level dist/
+const srcPrisma = path.join(__dirname, '../apps/backend/prisma');
+const destPrisma = path.join(__dirname, '../dist/prisma');
+if (fs.existsSync(srcPrisma)) {
+  copyDirSync(srcPrisma, destPrisma);
+  console.log('Copied prisma schema folder to root-level dist/');
+}
+
+console.log('Hostinger root-level dist packaging completed successfully!');
