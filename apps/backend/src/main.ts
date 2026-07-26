@@ -1,4 +1,8 @@
-import 'dotenv/config';
+try {
+  require('dotenv').config();
+} catch (e) {
+  // Hostinger handles environment variables natively
+}
 import { NestFactory, HttpAdapterHost } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { execSync } from 'child_process';
