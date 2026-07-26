@@ -9,7 +9,8 @@
     "start": "turbo run start",
     "lint": "turbo run lint",
     "postinstall": "npm run generate --workspace=@repo/database",
-    "render:build": "npm run db:push --workspace=@repo/database && npm run seed --workspace=backend && npm run reset:passwords --workspace=backend && turbo run build"
+    "render:build": "npm run db:push --workspace=@repo/database && npm run seed --workspace=backend && npm run reset:passwords --workspace=backend && turbo run build",
+    "hostinger:build": "npm run build --workspace=backend"
   },
   "workspaces": [
     "apps/*",
