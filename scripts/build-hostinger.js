@@ -51,4 +51,9 @@ if (fs.existsSync(srcPrisma)) {
   console.log('Copied prisma schema folder to root-level dist/');
 }
 
+// 6. Install production dependencies directly inside dist/
+console.log('Installing production dependencies into dist/node_modules...');
+execSync('npm install --prefix dist --omit=dev', { stdio: 'inherit' });
+console.log('Production dependencies installed in dist/node_modules successfully!');
+
 console.log('Hostinger root-level dist packaging completed successfully!');
