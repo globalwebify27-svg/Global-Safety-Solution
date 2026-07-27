@@ -668,6 +668,7 @@ model Inspection {
   certificates   Certificate[]
   items          InspectionItem[]
   report         InspectionReport?
+  expenditures   InspectionExpenditure[]
   client         Client            @relation(fields: [client_id], references: [id], onDelete: Cascade)
   engineer       User?             @relation(fields: [engineer_id], references: [id])
   project        Project?          @relation(fields: [project_id], references: [id])
@@ -678,6 +679,18 @@ model Inspection {
   @@index([project_id], map: "inspections_project_id_fkey")
   @@index([work_order_id], map: "inspections_work_order_id_fkey")
   @@map("inspections")
+}
+
+model InspectionExpenditure {
+  id            String     @id @default(uuid()) @db.VarChar(36)
+  inspection_id String     @db.VarChar(36)
+  date          DateTime   @db.Date
+  amount        Decimal    @db.Decimal(15, 2)
+  note          String     @db.Text
+  inspection    Inspection @relation(fields: [inspection_id], references: [id], onDelete: Cascade)
+
+  @@index([inspection_id])
+  @@map("inspection_expenditures")
 }
 
 model InspectionItem {

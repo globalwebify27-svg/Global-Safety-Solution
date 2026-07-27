@@ -76,6 +76,7 @@ interface Inspection {
   draft_cert_data?: any;
   expenditure?: number | string;
   pdf_url?: string;
+  expenditures?: any[];
 }
 
 export default function InspectionsPage() {
@@ -320,6 +321,27 @@ export default function InspectionsPage() {
       }
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  const updateExpenditures = async (expendituresList: any[]) => {
+    if (!selectedInspection || !token) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/inspections/${selectedInspection.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ expenditures: expendituresList })
+      });
+      if (res.ok) {
+        toast.success("Expenditures updated successfully!");
+        await fetchSingleInspection(selectedInspection.id);
+      } else {
+        const err = await res.json();
+        toast.error(err.message || "Failed to update expenditures");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to update expenditures");
     }
   };
 
@@ -1373,36 +1395,118 @@ export default function InspectionsPage() {
                       <div className="space-y-1">
                         <label className="text-[10px] font-bold text-muted-foreground uppercase">Total Expenditure (₹)</label>
                         <input
-                          type="number"
-                          placeholder="0.00"
+                          type="text"
+                          readOnly
                           value={
-                            selectedInspection.expenditure !== undefined && selectedInspection.expenditure !== null && Number(selectedInspection.expenditure) > 0
-                              ? selectedInspection.expenditure
-                              : ((selectedInspection.items || []).reduce((acc: number, curr: any) => acc + (Number(curr.expenditure) || 0), 0) || "")
+                            selectedInspection.expenditures && selectedInspection.expenditures.length > 0
+                              ? (selectedInspection.expenditures || []).reduce((acc: number, curr: any) => acc + Number(curr.amount), 0).toFixed(2)
+                              : Number(selectedInspection.expenditure || 0).toFixed(2)
                           }
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setSelectedInspection(prev => prev ? { ...prev, expenditure: val } : null);
-                          }}
-                          onBlur={async (e) => {
-                            const val = e.target.value;
-                            if (!token) return;
-                            try {
-                              const res = await fetch(`${API_BASE_URL}/inspections/${selectedInspection.id}`, {
-                                method: 'PATCH',
-                                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                                body: JSON.stringify({ expenditure: val ? Number(val) : 0 })
-                              });
-                              if (res.ok) {
-                                toast.success("Total expenditure updated!");
-                                await fetchSingleInspection(selectedInspection.id);
-                              }
-                            } catch (err) {
-                              toast.error("Failed to update expenditure");
-                            }
-                          }}
-                          className="w-full h-10 px-3 bg-background border border-border rounded-xl text-xs font-semibold focus:outline-none"
+                          className="w-full h-10 px-3 bg-muted border border-border rounded-xl text-xs font-semibold focus:outline-none cursor-not-allowed text-muted-foreground"
                         />
+                      </div>
+                    </div>
+
+                    {/* Itemized Expenditures List & Adder */}
+                    <div className="pt-4 border-t border-border/50 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Itemized Expenditures Breakdown</h4>
+                        <span className="text-[10px] text-muted-foreground font-bold">Total Entries: {(selectedInspection.expenditures || []).length}</span>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        {/* Expenditures List */}
+                        <div className="md:col-span-2 space-y-2 max-h-[140px] overflow-y-auto pr-1">
+                          {(selectedInspection.expenditures || []).map((exp: any, idx: number) => (
+                            <div key={exp.id || idx} className="flex items-center justify-between p-2.5 bg-background border border-border/80 rounded-xl text-xs shadow-sm hover:border-border/100 transition-all">
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold text-muted-foreground shrink-0">{exp.date ? exp.date.split('T')[0] : ""}</span>
+                                <span className="text-muted-foreground shrink-0 font-bold">•</span>
+                                <span className="font-medium text-foreground truncate max-w-[150px] md:max-w-[200px]" title={exp.note}>{exp.note}</span>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <span className="font-bold text-foreground">₹{Number(exp.amount).toFixed(2)}</span>
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    const updatedExp = (selectedInspection.expenditures || []).filter((_: any, i: number) => i !== idx).map((e: any) => ({
+                                      date: e.date,
+                                      amount: Number(e.amount),
+                                      note: e.note
+                                    }));
+                                    await updateExpenditures(updatedExp);
+                                  }}
+                                  className="text-rose-500 hover:text-rose-700 font-bold px-1.5 py-0.5 rounded hover:bg-rose-500/5 transition-all text-xs"
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                          {(selectedInspection.expenditures || []).length === 0 && (
+                            <p className="text-xs text-muted-foreground italic p-2 bg-background border border-dashed border-border rounded-xl text-center">No expenditure entries logged yet.</p>
+                          )}
+                        </div>
+
+                        {/* Add Form */}
+                        <div className="p-3.5 bg-background border border-border/80 rounded-2xl space-y-2.5 flex flex-col justify-between">
+                          <div className="space-y-2">
+                            <input
+                              type="date"
+                              id="new_exp_date"
+                              defaultValue={new Date().toISOString().split('T')[0]}
+                              className="w-full h-8 px-2.5 bg-background border border-border rounded-lg text-xs font-semibold focus:outline-none"
+                            />
+                            <input
+                              type="text"
+                              id="new_exp_note"
+                              placeholder="Note (e.g. Stay, Travel)"
+                              className="w-full h-8 px-2.5 bg-background border border-border rounded-lg text-xs font-semibold focus:outline-none"
+                            />
+                            <input
+                              type="number"
+                              id="new_exp_amount"
+                              placeholder="Amount (₹)"
+                              className="w-full h-8 px-2.5 bg-background border border-border rounded-lg text-xs font-semibold focus:outline-none"
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              const dateEl = document.getElementById('new_exp_date') as HTMLInputElement;
+                              const noteEl = document.getElementById('new_exp_note') as HTMLInputElement;
+                              const amountEl = document.getElementById('new_exp_amount') as HTMLInputElement;
+
+                              if (!dateEl?.value || !noteEl?.value || !amountEl?.value) {
+                                toast.error("Please enter date, note, and amount");
+                                return;
+                              }
+
+                              const newItem = {
+                                date: dateEl.value,
+                                note: noteEl.value,
+                                amount: Number(amountEl.value)
+                              };
+
+                              const updatedExp = [
+                                ...(selectedInspection.expenditures || []).map((e: any) => ({
+                                  date: e.date,
+                                  amount: Number(e.amount),
+                                  note: e.note
+                                })),
+                                newItem
+                              ];
+
+                              await updateExpenditures(updatedExp);
+
+                              noteEl.value = "";
+                              amountEl.value = "";
+                            }}
+                            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs py-1.5 rounded-lg shadow-md transition-all shrink-0"
+                          >
+                            + Add Entry
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>

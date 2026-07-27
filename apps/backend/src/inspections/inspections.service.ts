@@ -70,6 +70,7 @@ export class InspectionsService {
         project: true,
         work_order: true,
         items: true,
+        expenditures: true,
       },
       orderBy: { scheduled_date: 'desc' },
     });
@@ -88,6 +89,7 @@ export class InspectionsService {
           },
         },
         items: true,
+        expenditures: true,
       },
     });
     if (!inspection) throw new NotFoundException('Inspection not found');
@@ -95,13 +97,29 @@ export class InspectionsService {
   }
 
   async update(id: string, data: UpdateInspectionDto) {
-    const { admin_feedback, draft_cert_type, draft_cert_data, ...rest } = data;
+    const { admin_feedback, draft_cert_type, draft_cert_data, expenditures, ...rest } = data;
     const completed_date = rest.completed_date
       ? new Date(rest.completed_date)
       : undefined;
     const scheduled_date = rest.scheduled_date
       ? new Date(rest.scheduled_date)
       : undefined;
+
+    if (expenditures !== undefined) {
+      await this.prisma.inspectionExpenditure.deleteMany({ where: { inspection_id: id } });
+      if (expenditures && expenditures.length > 0) {
+        await this.prisma.inspectionExpenditure.createMany({
+          data: expenditures.map(exp => ({
+            inspection_id: id,
+            date: new Date(exp.date),
+            amount: exp.amount,
+            note: exp.note,
+          }))
+        });
+      }
+      const totalExpenditure = (expenditures || []).reduce((sum, item) => sum + Number(item.amount), 0);
+      rest.expenditure = totalExpenditure;
+    }
 
     // Handle JSON remarks updates safely
     let updatedRemarks = rest.remarks;
@@ -178,6 +196,7 @@ export class InspectionsService {
             service_product: true,
           },
         },
+        expenditures: true,
       },
     });
 
@@ -479,6 +498,7 @@ export class InspectionsService {
           },
         },
         items: true,
+        expenditures: true,
       },
       orderBy: { scheduled_date: 'asc' },
     });

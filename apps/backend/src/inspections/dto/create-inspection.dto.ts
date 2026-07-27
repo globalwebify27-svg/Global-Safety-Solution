@@ -121,6 +121,12 @@ export class UpdateInspectionDto {
   @IsOptional()
   @IsDateString()
   completed_date?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateInspectionExpenditureDto)
+  expenditures?: CreateInspectionExpenditureDto[];
 }
 
 export class UpdateInspectionItemDto {
@@ -219,4 +225,15 @@ export class AddInspectionItemDto {
   @IsOptional()
   @IsString()
   cert_competency_no?: string;
+}
+
+export class CreateInspectionExpenditureDto {
+  @IsDateString()
+  date: string;
+
+  @IsNumber()
+  amount: number;
+
+  @IsString()
+  note: string;
 }
