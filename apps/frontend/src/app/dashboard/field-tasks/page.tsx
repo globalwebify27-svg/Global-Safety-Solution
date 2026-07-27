@@ -1405,7 +1405,7 @@ export default function FieldTasksPage() {
 
                             const cert = await res.json();
                             toast.dismiss(loadingToast);
-                            toast.success("Certificate issued successfully! Opening preview...");
+                            toast.success("Certificate issued successfully!");
 
                             // 2. Load the certificate PDF
                             const pdfRes = await fetch(`${API_BASE_URL}/certificates/${cert.id}/pdf`, {
@@ -1414,8 +1414,10 @@ export default function FieldTasksPage() {
 
                             if (pdfRes.ok) {
                               const blob = await pdfRes.blob();
-                              const url = URL.createObjectURL(blob);
-                              setPreviewPdfUrl(url);
+                              const a = document.createElement("a");
+                              a.href = URL.createObjectURL(blob);
+                              a.download = `certificate-${item.cert_ref_no}.pdf`;
+                              a.click();
                             }
                           } catch (err: any) {
                             toast.dismiss(loadingToast);
@@ -1424,7 +1426,7 @@ export default function FieldTasksPage() {
                         }}
                         className="bg-blue-600 hover:bg-blue-500 text-white font-bold h-9 text-xs rounded-xl flex items-center justify-center gap-2 px-4 shadow-sm"
                       >
-                        Generate & Preview Certificate
+                        Generate & Download Certificate
                       </Button>
                     </div>
                   </div>
@@ -1475,10 +1477,12 @@ export default function FieldTasksPage() {
                       });
                       if (res.ok) {
                         const blob = await res.blob();
-                        const url = URL.createObjectURL(blob);
-                        setPreviewPdfUrl(url);
+                        const a = document.createElement("a");
+                        a.href = URL.createObjectURL(blob);
+                        a.download = `combined-certificates-${selectedTask.id.substring(0, 8)}.pdf`;
+                        a.click();
                         toast.dismiss(loadingToast);
-                        toast.success("Combined PDF ready!");
+                        toast.success("Combined PDF downloaded successfully!");
                       } else {
                         toast.dismiss(loadingToast);
                         toast.error("Failed to generate combined PDF");
@@ -1490,7 +1494,7 @@ export default function FieldTasksPage() {
                   }}
                   className="flex-1 rounded-2xl h-11 bg-blue-600 hover:bg-blue-700 text-white font-bold transition-all shadow-md flex items-center justify-center gap-2"
                 >
-                  Preview All Certificates (PDF)
+                  Download All Certificates (PDF)
                 </Button>
               )}
             </div>
