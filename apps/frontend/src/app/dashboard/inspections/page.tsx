@@ -297,7 +297,7 @@ export default function InspectionsPage() {
       if (Array.isArray(eData)) {
         setEngineers(eData.filter((u: any) => 
           u.is_active && 
-          u.roles?.some((ur: any) => ur.role?.name === 'FIELD_ENGINEER')
+          !u.roles?.some((ur: any) => ur.role?.name === 'CLIENT' || ur.role?.name === 'CLIENTS')
         ));
       }
     } catch (e) {

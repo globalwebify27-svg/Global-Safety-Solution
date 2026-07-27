@@ -150,6 +150,10 @@ export default function DashboardLayout({
     return navigation.filter(item => {
       if (item.module === "ALL") return true;
 
+      if (item.module === "FIELD_TASKS") {
+        return effectiveRole !== "CLIENT" && effectiveRole !== "SUPER_ADMIN";
+      }
+
       // 1. Always show the default sections for this role
       if (allowed.includes(item.module)) {
         if (effectiveRole === "SUPER_ADMIN" && item.module === "FIELD_TASKS") {
