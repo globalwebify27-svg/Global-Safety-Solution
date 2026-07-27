@@ -16,12 +16,23 @@ import {
   CheckCircle2,
   ArrowLeft,
   Upload,
-  Download
+  Download,
+  Loader2,
+  Eye
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogDescription 
+} from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { useRef } from "react";
 
 const openImageInNewTab = (url: string) => {
   if (url.startsWith('data:')) {
@@ -117,6 +128,99 @@ interface Task {
   remarks?: string | null;
   pdf_url?: string | null;
   expenditure?: number | string;
+  assigned_staff_id?: string | null;
+  expenditures?: any[];
+}
+
+function PdfPreviewer({ url }: { url: string }) {
+  const [pdfDoc, setPdfDoc] = useState<any>(null);
+  const [numPages, setNumPages] = useState(0);
+  const [libLoaded, setLibLoaded] = useState(false);
+  const canvasRefs = useRef<Record<number, HTMLCanvasElement | null>>({});
+
+  useEffect(() => {
+    if ((window as any).pdfjsLib) {
+      setLibLoaded(true);
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+    script.async = true;
+    script.onload = () => {
+      (window as any).pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+      setLibLoaded(true);
+    };
+    document.body.appendChild(script);
+  }, []);
+
+  useEffect(() => {
+    if (!libLoaded || !url) return;
+
+    const pdfjsLib = (window as any).pdfjsLib;
+    const loadingTask = pdfjsLib.getDocument(url);
+    loadingTask.promise.then(
+      (pdf: any) => {
+        setPdfDoc(pdf);
+        setNumPages(pdf.numPages);
+      },
+      (reason: any) => {
+        console.error("Error loading PDF: ", reason);
+      }
+    );
+  }, [libLoaded, url]);
+
+  useEffect(() => {
+    if (!pdfDoc || numPages === 0) return;
+
+    for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+      const renderPage = (num: number) => {
+        pdfDoc.getPage(num).then((page: any) => {
+          const canvas = canvasRefs.current[num];
+          if (!canvas) return;
+
+          const context = canvas.getContext("2d");
+          if (!context) return;
+
+          const viewport = page.getViewport({ scale: 2.2 });
+          canvas.height = viewport.height;
+          canvas.width = viewport.width;
+
+          const renderContext = {
+            canvasContext: context,
+            viewport: viewport,
+          };
+          page.render(renderContext);
+        });
+      };
+      renderPage(pageNum);
+    }
+  }, [pdfDoc, numPages]);
+
+  if (!libLoaded) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[50vh] w-full gap-3">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+        <p className="text-xs font-bold text-muted-foreground uppercase">Loading viewer...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-full h-full overflow-y-auto p-4 flex flex-col items-center gap-6 bg-slate-900/50">
+      {Array.from({ length: numPages }, (_, idx) => idx + 1).map((pageNum) => (
+        <div key={pageNum} className="bg-white p-4 shadow-xl rounded-xl border border-slate-200/50 relative w-full max-w-[1000px]">
+          <canvas
+            ref={(el) => { canvasRefs.current[pageNum] = el; }}
+            className="w-full h-auto rounded-lg shadow-sm bg-white"
+          />
+          <span className="absolute bottom-6 right-6 bg-slate-900/80 text-white text-[10px] px-2.5 py-1 rounded-full font-bold uppercase select-none shadow">
+            Page {pageNum} of {numPages}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 export default function FieldTasksPage() {
@@ -128,6 +232,7 @@ export default function FieldTasksPage() {
   const [selectedTemplateIds, setSelectedTemplateIds] = useState<Record<string, string>>({});
   const [templateFieldValues, setTemplateFieldValues] = useState<Record<string, Record<string, string>>>({});
   const [itemValidityPeriods, setItemValidityPeriods] = useState<Record<string, string>>({});
+  const [previewPdfUrl, setPreviewPdfUrl] = useState<string | null>(null);
 
   const calculateInitialValidity = (testDateStr?: string | null, expiryDateStr?: string | null) => {
     if (!testDateStr || !expiryDateStr) return "1y";
@@ -181,6 +286,9 @@ export default function FieldTasksPage() {
     }
     if (key.includes("address") || key.includes("factory_address")) {
       return (selectedTask?.client as any)?.address || (selectedTask?.client as any)?.city || "";
+    }
+    if (key.includes("competency") || key.includes("license")) {
+      return globalSettings.default_license_no || "";
     }
     return "";
   };
@@ -462,6 +570,41 @@ export default function FieldTasksPage() {
       toast.error("Failed to sync tasks");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const refreshSelectedTask = async (taskId: string) => {
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/inspections/${taskId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSelectedTask(data);
+        setTasks(prev => prev.map(t => t.id === taskId ? data : t));
+      }
+    } catch (e) {}
+  };
+
+  const updateExpenditures = async (expendituresList: any[]) => {
+    if (!selectedTask || !token) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/inspections/${selectedTask.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ expenditures: expendituresList })
+      });
+      if (res.ok) {
+        toast.success("Expenditures updated successfully!");
+        await refreshSelectedTask(selectedTask.id);
+      } else {
+        const err = await res.json();
+        toast.error(err.message || "Failed to update expenditures");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to update expenditures");
     }
   };
 
@@ -851,140 +994,191 @@ export default function FieldTasksPage() {
                 <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground block">Attached Inspection PDF</span>
                 <span className="text-sm text-foreground/80 font-semibold">Reference document for visit</span>
               </div>
-              <a 
-                href={selectedTask.pdf_url} 
-                download={`inspection-${selectedTask.id}.pdf`}
+              <Button
+                type="button"
+                onClick={() => setPreviewPdfUrl(selectedTask.pdf_url!)}
                 className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600/10 text-blue-600 border border-blue-600/20 rounded-xl text-xs font-bold hover:bg-blue-600 hover:text-white transition-all active:scale-95"
               >
-                <Download className="w-4 h-4" /> Download PDF
-              </a>
+                <Eye className="w-4 h-4" /> Preview PDF
+              </Button>
             </div>
           )}
 
           <div className="bg-card border border-border rounded-3xl p-6 space-y-4 shadow-sm">
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold text-muted-foreground uppercase">Total Expenditure (₹)</label>
-              <Input
-                type="number"
-                placeholder="0.00"
-                className="bg-muted/30 border-none rounded-xl h-12"
-                value={
-                  selectedTask.expenditure !== undefined && selectedTask.expenditure !== null && Number(selectedTask.expenditure) > 0
-                    ? selectedTask.expenditure
-                    : ((selectedTask.items || []).reduce((acc: number, curr: any) => acc + (Number(curr.expenditure) || 0), 0) || "")
-                }
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setSelectedTask(prev => prev ? { ...prev, expenditure: val } : null);
-                }}
-                onBlur={async (e) => {
-                  const val = e.target.value;
-                  if (!token) return;
-                  try {
-                    const res = await fetch(`${API_BASE_URL}/inspections/${selectedTask.id}`, {
-                      method: 'PATCH',
-                      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                      body: JSON.stringify({ expenditure: val ? Number(val) : 0 })
-                    });
-                    if (res.ok) {
-                      toast.success("Total expenditure updated!");
-                    } else {
-                      toast.error("Failed to update expenditure");
-                    }
-                  } catch (err) {
-                    toast.error("Failed to update expenditure");
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase">Total Expenditure (₹)</label>
+                <input
+                  type="text"
+                  readOnly
+                  value={
+                    selectedTask.expenditures && selectedTask.expenditures.length > 0
+                      ? (selectedTask.expenditures || []).reduce((acc: number, curr: any) => acc + Number(curr.amount), 0).toFixed(2)
+                      : Number(selectedTask.expenditure || 0).toFixed(2)
                   }
-                }}
-              />
+                  className="w-full h-10 px-3 bg-muted border border-border rounded-xl text-xs font-semibold focus:outline-none cursor-not-allowed text-muted-foreground"
+                />
+              </div>
+            </div>
+
+            {/* Itemized Expenditures List & Adder */}
+            <div className="pt-4 border-t border-border/50 space-y-4">
+              <div className="flex items-center justify-between">
+                <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Itemized Expenditures Breakdown</h4>
+                <span className="text-[10px] text-muted-foreground font-bold">Total Entries: {(selectedTask.expenditures || []).length}</span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {/* Expenditures List */}
+                <div className="md:col-span-2 space-y-2 max-h-[140px] overflow-y-auto pr-1">
+                  {(selectedTask.expenditures || []).map((exp: any, idx: number) => (
+                    <div key={exp.id || idx} className="flex items-center justify-between p-2.5 bg-background border border-border/85 rounded-xl text-xs shadow-sm hover:border-border transition-all">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-muted-foreground shrink-0">{exp.date ? exp.date.split('T')[0] : ""}</span>
+                        <span className="text-muted-foreground shrink-0 font-bold">•</span>
+                        <span className="font-medium text-foreground truncate max-w-[150px] md:max-w-[200px]" title={exp.note}>{exp.note}</span>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="font-bold text-foreground">₹{Number(exp.amount).toFixed(2)}</span>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const updatedExp = (selectedTask.expenditures || []).filter((_: any, i: number) => i !== idx).map((e: any) => ({
+                              date: e.date,
+                              amount: Number(e.amount),
+                              note: e.note
+                            }));
+                            await updateExpenditures(updatedExp);
+                          }}
+                          className="text-rose-500 hover:text-rose-700 font-bold px-1.5 py-0.5 rounded hover:bg-rose-500/5 transition-all text-xs"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  {(selectedTask.expenditures || []).length === 0 && (
+                    <p className="text-xs text-muted-foreground italic p-2 bg-background border border-dashed border-border rounded-xl text-center">No expenditure entries logged yet.</p>
+                  )}
+                </div>
+
+                {/* Add Form */}
+                <div className="p-3.5 bg-background border border-border/80 rounded-2xl space-y-2.5 flex flex-col justify-between">
+                  <div className="space-y-2">
+                    <input
+                      type="date"
+                      id="new_exp_date"
+                      defaultValue={new Date().toISOString().split('T')[0]}
+                      className="w-full h-8 px-2.5 bg-background border border-border rounded-lg text-xs font-semibold focus:outline-none text-foreground"
+                    />
+                    <input
+                      type="text"
+                      id="new_exp_note"
+                      placeholder="Note (e.g. Stay, Travel)"
+                      className="w-full h-8 px-2.5 bg-background border border-border rounded-lg text-xs font-semibold focus:outline-none text-foreground"
+                    />
+                    <input
+                      type="number"
+                      id="new_exp_amount"
+                      placeholder="Amount (₹)"
+                      className="w-full h-8 px-2.5 bg-background border border-border rounded-lg text-xs font-semibold focus:outline-none text-foreground"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const dateEl = document.getElementById('new_exp_date') as HTMLInputElement;
+                      const noteEl = document.getElementById('new_exp_note') as HTMLInputElement;
+                      const amountEl = document.getElementById('new_exp_amount') as HTMLInputElement;
+
+                      if (!dateEl?.value || !noteEl?.value || !amountEl?.value) {
+                        toast.error("Please enter date, note, and amount");
+                        return;
+                      }
+
+                      const newItem = {
+                        date: dateEl.value,
+                        note: noteEl.value,
+                        amount: Number(amountEl.value)
+                      };
+
+                      const updatedExp = [
+                        ...(selectedTask.expenditures || []).map((e: any) => ({
+                          date: e.date,
+                          amount: Number(e.amount),
+                          note: e.note
+                        })),
+                        newItem
+                      ];
+
+                      await updateExpenditures(updatedExp);
+
+                      noteEl.value = "";
+                      amountEl.value = "";
+                    }}
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs py-1.5 rounded-lg shadow-md transition-all shrink-0"
+                  >
+                    + Add Entry
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
-
           <div className="space-y-4">
             <h3 className="text-sm font-black uppercase tracking-widest text-muted-foreground px-2">Checklist Items</h3>
-            {selectedTask.items.map((item, idx) => (
-              <div key={item.id} className="bg-card border border-border rounded-2xl p-5 shadow-sm space-y-4">
-                <div className="flex items-start justify-between gap-4">
-                  <span className="font-bold leading-tight">{idx + 1}. {item.description}</span>
-                  <div className="flex items-center gap-2 shrink-0">
+            {(selectedTask?.items || []).map((item, index) => (
+              <div key={item.id} className="p-5 bg-card border border-border rounded-2xl space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-foreground">Observation {index + 1}</span>
+                  <div className="flex items-center gap-2">
                     <Button 
                       size="sm" 
                       variant={item.status === 'PASS' ? 'default' : 'outline'} 
-                      className={cn("w-10 h-10 rounded-xl", item.status === 'PASS' && "bg-emerald-600 hover:bg-emerald-500 shadow-lg shadow-emerald-500/20")}
+                      className={cn("h-8 rounded-lg", item.status === 'PASS' && "bg-emerald-600 hover:bg-emerald-500")}
                       onClick={() => handleUpdateItem(item.id, 'PASS', item.notes)}
                     >
-                      <Check className="w-5 h-5" />
+                      <Check className="w-4 h-4" />
                     </Button>
                     <Button 
                       size="sm" 
-                      variant="outline"
-                      className="w-10 h-10 rounded-xl hover:bg-rose-500/10 hover:text-rose-600 hover:border-rose-500/20"
+                      variant="outline" 
+                      className="h-8 rounded-lg hover:bg-rose-500/10 hover:text-rose-600 hover:border-rose-500/20"
                       onClick={() => handleDeleteItem(item.id)}
                     >
-                      <X className="w-5 h-5" />
+                      <X className="w-4 h-4" />
                     </Button>
                   </div>
                 </div>
-                
                 <div className="flex flex-col gap-3">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-muted-foreground uppercase">Inspections Name</label>
-                    <IsolatedInput 
-                      placeholder="Inspections Name..." 
-                      className="bg-muted/30 border-none rounded-xl h-12"
-                      value={item.scope || ""}
-                      onChange={(value) => handleUpdateItem(item.id, item.status, item.notes, undefined, value, item.recommendations)}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-muted-foreground uppercase">Observations / Notes</label>
-                    <IsolatedTextarea 
-                      placeholder="Observations / Notes..." 
-                      className="w-full bg-muted/30 border-none rounded-xl p-3 min-h-[100px] text-sm focus:outline-none text-foreground font-medium"
-                      value={item.notes || ""}
-                      onChange={(value) => handleUpdateItem(item.id, item.status, value, undefined, item.scope, item.recommendations)}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-muted-foreground uppercase">Remarks & Recommendations</label>
-                    <IsolatedInput 
-                      placeholder="Remarks & Recommendations..." 
-                      className="bg-muted/30 border-none rounded-xl h-12"
-                      value={item.recommendations || ""}
-                      onChange={(value) => handleUpdateItem(item.id, item.status, item.notes, undefined, item.scope, value)}
-                    />
-                  </div>
-
-                  {/* Certificate configuration and download for this safety checklist section */}
-                  <div className="pt-4 mt-4 border-t border-border/40 space-y-4">
+                  {/* Certificate configuration for this safety checklist section */}
+                  <div className="pt-2 space-y-4">
                     <h4 className="text-xs font-black text-blue-600 uppercase tracking-wider">Section Certificate Details</h4>
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-muted-foreground uppercase">Certificate Reference No.</label>
-                        <Input 
-                          placeholder="e.g. GSS/TEST/CPB/01/2026" 
-                          className="bg-background h-10 rounded-xl text-sm text-foreground"
-                          defaultValue={item.cert_ref_no || ""}
-                          onBlur={(e) => handleUpdateItem(item.id, item.status, item.notes, undefined, item.scope, item.recommendations, e.target.value)}
-                        />
+                        <Label className="text-[10px] font-bold text-muted-foreground uppercase">Select Certificate Template</Label>
+                        <select
+                          value={selectedTemplateIds[item.id] || ""}
+                          onChange={(e) => {
+                            const newTempId = e.target.value;
+                            setSelectedTemplateIds({ ...selectedTemplateIds, [item.id]: newTempId });
+                            handleUpdateItem(item.id, item.status, item.notes, undefined, item.scope, item.recommendations, item.cert_ref_no, item.cert_test_date, item.cert_expiry_date, item.cert_competency_no, newTempId);
+                          }}
+                          className="w-full h-9 px-3 bg-background border border-border rounded-xl text-xs focus:outline-none text-foreground"
+                        >
+                          <option value="">Select a template...</option>
+                          {templates.map(t => (
+                            <option key={t.id} value={t.id}>{t.name}</option>
+                          ))}
+                        </select>
                       </div>
 
                       <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-muted-foreground uppercase">License / Competency No.</label>
-                        <Input 
-                          placeholder="e.g. 663, valid upto 10.11.2026" 
-                          className="bg-background h-10 rounded-xl text-sm text-foreground"
-                          defaultValue={item.cert_competency_no || globalSettings.default_license_no || certCompetencyNo || ""}
-                          onBlur={(e) => handleUpdateItem(item.id, item.status, item.notes, undefined, item.scope, item.recommendations, item.cert_ref_no, undefined, undefined, e.target.value)}
-                        />
-                      </div>
-
-                      <div className="space-y-1 md:col-span-2">
-                        <label className="text-[10px] font-bold text-muted-foreground uppercase">Validity Period</label>
+                        <Label className="text-[10px] font-bold text-muted-foreground uppercase">Validity Period</Label>
                         <select 
                           value={itemValidityPeriods[item.id] || calculateInitialValidity(item.cert_test_date, item.cert_expiry_date)}
                           onChange={(e) => handleValidityChange(item.id, item, e.target.value)}
-                          className="w-full h-10 px-3 bg-background border border-border rounded-xl text-sm focus:outline-none text-foreground"
+                          className="w-full h-9 px-3 bg-background border border-border rounded-xl text-xs focus:outline-none text-foreground"
                         >
                           <option value="1y">1 Year</option>
                           <option value="2y">2 Years</option>
@@ -992,163 +1186,97 @@ export default function FieldTasksPage() {
                           <option value="1/2y">6 Months</option>
                         </select>
                       </div>
-                    </div>
 
-                    <div className="space-y-3 p-4 bg-blue-500/5 rounded-xl border border-blue-500/10">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-bold text-muted-foreground uppercase">Select Certificate Template</label>
-                          <select
-                            value={selectedTemplateIds[item.id] || ""}
-                            onChange={(e) => {
-                              const newTempId = e.target.value;
-                              setSelectedTemplateIds({ ...selectedTemplateIds, [item.id]: newTempId });
-                              handleUpdateItem(item.id, item.status, item.notes, undefined, item.scope, item.recommendations, item.cert_ref_no, item.cert_test_date, item.cert_expiry_date, item.cert_competency_no, newTempId);
-                            }}
-                            className="w-full h-10 px-3 bg-background border border-border rounded-xl text-sm focus:outline-none text-foreground"
-                          >
-                            <option value="">Select a template...</option>
-                            {templates.map(t => (
-                              <option key={t.id} value={t.id}>{t.name}</option>
-                            ))}
-                          </select>
-                        </div>
-
-                        <div className="flex items-end">
-                          <Button
-                            type="button"
-                            onClick={async () => {
-                              const templateId = selectedTemplateIds[item.id];
-                              if (!templateId) {
-                                toast.error("Please select a template first");
-                                return;
-                              }
-                              if (!item.cert_ref_no) {
-                                toast.error("Certificate Reference Number is required");
-                                return;
-                              }
-                              
-                              const activeTemp = templates.find(t => t.id === templateId);
-                              let tempFields: any[] = [];
-                              try {
-                                tempFields = JSON.parse(activeTemp.fields);
-                              } catch(e){}
-
-                              const fieldVals = { ...templateFieldValues[item.id] };
-                              for (const f of tempFields) {
-                                if (!fieldVals[f.key]) {
-                                  fieldVals[f.key] = getDefaultFieldValue(f.key) || f.default || "";
-                                }
-                              }
-
-                              const metadata = {
-                                template_id: templateId,
-                                field_values: fieldVals
-                              };
-                              
-                              try {
-                                // 1. Create the certificate
-                                const res = await fetch(`${API_BASE_URL}/certificates`, {
-                                  method: "POST",
-                                  headers: {
-                                    "Content-Type": "application/json",
-                                    Authorization: `Bearer ${token}`
-                                  },
-                                  body: JSON.stringify({
-                                    inspection_id: selectedTask.id,
-                                    inspection_item_id: item.id,
-                                    certificate_no: item.cert_ref_no,
-                                    issue_date: item.cert_test_date || new Date().toISOString(),
-                                    validity_period: itemValidityPeriods[item.id] || calculateInitialValidity(item.cert_test_date, item.cert_expiry_date),
-                                    metadata
-                                  })
-                                });
-
-                                if (!res.ok) {
-                                  const error = await res.json();
-                                  throw new Error(error.message || "Failed to issue certificate");
-                                }
-
-                                const cert = await res.json();
-                                toast.success("Certificate issued successfully! Starting download...");
-
-                                // 2. Download the certificate PDF
-                                const pdfRes = await fetch(`${API_BASE_URL}/certificates/${cert.id}/pdf`, {
-                                  headers: { Authorization: `Bearer ${token}` }
-                                });
-
-                                if (pdfRes.ok) {
-                                  const blob = await pdfRes.blob();
-                                  const a = document.createElement("a");
-                                  a.href = URL.createObjectURL(blob);
-                                  a.download = `certificate-${item.cert_ref_no}.pdf`;
-                                  a.click();
-                                }
-                              } catch (err: any) {
-                                toast.error(err.message || "Failed to generate certificate");
-                              }
-                            }}
-                            className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold h-10 text-sm rounded-xl flex items-center justify-center gap-2"
-                          >
-                            Generate & Download Certificate
-                          </Button>
-                        </div>
+                      <div className="space-y-1">
+                        <Label className="text-[10px] font-bold text-muted-foreground uppercase">Certificate Reference No.</Label>
+                        <Input 
+                          placeholder="e.g. GSS/TEST/CPB/01/2026" 
+                          className="bg-background h-9 text-xs"
+                          defaultValue={item.cert_ref_no || ""}
+                          onBlur={(e) => handleUpdateItem(item.id, item.status, item.notes, undefined, item.scope, item.recommendations, e.target.value)}
+                        />
                       </div>
 
-                      {/* Custom Fields based on selected template */}
-                      {(() => {
-                        const tempId = selectedTemplateIds[item.id];
-                        const activeTemp = templates.find(t => t.id === tempId);
-                        if (!activeTemp) return null;
-                        
-                        let tempFields: any[] = [];
-                        try {
-                          tempFields = JSON.parse(activeTemp.fields);
-                        } catch(e){}
+                      <div className="space-y-1">
+                        <Label className="text-[10px] font-bold text-muted-foreground uppercase">License / Competency No.</Label>
+                        <Input 
+                          placeholder="e.g. 663, valid upto 10.11.2026" 
+                          className="bg-background h-9 text-xs"
+                          defaultValue={item.cert_competency_no || globalSettings.default_license_no || certCompetencyNo || ""}
+                          onBlur={(e) => handleUpdateItem(item.id, item.status, item.notes, undefined, item.scope, item.recommendations, item.cert_ref_no, undefined, undefined, e.target.value)}
+                        />
+                      </div>
 
-                        if (tempFields.length === 0) return null;
+                    </div>
 
-                        return (
-                          <div className="space-y-3 pt-3 border-t border-blue-500/10">
-                            <h5 className="text-[10px] font-bold text-blue-500 uppercase tracking-widest">Template Fields</h5>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                              {tempFields.map((field: any, idx: number) => (
-                                <div key={idx} className="space-y-1">
-                                  <label className="text-[10px] text-slate-400">{field.label}</label>
-                                  <textarea
-                                    placeholder={field.default || "Enter value..."}
-                                    className="w-full bg-background border border-border rounded-xl p-2.5 text-sm text-foreground focus:outline-none min-h-[80px] resize-y"
-                                    value={templateFieldValues[item.id]?.[field.key] ?? (getDefaultFieldValue(field.key) || field.default || "")}
-                                    onChange={(e) => {
-                                      const currentVals = templateFieldValues[item.id] || {};
-                                      setTemplateFieldValues({
-                                        ...templateFieldValues,
-                                        [item.id]: {
-                                          ...currentVals,
-                                          [field.key]: e.target.value
-                                        }
-                                      });
-                                    }}
-                                    onBlur={(e) => {
-                                      const currentVals = templateFieldValues[item.id] || {};
-                                      const updatedVals = {
+                    {/* Custom Fields based on selected template */}
+                    {(() => {
+                      const tempId = selectedTemplateIds[item.id];
+                      const activeTemp = templates.find(t => t.id === tempId);
+                      if (!activeTemp) return null;
+                      
+                      let tempFields: any[] = [];
+                      try {
+                        tempFields = JSON.parse(activeTemp.fields);
+                      } catch(e){}
+
+                      if (tempFields.length === 0) return null;
+
+                      return (
+                        <div className="space-y-3 pt-3 border-t border-blue-500/10">
+                          <h5 className="text-[10px] font-bold text-blue-500 uppercase tracking-widest">Template Fields</h5>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {tempFields.map((field: any, idx: number) => (
+                              <div key={idx} className="space-y-1">
+                                <Label className="text-[10px] text-slate-400">{field.label}</Label>
+                                <textarea
+                                  placeholder={field.default || "Enter value..."}
+                                  className="w-full bg-background border border-border rounded-xl p-2.5 text-xs text-foreground focus:outline-none min-h-[80px] resize-y"
+                                  value={templateFieldValues[item.id]?.[field.key] ?? (getDefaultFieldValue(field.key) || field.default || "")}
+                                  onChange={(e) => {
+                                    const currentVals = templateFieldValues[item.id] || {};
+                                    setTemplateFieldValues({
+                                      ...templateFieldValues,
+                                      [item.id]: {
                                         ...currentVals,
                                         [field.key]: e.target.value
-                                      };
-                                      handleUpdateItem(item.id, item.status, item.notes, undefined, item.scope, item.recommendations, item.cert_ref_no, item.cert_test_date, item.cert_expiry_date, item.cert_competency_no, selectedTemplateIds[item.id], JSON.stringify(updatedVals));
-                                    }}
-                                  />
-                                </div>
-                              ))}
-                            </div>
+                                      }
+                                    });
+                                  }}
+                                  onBlur={(e) => {
+                                    const currentVals = templateFieldValues[item.id] || {};
+                                    const updatedVals = {
+                                      ...currentVals,
+                                      [field.key]: e.target.value
+                                    };
+                                    handleUpdateItem(item.id, item.status, item.notes, undefined, item.scope, item.recommendations, item.cert_ref_no, item.cert_test_date, item.cert_expiry_date, item.cert_competency_no, selectedTemplateIds[item.id], JSON.stringify(updatedVals));
+                                  }}
+                                />
+                              </div>
+                            ))}
                           </div>
-                        );
-                      })()}
-                    </div>
+                        </div>
+                      );
+                    })()}
                   </div>
 
+                  {/* Inspections Name Input (Below Certificate Details) */}
+                  <div className="space-y-1 pt-3 border-t border-border/40">
+                    <Label className="text-[10px] font-bold text-muted-foreground uppercase">Inspections Name</Label>
+                    <Input 
+                      placeholder="Inspections Name..." 
+                      className="bg-background h-10 text-sm flex-1"
+                      defaultValue={item.scope || ""}
+                      onBlur={(e) => {
+                        if (e.target.value !== (item.scope || "")) {
+                          handleUpdateItem(item.id, item.status, item.notes, undefined, e.target.value, item.recommendations);
+                        }
+                      }}
+                    />
+                  </div>
+                  
                   {/* Per-item Photo Upload & Preview */}
-                  <div className="space-y-2">
+                  <div className="space-y-2 pt-2">
                     {item.photo_url && parseItemPhotos(item.photo_url).length > 0 && (
                       <div className="grid grid-cols-4 sm:grid-cols-6 gap-3 p-3 bg-muted/30 border border-border/50 rounded-xl">
                         {parseItemPhotos(item.photo_url).map((url, index) => (
@@ -1163,7 +1291,7 @@ export default function FieldTasksPage() {
                               type="button"
                               onClick={async () => {
                                 const remaining = parseItemPhotos(item.photo_url).filter((_, idx) => idx !== index);
-                                await handleUpdateItem(item.id, item.status, item.notes, remaining.length > 0 ? JSON.stringify(remaining) : "");
+                                await handleUpdateItem(item.id, item.status, item.notes, undefined, remaining.length > 0 ? JSON.stringify(remaining) : "");
                               }}
                               className="absolute top-1.5 right-1.5 bg-rose-500 hover:bg-rose-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow duration-200 cursor-pointer"
                             >
@@ -1174,7 +1302,7 @@ export default function FieldTasksPage() {
                       </div>
                     )}
                     
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <input 
                         type="file" 
                         id={`item-file-${item.id}`}
@@ -1219,14 +1347,93 @@ export default function FieldTasksPage() {
                       >
                         <Upload className="w-3.5 h-3.5 mr-1" /> Upload Photo
                       </Button>
+
+                      <Button
+                        type="button"
+                        onClick={async () => {
+                          const templateId = selectedTemplateIds[item.id];
+                          if (!templateId) {
+                            toast.error("Please select a template first");
+                            return;
+                          }
+                          if (!item.cert_ref_no) {
+                            toast.error("Certificate Reference Number is required");
+                            return;
+                          }
+                          
+                          const activeTemp = templates.find(t => t.id === templateId);
+                          let tempFields: any[] = [];
+                          try {
+                            tempFields = JSON.parse(activeTemp.fields);
+                          } catch(e){}
+
+                          const fieldVals = { ...templateFieldValues[item.id] };
+                          for (const f of tempFields) {
+                            if (!fieldVals[f.key]) {
+                              fieldVals[f.key] = getDefaultFieldValue(f.key) || f.default || "";
+                            }
+                          }
+
+                          const metadata = {
+                            template_id: templateId,
+                            field_values: fieldVals
+                          };
+                          
+                          const loadingToast = toast.loading("Generating certificate...");
+                          try {
+                            // 1. Create the certificate
+                            const res = await fetch(`${API_BASE_URL}/certificates`, {
+                              method: "POST",
+                              headers: {
+                                "Content-Type": "application/json",
+                                Authorization: `Bearer ${token}`
+                              },
+                              body: JSON.stringify({
+                                inspection_id: selectedTask.id,
+                                inspection_item_id: item.id,
+                                certificate_no: item.cert_ref_no,
+                                issue_date: item.cert_test_date || new Date().toISOString(),
+                                validity_period: itemValidityPeriods[item.id] || calculateInitialValidity(item.cert_test_date, item.cert_expiry_date),
+                                metadata
+                              })
+                            });
+
+                            if (!res.ok) {
+                              const error = await res.json();
+                              throw new Error(error.message || "Failed to issue certificate");
+                            }
+
+                            const cert = await res.json();
+                            toast.dismiss(loadingToast);
+                            toast.success("Certificate issued successfully! Opening preview...");
+
+                            // 2. Load the certificate PDF
+                            const pdfRes = await fetch(`${API_BASE_URL}/certificates/${cert.id}/pdf`, {
+                              headers: { Authorization: `Bearer ${token}` }
+                            });
+
+                            if (pdfRes.ok) {
+                              const blob = await pdfRes.blob();
+                              const url = URL.createObjectURL(blob);
+                              setPreviewPdfUrl(url);
+                            }
+                          } catch (err: any) {
+                            toast.dismiss(loadingToast);
+                            toast.error(err.message || "Failed to generate certificate");
+                          }
+                        }}
+                        className="bg-blue-600 hover:bg-blue-500 text-white font-bold h-9 text-xs rounded-xl flex items-center justify-center gap-2 px-4 shadow-sm"
+                      >
+                        Generate & Preview Certificate
+                      </Button>
                     </div>
                   </div>
                 </div>
               </div>
             ))}
 
-            {/* Manual Button to Add Observation */}
-            <div className="pt-2">
+            {/* Manual Button to Add Observation & Combined preview */}
+            <div className="flex gap-4 items-center pt-2">
               <Button
                 type="button"
                 variant="outline"
@@ -1245,23 +1452,47 @@ export default function FieldTasksPage() {
                     });
                     if (res.ok) {
                       toast.success("New observation section added!");
-                      // Refresh selected task details
-                      const refRes = await fetch(`${API_BASE_URL}/inspections/${selectedTask.id}`, {
-                        headers: { Authorization: `Bearer ${token}` }
-                      });
-                      if (refRes.ok) {
-                        const updatedData = await refRes.json();
-                        setSelectedTask(updatedData);
-                      }
+                      await refreshSelectedTask(selectedTask.id);
                     }
                   } catch (err) {
                     toast.error("Failed to add observation section");
                   }
                 }}
-                className="w-full rounded-2xl h-11 border-dashed border-blue-500/30 text-blue-600 hover:bg-blue-500/5 font-bold transition-all"
+                className="flex-1 rounded-2xl h-11 border-dashed border-blue-500/30 text-blue-600 hover:bg-blue-500/5 font-bold transition-all"
               >
-                + Add Observation Section
+                + Issue new certificate
               </Button>
+
+              {(selectedTask?.items || []).some(item => item.cert_template_id && item.cert_ref_no) && (
+                <Button
+                  type="button"
+                  onClick={async () => {
+                    if (!token) return;
+                    const loadingToast = toast.loading("Generating combined PDF...");
+                    try {
+                      const res = await fetch(`${API_BASE_URL}/inspections/${selectedTask.id}/certificates/download-all`, {
+                        headers: { Authorization: `Bearer ${token}` }
+                      });
+                      if (res.ok) {
+                        const blob = await res.blob();
+                        const url = URL.createObjectURL(blob);
+                        setPreviewPdfUrl(url);
+                        toast.dismiss(loadingToast);
+                        toast.success("Combined PDF ready!");
+                      } else {
+                        toast.dismiss(loadingToast);
+                        toast.error("Failed to generate combined PDF");
+                      }
+                    } catch (e) {
+                      toast.dismiss(loadingToast);
+                      toast.error("Failed to generate combined PDF");
+                    }
+                  }}
+                  className="flex-1 rounded-2xl h-11 bg-blue-600 hover:bg-blue-700 text-white font-bold transition-all shadow-md flex items-center justify-center gap-2"
+                >
+                  Preview All Certificates (PDF)
+                </Button>
+              )}
             </div>
           </div>
 
@@ -1425,6 +1656,26 @@ export default function FieldTasksPage() {
           <p className="text-sm text-amber-800/80">Always ensure all personal protective equipment (PPE) is worn before starting an on-site audit. Your GPS location is verified for each submission.</p>
         </div>
       </div>
+
+      {previewPdfUrl && (
+        <Dialog open={!!previewPdfUrl} onOpenChange={(open) => !open && setPreviewPdfUrl(null)}>
+          <DialogContent className="max-w-none w-[96vw] h-[95vh] p-0 bg-slate-900 border-slate-800 flex flex-col overflow-hidden rounded-2xl shadow-2xl">
+            <DialogHeader className="p-5 border-b border-slate-800 flex flex-row items-center justify-between shrink-0 bg-slate-950/80 backdrop-blur">
+              <div>
+                <DialogTitle className="text-lg font-black text-white uppercase tracking-wider flex items-center gap-2">
+                  <Eye className="w-5 h-5 text-blue-500" /> Secure Document Viewer
+                </DialogTitle>
+                <DialogDescription className="text-xs text-slate-400 font-medium">
+                  Authorised Personnel Only. Saving, printing, and downloading have been disabled.
+                </DialogDescription>
+              </div>
+            </DialogHeader>
+            <div className="flex-1 min-h-0 bg-slate-950 overflow-hidden relative">
+              <PdfPreviewer url={previewPdfUrl} />
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

@@ -79,6 +79,7 @@ interface Inspection {
   pdf_url?: string;
   expenditures?: any[];
   certificates?: any[];
+  assigned_staff_id?: string | null;
 }
 
 function PdfPreviewer({ url }: { url: string }) {

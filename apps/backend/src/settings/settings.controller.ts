@@ -10,7 +10,6 @@ export class SettingsController {
   constructor(private readonly settingsService: SettingsService) {}
 
   @Get()
-  @Permissions('READ_SETTING')
   findAll() {
     return this.settingsService.findAll();
   }
