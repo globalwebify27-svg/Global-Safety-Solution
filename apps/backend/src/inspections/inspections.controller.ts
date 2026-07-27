@@ -99,6 +99,20 @@ export class InspectionsController {
     res.end(buffer);
   }
 
+  @Get(':id/certificates/download-all')
+  async downloadAllCertificates(
+    @Param('id') id: string,
+    @Res() res: any,
+  ) {
+    const buffer = await this.inspectionsService.generateAllCertificatesPdf(id);
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename=all-certificates-${id.substring(0, 8)}.pdf`,
+      'Content-Length': buffer.length,
+    });
+    res.end(buffer);
+  }
+
   @Post(':id/approve')
   approve(@Param('id') id: string) {
     return this.inspectionsService.approve(id);

@@ -19,7 +19,8 @@ import {
   Check,
   X,
   Download,
-  Loader2
+  Loader2,
+  Eye
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
@@ -77,6 +78,98 @@ interface Inspection {
   expenditure?: number | string;
   pdf_url?: string;
   expenditures?: any[];
+  certificates?: any[];
+}
+
+function PdfPreviewer({ url }: { url: string }) {
+  const [pdfDoc, setPdfDoc] = useState<any>(null);
+  const [numPages, setNumPages] = useState(0);
+  const [libLoaded, setLibLoaded] = useState(false);
+  const canvasRefs = useRef<Record<number, HTMLCanvasElement | null>>({});
+
+  useEffect(() => {
+    if ((window as any).pdfjsLib) {
+      setLibLoaded(true);
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+    script.async = true;
+    script.onload = () => {
+      (window as any).pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+      setLibLoaded(true);
+    };
+    document.body.appendChild(script);
+  }, []);
+
+  useEffect(() => {
+    if (!libLoaded || !url) return;
+
+    const pdfjsLib = (window as any).pdfjsLib;
+    const loadingTask = pdfjsLib.getDocument(url);
+    loadingTask.promise.then(
+      (pdf: any) => {
+        setPdfDoc(pdf);
+        setNumPages(pdf.numPages);
+      },
+      (reason: any) => {
+        console.error("Error loading PDF: ", reason);
+      }
+    );
+  }, [libLoaded, url]);
+
+  useEffect(() => {
+    if (!pdfDoc || numPages === 0) return;
+
+    for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+      const renderPage = (num: number) => {
+        pdfDoc.getPage(num).then((page: any) => {
+          const canvas = canvasRefs.current[num];
+          if (!canvas) return;
+
+          const context = canvas.getContext("2d");
+          if (!context) return;
+
+          const viewport = page.getViewport({ scale: 2.2 });
+          canvas.height = viewport.height;
+          canvas.width = viewport.width;
+
+          const renderContext = {
+            canvasContext: context,
+            viewport: viewport,
+          };
+          page.render(renderContext);
+        });
+      };
+      renderPage(pageNum);
+    }
+  }, [pdfDoc, numPages]);
+
+  if (!libLoaded) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[50vh] w-full gap-3">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+        <p className="text-xs font-bold text-muted-foreground uppercase">Loading viewer...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-full h-full overflow-y-auto p-4 flex flex-col items-center gap-6 bg-slate-900/50">
+      {Array.from({ length: numPages }, (_, idx) => idx + 1).map((pageNum) => (
+        <div key={pageNum} className="bg-white p-4 shadow-xl rounded-xl border border-slate-200/50 relative w-full max-w-[1000px]">
+          <canvas
+            ref={(el) => { canvasRefs.current[pageNum] = el; }}
+            className="w-full h-auto rounded-lg shadow-sm bg-white"
+          />
+          <span className="absolute bottom-6 right-6 bg-slate-900/80 text-white text-[10px] px-2.5 py-1 rounded-full font-bold uppercase select-none shadow">
+            Page {pageNum} of {numPages}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 export default function InspectionsPage() {
@@ -87,6 +180,7 @@ export default function InspectionsPage() {
   const [openSchedule, setOpenSchedule] = useState(false);
   const [openVisit, setOpenVisit] = useState(false);
   const [selectedInspection, setSelectedInspection] = useState<Inspection | null>(null);
+  const [previewPdfUrl, setPreviewPdfUrl] = useState<string | null>(null);
 
   // Certificate Preparation & Review States
   const [draftCertType, setDraftCertType] = useState("FIRE_SAFETY");
@@ -1518,13 +1612,13 @@ export default function InspectionsPage() {
                       <span className="text-[10px] font-bold text-muted-foreground uppercase block">Attached Inspection PDF</span>
                       <span className="text-xs text-foreground/80 font-medium">Provided at scheduling</span>
                     </div>
-                    <a 
-                      href={selectedInspection.pdf_url} 
-                      download={`inspection-${selectedInspection.id}.pdf`}
-                      className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600/10 text-blue-600 border border-blue-600/20 rounded-xl text-xs font-bold hover:bg-blue-600 hover:text-white transition-all shadow-sm active:scale-95"
+                    <Button 
+                      type="button"
+                      onClick={() => setPreviewPdfUrl(selectedInspection.pdf_url || null)}
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600/10 text-blue-600 border border-blue-600/20 rounded-xl text-xs font-bold hover:bg-blue-600 hover:text-white transition-all shadow-sm active:scale-95 h-9"
                     >
-                      <Download className="w-4 h-4" /> Download PDF
-                    </a>
+                      <Eye className="w-4 h-4" /> Preview PDF
+                    </Button>
                   </div>
                 )}
   
@@ -1651,10 +1745,10 @@ export default function InspectionsPage() {
                 ) : (
                   <>
                     <div className="space-y-4">
-                      {(selectedInspection?.items || []).map((item) => (
+                      {(selectedInspection?.items || []).map((item, index) => (
                         <div key={item.id} className="p-5 bg-muted/20 border border-border rounded-2xl space-y-3">
                           <div className="flex items-center justify-between">
-                            <span className="font-bold text-foreground">{item.description}</span>
+                            <span className="font-bold text-foreground">Observation {index + 1}</span>
                             <div className="flex items-center gap-2">
                               <Button 
                                 size="sm" 
@@ -1675,51 +1769,43 @@ export default function InspectionsPage() {
                             </div>
                           </div>
                           <div className="flex flex-col gap-3">
-                            <div className="space-y-1">
-                              <Label className="text-[10px] font-bold text-muted-foreground uppercase">Inspections Name</Label>
-                              <Input 
-                                placeholder="Inspections Name..." 
-                                className="bg-background h-10 text-sm flex-1"
-                                defaultValue={item.scope || ""}
-                                onBlur={(e) => {
-                                  if (e.target.value !== (item.scope || "")) {
-                                    handleUpdateItem(item.id, item.status, item.notes, undefined, undefined, e.target.value, item.recommendations);
-                                  }
-                                }}
-                              />
-                            </div>
-                            <div className="space-y-1">
-                              <Label className="text-[10px] font-bold text-muted-foreground uppercase">Observations / Notes</Label>
-                              <textarea 
-                                placeholder="Add observations..." 
-                                className="w-full bg-background border border-border rounded-xl p-3 min-h-[100px] text-sm focus:outline-none text-foreground font-medium"
-                                defaultValue={item.notes || ""}
-                                onBlur={(e) => {
-                                  if (e.target.value !== (item.notes || "")) {
-                                    handleUpdateItem(item.id, item.status, e.target.value, undefined, undefined, item.scope, item.recommendations);
-                                  }
-                                }}
-                              />
-                            </div>
-                            <div className="space-y-1">
-                              <Label className="text-[10px] font-bold text-muted-foreground uppercase">Remarks & Recommendations</Label>
-                              <Input 
-                                placeholder="Remarks & Recommendations..." 
-                                className="bg-background h-10 text-sm flex-1"
-                                defaultValue={item.recommendations || ""}
-                                onBlur={(e) => {
-                                  if (e.target.value !== (item.recommendations || "")) {
-                                    handleUpdateItem(item.id, item.status, item.notes, undefined, undefined, item.scope, e.target.value);
-                                  }
-                                }}
-                              />
-                            </div>
-                            
-                            {/* Certificate configuration and download for this safety checklist section */}
-                            <div className="pt-4 mt-4 border-t border-border/40 space-y-4">
+                            {/* Certificate configuration for this safety checklist section */}
+                            <div className="pt-2 space-y-4">
                               <h4 className="text-xs font-black text-blue-600 uppercase tracking-wider">Section Certificate Details</h4>
                               
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                  <Label className="text-[10px] font-bold text-muted-foreground uppercase">Select Certificate Template</Label>
+                                  <select
+                                    value={selectedTemplateIds[item.id] || ""}
+                                    onChange={(e) => {
+                                      const newTempId = e.target.value;
+                                      setSelectedTemplateIds({ ...selectedTemplateIds, [item.id]: newTempId });
+                                      handleUpdateItem(item.id, item.status, item.notes, undefined, undefined, item.scope, item.recommendations, item.cert_ref_no, item.cert_test_date, item.cert_expiry_date, item.cert_competency_no, newTempId);
+                                    }}
+                                    className="w-full h-9 px-3 bg-background border border-border rounded-xl text-xs focus:outline-none text-foreground"
+                                  >
+                                    <option value="">Select a template...</option>
+                                    {templates.map(t => (
+                                      <option key={t.id} value={t.id}>{t.name}</option>
+                                    ))}
+                                  </select>
+                                </div>
+
+                                <div className="space-y-1">
+                                  <Label className="text-[10px] font-bold text-muted-foreground uppercase">Validity Period</Label>
+                                  <select 
+                                    value={itemValidityPeriods[item.id] || calculateInitialValidity(item.cert_test_date, item.cert_expiry_date)}
+                                    onChange={(e) => handleValidityChange(item.id, item, e.target.value)}
+                                    className="w-full h-9 px-3 bg-background border border-border rounded-xl text-xs focus:outline-none text-foreground"
+                                  >
+                                    <option value="1y">1 Year</option>
+                                    <option value="2y">2 Years</option>
+                                    <option value="3y">3 Years</option>
+                                    <option value="1/2y">6 Months</option>
+                                  </select>
+                                </div>
+
                                 <div className="space-y-1">
                                   <Label className="text-[10px] font-bold text-muted-foreground uppercase">Certificate Reference No.</Label>
                                   <Input 
@@ -1740,176 +1826,76 @@ export default function InspectionsPage() {
                                   />
                                 </div>
 
-                                <div className="space-y-1 md:col-span-2">
-                                   <Label className="text-[10px] font-bold text-muted-foreground uppercase">Validity Period</Label>
-                                   <select 
-                                     value={itemValidityPeriods[item.id] || calculateInitialValidity(item.cert_test_date, item.cert_expiry_date)}
-                                     onChange={(e) => handleValidityChange(item.id, item, e.target.value)}
-                                     className="w-full h-9 px-3 bg-background border border-border rounded-xl text-xs focus:outline-none text-foreground"
-                                   >
-                                     <option value="1y">1 Year</option>
-                                     <option value="2y">2 Years</option>
-                                     <option value="3y">3 Years</option>
-                                     <option value="1/2y">6 Months</option>
-                                   </select>
-                                 </div>
                               </div>
 
-                              <div className="space-y-3 p-4 bg-blue-500/5 rounded-xl border border-blue-500/10">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                  <div className="space-y-1">
-                                    <Label className="text-[10px] font-bold text-muted-foreground uppercase">Select Certificate Template</Label>
-                                    <select
-                                      value={selectedTemplateIds[item.id] || ""}
-                                      onChange={(e) => {
-                                        const newTempId = e.target.value;
-                                        setSelectedTemplateIds({ ...selectedTemplateIds, [item.id]: newTempId });
-                                        handleUpdateItem(item.id, item.status, item.notes, undefined, undefined, item.scope, item.recommendations, item.cert_ref_no, item.cert_test_date, item.cert_expiry_date, item.cert_competency_no, newTempId);
-                                      }}
-                                      className="w-full h-9 px-3 bg-background border border-border rounded-xl text-xs focus:outline-none text-foreground"
-                                    >
-                                      <option value="">Select a template...</option>
-                                      {templates.map(t => (
-                                        <option key={t.id} value={t.id}>{t.name}</option>
-                                      ))}
-                                    </select>
-                                  </div>
+                              {/* Custom Fields based on selected template */}
+                              {(() => {
+                                const tempId = selectedTemplateIds[item.id];
+                                const activeTemp = templates.find(t => t.id === tempId);
+                                if (!activeTemp) return null;
+                                
+                                let tempFields: any[] = [];
+                                try {
+                                  tempFields = JSON.parse(activeTemp.fields);
+                                } catch(e){}
 
-                                  <div className="flex items-end">
-                                    <Button
-                                      type="button"
-                                      onClick={async () => {
-                                        const templateId = selectedTemplateIds[item.id];
-                                        if (!templateId) {
-                                          toast.error("Please select a template first");
-                                          return;
-                                        }
-                                        if (!item.cert_ref_no) {
-                                          toast.error("Certificate Reference Number is required");
-                                          return;
-                                        }
-                                        
-                                        const activeTemp = templates.find(t => t.id === templateId);
-                                        let tempFields: any[] = [];
-                                        try {
-                                          tempFields = JSON.parse(activeTemp.fields);
-                                        } catch(e){}
+                                if (tempFields.length === 0) return null;
 
-                                        const fieldVals = { ...templateFieldValues[item.id] };
-                                        for (const f of tempFields) {
-                                          if (!fieldVals[f.key]) {
-                                            fieldVals[f.key] = getDefaultFieldValue(f.key) || f.default || "";
-                                          }
-                                        }
-
-                                        const metadata = {
-                                          template_id: templateId,
-                                          field_values: fieldVals
-                                        };
-                                        
-                                        try {
-                                          // 1. Create the certificate
-                                          const res = await fetch(`${API_BASE_URL}/certificates`, {
-                                            method: "POST",
-                                            headers: {
-                                              "Content-Type": "application/json",
-                                              Authorization: `Bearer ${token}`
-                                            },
-                                            body: JSON.stringify({
-                                              inspection_id: selectedInspection.id,
-                                              inspection_item_id: item.id,
-                                              certificate_no: item.cert_ref_no,
-                                              issue_date: item.cert_test_date || new Date().toISOString(),
-                                              validity_period: itemValidityPeriods[item.id] || calculateInitialValidity(item.cert_test_date, item.cert_expiry_date),
-                                              metadata
-                                            })
-                                          });
-
-                                          if (!res.ok) {
-                                            const error = await res.json();
-                                            throw new Error(error.message || "Failed to issue certificate");
-                                          }
-
-                                          const cert = await res.json();
-                                          toast.success("Certificate issued successfully! Starting download...");
-
-                                          // 2. Download the certificate PDF
-                                          const pdfRes = await fetch(`${API_BASE_URL}/certificates/${cert.id}/pdf`, {
-                                            headers: { Authorization: `Bearer ${token}` }
-                                          });
-
-                                          if (pdfRes.ok) {
-                                            const blob = await pdfRes.blob();
-                                            const a = document.createElement("a");
-                                            a.href = URL.createObjectURL(blob);
-                                            a.download = `certificate-${item.cert_ref_no}.pdf`;
-                                            a.click();
-                                          }
-                                        } catch (err: any) {
-                                          toast.error(err.message || "Failed to generate certificate");
-                                        }
-                                      }}
-                                      className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold h-9 text-xs rounded-xl flex items-center justify-center gap-2"
-                                    >
-                                      Generate & Download Certificate
-                                    </Button>
-                                  </div>
-                                </div>
-
-                                {/* Custom Fields based on selected template */}
-                                {(() => {
-                                  const tempId = selectedTemplateIds[item.id];
-                                  const activeTemp = templates.find(t => t.id === tempId);
-                                  if (!activeTemp) return null;
-                                  
-                                  let tempFields: any[] = [];
-                                  try {
-                                    tempFields = JSON.parse(activeTemp.fields);
-                                  } catch(e){}
-
-                                  if (tempFields.length === 0) return null;
-
-                                  return (
-                                    <div className="space-y-3 pt-3 border-t border-blue-500/10">
-                                      <h5 className="text-[10px] font-bold text-blue-500 uppercase tracking-widest">Template Fields</h5>
-                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                        {tempFields.map((field: any, idx: number) => (
-                                          <div key={idx} className="space-y-1">
-                                            <Label className="text-[10px] text-slate-400">{field.label}</Label>
-                                            <textarea
-                                              placeholder={field.default || "Enter value..."}
-                                              className="w-full bg-background border border-border rounded-xl p-2.5 text-xs text-foreground focus:outline-none min-h-[80px] resize-y"
-                                              value={templateFieldValues[item.id]?.[field.key] ?? (getDefaultFieldValue(field.key) || field.default || "")}
-                                              onChange={(e) => {
-                                                const currentVals = templateFieldValues[item.id] || {};
-                                                setTemplateFieldValues({
-                                                  ...templateFieldValues,
-                                                  [item.id]: {
-                                                    ...currentVals,
-                                                    [field.key]: e.target.value
-                                                  }
-                                                });
-                                              }}
-                                              onBlur={(e) => {
-                                                const currentVals = templateFieldValues[item.id] || {};
-                                                const updatedVals = {
+                                return (
+                                  <div className="space-y-3 pt-3 border-t border-blue-500/10">
+                                    <h5 className="text-[10px] font-bold text-blue-500 uppercase tracking-widest">Template Fields</h5>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                      {tempFields.map((field: any, idx: number) => (
+                                        <div key={idx} className="space-y-1">
+                                          <Label className="text-[10px] text-slate-400">{field.label}</Label>
+                                          <textarea
+                                            placeholder={field.default || "Enter value..."}
+                                            className="w-full bg-background border border-border rounded-xl p-2.5 text-xs text-foreground focus:outline-none min-h-[80px] resize-y"
+                                            value={templateFieldValues[item.id]?.[field.key] ?? (getDefaultFieldValue(field.key) || field.default || "")}
+                                            onChange={(e) => {
+                                              const currentVals = templateFieldValues[item.id] || {};
+                                              setTemplateFieldValues({
+                                                ...templateFieldValues,
+                                                [item.id]: {
                                                   ...currentVals,
                                                   [field.key]: e.target.value
-                                                };
-                                                handleUpdateItem(item.id, item.status, item.notes, undefined, undefined, item.scope, item.recommendations, item.cert_ref_no, item.cert_test_date, item.cert_expiry_date, item.cert_competency_no, selectedTemplateIds[item.id], JSON.stringify(updatedVals));
-                                              }}
-                                            />
-                                          </div>
-                                        ))}
-                                      </div>
+                                                }
+                                              });
+                                            }}
+                                            onBlur={(e) => {
+                                              const currentVals = templateFieldValues[item.id] || {};
+                                              const updatedVals = {
+                                                ...currentVals,
+                                                [field.key]: e.target.value
+                                              };
+                                              handleUpdateItem(item.id, item.status, item.notes, undefined, undefined, item.scope, item.recommendations, item.cert_ref_no, item.cert_test_date, item.cert_expiry_date, item.cert_competency_no, selectedTemplateIds[item.id], JSON.stringify(updatedVals));
+                                            }}
+                                          />
+                                        </div>
+                                      ))}
                                     </div>
-                                  );
-                                })()}
-                              </div>
+                                  </div>
+                                );
+                              })()}
                             </div>
 
+                            {/* Inspections Name Input (Below Certificate Details) */}
+                            <div className="space-y-1 pt-3 border-t border-border/40">
+                              <Label className="text-[10px] font-bold text-muted-foreground uppercase">Inspections Name</Label>
+                              <Input 
+                                placeholder="Inspections Name..." 
+                                className="bg-background h-10 text-sm flex-1"
+                                defaultValue={item.scope || ""}
+                                onBlur={(e) => {
+                                  if (e.target.value !== (item.scope || "")) {
+                                    handleUpdateItem(item.id, item.status, item.notes, undefined, undefined, e.target.value, item.recommendations);
+                                  }
+                                }}
+                              />
+                            </div>
+                            
                             {/* Per-item Photo Upload & Preview */}
-                            <div className="space-y-2">
+                            <div className="space-y-2 pt-2">
                               {item.photo_url && parseItemPhotos(item.photo_url).length > 0 && (
                                 <div className="grid grid-cols-4 sm:grid-cols-6 gap-3 p-3 bg-muted/30 border border-border/50 rounded-xl">
                                   {parseItemPhotos(item.photo_url).map((url, index) => (
@@ -1935,7 +1921,7 @@ export default function InspectionsPage() {
                                 </div>
                               )}
                               
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2 flex-wrap">
                                 <input 
                                   type="file" 
                                   id={`item-file-${item.id}`}
@@ -1958,6 +1944,85 @@ export default function InspectionsPage() {
                                 >
                                   <Camera className="w-3.5 h-3.5 mr-1" /> Upload Item Photo
                                 </Button>
+
+                                <Button
+                                  type="button"
+                                  onClick={async () => {
+                                    const templateId = selectedTemplateIds[item.id];
+                                    if (!templateId) {
+                                      toast.error("Please select a template first");
+                                      return;
+                                    }
+                                    if (!item.cert_ref_no) {
+                                      toast.error("Certificate Reference Number is required");
+                                      return;
+                                    }
+                                    
+                                    const activeTemp = templates.find(t => t.id === templateId);
+                                    let tempFields: any[] = [];
+                                    try {
+                                      tempFields = JSON.parse(activeTemp.fields);
+                                    } catch(e){}
+
+                                    const fieldVals = { ...templateFieldValues[item.id] };
+                                    for (const f of tempFields) {
+                                      if (!fieldVals[f.key]) {
+                                        fieldVals[f.key] = getDefaultFieldValue(f.key) || f.default || "";
+                                      }
+                                    }
+
+                                    const metadata = {
+                                      template_id: templateId,
+                                      field_values: fieldVals
+                                    };
+                                    
+                                    const loadingToast = toast.loading("Generating certificate...");
+                                    try {
+                                      // 1. Create the certificate
+                                      const res = await fetch(`${API_BASE_URL}/certificates`, {
+                                        method: "POST",
+                                        headers: {
+                                          "Content-Type": "application/json",
+                                          Authorization: `Bearer ${token}`
+                                        },
+                                        body: JSON.stringify({
+                                          inspection_id: selectedInspection.id,
+                                          inspection_item_id: item.id,
+                                          certificate_no: item.cert_ref_no,
+                                          issue_date: item.cert_test_date || new Date().toISOString(),
+                                          validity_period: itemValidityPeriods[item.id] || calculateInitialValidity(item.cert_test_date, item.cert_expiry_date),
+                                          metadata
+                                        })
+                                      });
+
+                                      if (!res.ok) {
+                                        const error = await res.json();
+                                        throw new Error(error.message || "Failed to issue certificate");
+                                      }
+
+                                      const cert = await res.json();
+                                      toast.dismiss(loadingToast);
+                                      toast.success("Certificate issued successfully! Opening preview...");
+
+                                      // 2. Download the certificate PDF
+                                      const pdfRes = await fetch(`${API_BASE_URL}/certificates/${cert.id}/pdf`, {
+                                        headers: { Authorization: `Bearer ${token}` }
+                                      });
+
+                                      if (pdfRes.ok) {
+                                        const blob = await pdfRes.blob();
+                                        const url = URL.createObjectURL(blob);
+                                        setPreviewPdfUrl(url);
+                                      }
+                                    } catch (err: any) {
+                                      toast.dismiss(loadingToast);
+                                      toast.error(err.message || "Failed to generate certificate");
+                                    }
+                                  }}
+                                  className="bg-blue-600 hover:bg-blue-500 text-white font-bold h-9 text-xs rounded-xl flex items-center justify-center gap-2 px-4 shadow-sm"
+                                >
+                                  Generate & Preview Certificate
+                                </Button>
                               </div>
                             </div>
                           </div>
@@ -1965,7 +2030,7 @@ export default function InspectionsPage() {
                       ))}
                       
                       {/* Manual Button to Add Observation */}
-                      <div className="pt-2">
+                      <div className="flex flex-col sm:flex-row gap-3 pt-2">
                         <Button
                           type="button"
                           variant="outline"
@@ -1990,10 +2055,41 @@ export default function InspectionsPage() {
                               toast.error("Failed to add observation section");
                             }
                           }}
-                          className="w-full rounded-2xl h-11 border-dashed border-blue-500/30 text-blue-600 hover:bg-blue-500/5 font-bold transition-all"
+                          className="flex-1 rounded-2xl h-11 border-dashed border-blue-500/30 text-blue-600 hover:bg-blue-500/5 font-bold transition-all"
                         >
-                          + Add Observation Section
+                          + Issue new certificate
                         </Button>
+
+                        {(selectedInspection?.items || []).some(item => item.cert_template_id && item.cert_ref_no) && (
+                          <Button
+                            type="button"
+                            onClick={async () => {
+                              if (!token) return;
+                              const loadingToast = toast.loading("Generating combined PDF...");
+                              try {
+                                const res = await fetch(`${API_BASE_URL}/inspections/${selectedInspection.id}/certificates/download-all`, {
+                                  headers: { Authorization: `Bearer ${token}` }
+                                });
+                                if (res.ok) {
+                                  const blob = await res.blob();
+                                  const url = URL.createObjectURL(blob);
+                                  setPreviewPdfUrl(url);
+                                  toast.dismiss(loadingToast);
+                                  toast.success("Combined PDF ready!");
+                                } else {
+                                  toast.dismiss(loadingToast);
+                                  toast.error("Failed to generate combined PDF");
+                                }
+                              } catch (e) {
+                                toast.dismiss(loadingToast);
+                                toast.error("Failed to generate combined PDF");
+                              }
+                            }}
+                            className="flex-1 rounded-2xl h-11 bg-blue-600 hover:bg-blue-700 text-white font-bold transition-all shadow-md flex items-center justify-center gap-2"
+                          >
+                            Preview All Certificates (PDF)
+                          </Button>
+                        )}
                       </div>
                     </div>
     
@@ -2075,6 +2171,23 @@ export default function InspectionsPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {previewPdfUrl && (
+        <Dialog open={!!previewPdfUrl} onOpenChange={(open) => { if (!open) setPreviewPdfUrl(null); }}>
+          <DialogContent 
+            style={{ maxWidth: "96vw", width: "96vw", height: "95vh" }}
+            className="flex flex-col p-6 bg-background border border-border rounded-2xl shadow-2xl"
+          >
+            <DialogHeader className="flex flex-col gap-1 pb-2 border-b border-border/50">
+              <DialogTitle className="text-sm font-bold text-foreground">PDF Certificate Preview</DialogTitle>
+              <DialogDescription className="text-xs text-muted-foreground">Preview only mode (downloading restricted)</DialogDescription>
+            </DialogHeader>
+            <div className="flex-1 w-full overflow-hidden bg-muted/10 rounded-xl relative min-h-[500px]">
+              <PdfPreviewer url={previewPdfUrl} />
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

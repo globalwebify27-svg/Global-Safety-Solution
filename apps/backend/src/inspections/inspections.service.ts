@@ -90,6 +90,7 @@ export class InspectionsService {
         },
         items: true,
         expenditures: true,
+        certificates: true,
       },
     });
     if (!inspection) throw new NotFoundException('Inspection not found');
@@ -1150,8 +1151,289 @@ export class InspectionsService {
         doc.font('Helvetica-Bold').fontSize(8.5).fillColor(primaryColor).text('Authorized Signatory', 350, stdFootY + 49, { align: 'center', width: 200 });
         doc.fontSize(7.5).text('Global Safety Solution', 350, stdFootY + 61, { align: 'center', width: 200 });
 
-        drawCompetencyFooter(stdFootY + 80, '663, Dt. \u2013 11/11/2025', 'Competent Person');
+        drawCompetencyFooter(stdFootY + 80, '663, Dt. – 11/11/2025', 'Competent Person');
       } // end else (standard cert)
+
+      doc.end();
+    });
+  }
+
+  async generateAllCertificatesPdf(id: string): Promise<Buffer> {
+    const inspection = await this.prisma.inspection.findUnique({
+      where: { id },
+      include: {
+        items: true,
+      },
+    });
+
+    if (!inspection) {
+      return Buffer.alloc(0);
+    }
+
+    // Auto-create/upsert certificates for any items that have template and ref number
+    for (const item of inspection.items) {
+      if (item.cert_template_id && item.cert_ref_no) {
+        const existingCert = await this.prisma.certificate.findFirst({
+          where: { inspection_item_id: item.id },
+        });
+
+        if (!existingCert) {
+          try {
+            await this.prisma.certificate.create({
+              data: {
+                inspection_id: id,
+                inspection_item_id: item.id,
+                certificate_no: item.cert_ref_no,
+                issue_date: item.cert_test_date || new Date(),
+                expiry_date: item.cert_expiry_date || new Date(new Date().setFullYear(new Date().getFullYear() + 1)),
+                validity_period: "1 Year",
+                metadata: JSON.stringify({
+                  template_id: item.cert_template_id,
+                  field_values: item.cert_template_fields ? JSON.parse(item.cert_template_fields) : {}
+                })
+              }
+            });
+          } catch (e) {
+            console.error('Failed to auto-create certificate for item:', item.id, e);
+          }
+        }
+      }
+    }
+
+    const certificates = await this.prisma.certificate.findMany({
+      where: { inspection_id: id },
+      include: {
+        inspection: {
+          include: {
+            client: true,
+            engineer: true,
+          },
+        },
+        inspection_item: true,
+      },
+    });
+
+    if (!certificates || certificates.length === 0) {
+      return Buffer.alloc(0);
+    }
+
+    const QRCode = require('qrcode');
+    const path = require('path');
+    const fs = require('fs');
+
+    // Load GSS logo
+    let logoBuffer: Buffer | null = null;
+    try {
+      const possiblePaths = [
+        path.join(__dirname, '..', 'assets', 'gss-logo.png'),
+        path.join(__dirname, 'assets', 'gss-logo.png'),
+        path.join(process.cwd(), 'apps/backend/src/assets/gss-logo.png'),
+        path.join(process.cwd(), 'src/assets/gss-logo.png'),
+      ];
+      for (const logoPath of possiblePaths) {
+        if (fs.existsSync(logoPath)) {
+          logoBuffer = fs.readFileSync(logoPath);
+          break;
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load GSS logo:', err);
+    }
+
+    const PDFDocument = require('pdfkit');
+
+    return new Promise(async (resolve) => {
+      const doc = new PDFDocument({ margin: 40, size: 'A4' });
+      const buffers: Buffer[] = [];
+
+      doc.on('data', buffers.push.bind(buffers));
+      doc.on('end', () => resolve(Buffer.concat(buffers)));
+
+      for (let i = 0; i < certificates.length; i++) {
+        if (i > 0) {
+          doc.addPage();
+        }
+
+        const certificate = certificates[i];
+
+        // 1. Parse metadata for template details
+        let templateId: string | null = null;
+        let fieldValues: any = {};
+        if (certificate.metadata) {
+          try {
+            const meta = JSON.parse(certificate.metadata);
+            templateId = meta.template_id || null;
+            fieldValues = meta.field_values || {};
+          } catch (e) {
+            console.error('Error parsing certificate metadata:', e);
+          }
+        }
+
+        // 2. Fetch template
+        let template: any = null;
+        if (templateId) {
+          template = await this.prisma.certificateTemplate.findUnique({
+            where: { id: templateId },
+          });
+        }
+
+        // 3. QR code generation
+        let qrCodeBuffer: Buffer | null = null;
+        try {
+          const frontendUrl = process.env.FRONTEND_URL || 'https://globalsafetysolution.in';
+          const qrUrl = `${frontendUrl}/verify/certificate/${certificate.id}`;
+          qrCodeBuffer = await QRCode.toBuffer(qrUrl, {
+            width: 150,
+            margin: 1,
+          });
+        } catch (err) {
+          console.error('Failed to generate QR Code locally:', err);
+        }
+
+        // Colors
+        const primaryColor = '#0f172a';
+        const goldColor = '#b8860b';
+
+        // Gold border
+        doc.rect(15, 15, 565, 812).lineWidth(1.5).stroke(goldColor);
+        doc.rect(20, 20, 555, 802).lineWidth(0.5).stroke(primaryColor);
+
+        // Enterprise header
+        doc.fillColor('#000000').fontSize(7.5).font('Helvetica-Bold');
+        doc.text('GSTIN: 20BILPA8494E1ZE', 40, 26, { align: 'right', width: 510 });
+        doc.text('ISO:9001:2015', 40, 36, { align: 'right', width: 510 });
+
+        // Logo
+        if (logoBuffer) {
+          doc.image(logoBuffer, 30, 28, { width: 60, height: 60 });
+        }
+
+        // Company name
+        doc.fontSize(20).font('Helvetica-Bold').fillColor(primaryColor);
+        doc.text('M/s Global Safety Solution', 100, 34);
+        doc.fontSize(7).font('Helvetica').fillColor('#334155');
+        doc.text('☉ Shop No. 51, 2nd Floor, AC Market, Gel Church Complex, Main Road, Ranchi-834001 (Jharkhand)', 100, 58);
+        doc.text('☎ 6201186550   ✉ id-globalsafety56@gmail.com', 100, 68);
+
+        // Divider
+        doc.moveTo(28, 92).lineTo(567, 92).lineWidth(1.2).stroke(primaryColor);
+
+        // Certificate header info
+        const title = template?.name || 'SAFETY COMPLIANCE CERTIFICATE';
+        const description = template?.description || 'Test Report / Safety Certificate';
+
+        doc.fillColor(primaryColor);
+        doc.fontSize(11).font('Helvetica-Bold').text(title.toUpperCase(), 30, 105, { align: 'center', width: 539 });
+        doc.fontSize(8.5).font('Helvetica').fillColor(goldColor).text(description, { align: 'center', width: 539 });
+        doc.moveDown(0.3);
+
+        // Ref and Dates
+        const refNo = certificate.certificate_no;
+        const issueDateStr = new Date(certificate.issue_date).toLocaleDateString('en-IN');
+        const expiryDateStr = new Date(certificate.expiry_date).toLocaleDateString('en-IN');
+
+        doc.fontSize(8).font('Helvetica-Bold').fillColor(primaryColor);
+        doc.text(`REF NO: ${refNo}`, 40, 142);
+        doc.text(`Test Date: ${issueDateStr}`, 240, 142);
+        doc.text(`Valid Upto: ${expiryDateStr}`, 430, 142);
+        doc.moveTo(35, 154).lineTo(560, 154).lineWidth(0.5).stroke('#cbd5e1');
+
+        // Helper function to replace placeholders
+        const replacePlaceholders = (text: string) => {
+          if (!text) return '';
+          let result = text;
+          result = result.replace(/{{cert_ref_no}}/g, certificate.certificate_no);
+          result = result.replace(/{{cert_test_date}}/g, issueDateStr);
+          result = result.replace(/{{cert_expiry_date}}/g, expiryDateStr);
+          result = result.replace(/{{cert_competency_no}}/g, certificate.inspection_item?.cert_competency_no || '663');
+          result = result.replace(/{{client_name}}/g, certificate.inspection?.client?.name || '');
+          result = result.replace(/{{client_city}}/g, certificate.inspection?.client?.city || '');
+          result = result.replace(/{{client_address}}/g, certificate.inspection?.client?.billing_address || '');
+          Object.keys(fieldValues).forEach((key) => {
+            const val = fieldValues[key];
+            result = result.replace(new RegExp(`{{${key}}}`, 'g'), val || '');
+          });
+          return result.replace(/{{.*?}}/g, 'N/A');
+        };
+
+        // Draw Key-Value dynamic fields
+        let yRef = { val: 165 };
+        const drawRow = (num: string, label: string, val: string, labelWidth = 220) => {
+          const y = yRef.val;
+          doc.font('Helvetica-Bold').fontSize(8);
+          const labelHeight = doc.heightOfString(label, { width: labelWidth });
+          doc.font('Helvetica').fontSize(8);
+          const valHeight = doc.heightOfString(`:  ${val || 'N/A'}`, { width: 560 - 56 - labelWidth - 4 });
+          const rowHeight = Math.max(labelHeight, valHeight);
+          const rowPadding = 8;
+          doc.font('Helvetica-Bold').fontSize(8).fillColor(primaryColor).text(`${num}.`, 38, y, { width: 16 });
+          doc.font('Helvetica-Bold').text(label, 56, y, { width: labelWidth });
+          doc.font('Helvetica').text(`:  ${val || 'N/A'}`, 56 + labelWidth + 4, y, { width: 560 - 56 - labelWidth - 4 });
+          yRef.val += rowHeight + rowPadding;
+          doc.moveTo(35, yRef.val - 3).lineTo(560, yRef.val - 3).lineWidth(0.3).stroke('#e2e8f0');
+        };
+
+        drawRow('1', 'Name of the occupier of the Factory', certificate.inspection?.client?.name || 'N/A');
+        drawRow('2', 'Address of the Factory', certificate.inspection?.client?.billing_address || certificate.inspection?.client?.city || 'N/A');
+
+        let templateFields: any[] = [];
+        if (template?.fields) {
+          try {
+            templateFields = JSON.parse(template.fields);
+          } catch (e) {
+            console.error('Error parsing template fields:', e);
+          }
+        }
+
+        if (Array.isArray(templateFields) && templateFields.length > 0) {
+          templateFields.forEach((field: any, index: number) => {
+            const label = field.label || field.name || 'Field';
+            const placeholderKey = field.key || field.name || '';
+            const valueRaw = fieldValues[placeholderKey] || '';
+            const finalVal = replacePlaceholders(valueRaw || field.default || '');
+            drawRow((index + 3).toString(), label, finalVal);
+          });
+        } else {
+          drawRow('3', 'Description of Safety Check / Eqpt', certificate.inspection_item?.description || 'N/A');
+          drawRow('4', 'Observations / Notes', certificate.inspection_item?.notes || 'N/A');
+          drawRow('5', 'Scope of Inspection', certificate.inspection_item?.scope || 'N/A');
+          drawRow('6', 'Remarks & Recommendations', certificate.inspection_item?.recommendations || 'N/A');
+        }
+
+        const finalStatementRaw = template?.html_content || `I / We certify that on {{cert_test_date}} the safety checklist section described above was thoroughly examined and found satisfactory, subject to notes and recommendations.`;
+        const finalStatement = replacePlaceholders(finalStatementRaw);
+
+        const statementY = yRef.val + 10;
+        doc.fontSize(8).font('Helvetica-Oblique').fillColor(primaryColor);
+        doc.text(finalStatement, 38, statementY, { width: 516, align: 'justify', lineGap: 1.5 });
+
+        const sigY = Math.min(statementY + 90, 710);
+        doc.moveTo(28, sigY - 10).lineTo(567, sigY - 10).lineWidth(0.5).stroke('#94a3b8');
+
+        doc.font('Helvetica-Bold').fontSize(8).fillColor(primaryColor);
+        doc.text(`Test Date: ${issueDateStr}`, 38, sigY);
+        doc.text(`Due Date: ${expiryDateStr}`, 38, sigY + 12);
+        doc.font('Helvetica').text(`Competency No – ${certificate.inspection_item?.cert_competency_no || '663'}`, 38, sigY + 24);
+
+        if (qrCodeBuffer) {
+          doc.image(qrCodeBuffer, 460, sigY, { width: 55, height: 55 });
+          doc.fontSize(6).fillColor('#475569').text('SCAN TO VERIFY', 460, sigY + 57, { align: 'center', width: 55 });
+        }
+
+        doc.moveTo(220, sigY + 35).lineTo(420, sigY + 35).lineWidth(0.5).stroke(primaryColor);
+        doc.font('Helvetica-Bold').fontSize(8.5).fillColor(primaryColor).text('Competent Person', 220, sigY + 39, { align: 'center', width: 200 });
+        doc.fontSize(7.5).text('Global Safety Solution', 220, sigY + 49, { align: 'center', width: 200 });
+
+        const drawCompetencyFooter = (startY: number, competencyNo: string) => {
+          doc.moveTo(28, startY).lineTo(567, startY).lineWidth(0.5).stroke('#94a3b8');
+          startY += 6;
+          doc.fontSize(7.5).font('Helvetica-Bold').fillColor(primaryColor);
+          doc.text('Global Safety Solution', 160, startY, { align: 'center', width: 280 });
+          doc.text('Competent Person under the Factories Act. 1948', 160, startY + 10, { align: 'center', width: 280 });
+          doc.text(`Competency No. from Govt. – Memo. No.: ${competencyNo}`, 160, startY + 20, { align: 'center', width: 280 });
+        };
+        drawCompetencyFooter(sigY + 74, certificate.inspection_item?.cert_competency_no || '663');
+      }
 
       doc.end();
     });
