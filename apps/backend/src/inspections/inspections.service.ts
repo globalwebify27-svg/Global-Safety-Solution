@@ -495,7 +495,12 @@ export class InspectionsService {
 
   async findByEngineer(engineerId: string) {
     return this.prisma.inspection.findMany({
-      where: { engineer_id: engineerId },
+      where: {
+        OR: [
+          { engineer_id: engineerId },
+          { assigned_staff_id: engineerId },
+        ],
+      },
       include: {
         client: true,
         project: true,

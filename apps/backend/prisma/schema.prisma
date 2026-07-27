@@ -655,6 +655,7 @@ model Inspection {
   client_id      String            @db.VarChar(36)
   project_id     String?           @db.VarChar(36)
   engineer_id    String?           @db.VarChar(36)
+  assigned_staff_id String?        @db.VarChar(36)
   scheduled_date DateTime          @db.Date
   completed_date DateTime?         @db.DateTime(6)
   status         String            @default("SCHEDULED") @db.VarChar(50)

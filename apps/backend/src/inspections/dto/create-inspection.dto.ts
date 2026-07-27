@@ -56,6 +56,10 @@ export class CreateInspectionDto {
   @IsUUID()
   work_order_id?: string;
 
+  @IsOptional()
+  @IsUUID()
+  assigned_staff_id?: string;
+
   @IsDateString()
   scheduled_date: string;
 
@@ -82,6 +86,10 @@ export class UpdateInspectionDto {
   @IsOptional()
   @IsUUID()
   engineer_id?: string;
+
+  @IsOptional()
+  @IsUUID()
+  assigned_staff_id?: string;
 
   @IsOptional()
   @IsDateString()

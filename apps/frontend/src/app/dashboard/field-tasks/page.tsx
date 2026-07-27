@@ -1372,7 +1372,12 @@ export default function FieldTasksPage() {
               }}
               className="group bg-card hover:bg-muted/20 border border-border rounded-[2rem] p-6 transition-all duration-300 cursor-pointer shadow-sm hover:shadow-xl relative overflow-hidden"
             >
-              <div className="absolute top-0 right-0 p-4">
+              <div className="absolute top-0 right-0 p-4 flex gap-2">
+                {task.assigned_staff_id === user?.id && (
+                  <div className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter bg-purple-500/10 text-purple-600 ring-1 ring-purple-500/20 shadow-sm">
+                    Data Entry Assist
+                  </div>
+                )}
                 <div className={cn("px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter ring-1", 
                   task.status === 'COMPLETED' ? 'bg-emerald-500/10 text-emerald-600 ring-emerald-500/20' :
                   task.status === 'PENDING_REVIEW' ? 'bg-amber-500/10 text-amber-600 ring-amber-500/20' :

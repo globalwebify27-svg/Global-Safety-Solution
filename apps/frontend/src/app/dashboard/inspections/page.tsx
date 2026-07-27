@@ -296,6 +296,7 @@ export default function InspectionsPage() {
   const [scheduleForm, setScheduleForm] = useState({
     client_id: "",
     engineer_id: "",
+    assigned_staff_id: "",
     scheduled_date: new Date().toISOString().split('T')[0],
     items: [{ description: "General Safety Check" }]
   });
@@ -493,6 +494,7 @@ export default function InspectionsPage() {
       const payload: any = {
         client_id: scheduleForm.client_id,
         engineer_id: scheduleForm.engineer_id,
+        assigned_staff_id: scheduleForm.assigned_staff_id || null,
         scheduled_date: scheduleForm.scheduled_date,
         items: [{ description: "General Safety Check" }]
       };
@@ -1032,6 +1034,17 @@ export default function InspectionsPage() {
                     </select>
                   </div>
                   <div className="space-y-2">
+                    <Label>Data Entry Staff (Optional)</Label>
+                    <select 
+                      value={scheduleForm.assigned_staff_id || ""}
+                      onChange={(e) => setScheduleForm({...scheduleForm, assigned_staff_id: e.target.value})}
+                      className="w-full h-11 px-4 bg-background border border-border rounded-xl text-sm"
+                    >
+                      <option value="">None (Engineer Fills)</option>
+                      {engineers.map(e => <option key={e.id} value={e.id}>{e.name} ({e.employee_id || e.designation || 'Staff Member'})</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
                     <Label>Scheduled Date</Label>
                     <Input 
                       type="date"
@@ -1435,6 +1448,36 @@ export default function InspectionsPage() {
                           <option value="">Unassigned</option>
                           {engineers.map(eng => (
                             <option key={eng.id} value={eng.id}>{eng.name} ({eng.employee_id || eng.designation || 'Field Engineer'})</option>
+                          ))}
+                        </select>
+                      </div>
+                      
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-muted-foreground uppercase">Data Entry Staff</label>
+                        <select
+                          value={selectedInspection.assigned_staff_id || ""}
+                          onChange={async (e) => {
+                            const newStaffId = e.target.value;
+                            if (!token) return;
+                            try {
+                              const res = await fetch(`${API_BASE_URL}/inspections/${selectedInspection.id}`, {
+                                method: 'PATCH',
+                                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                                body: JSON.stringify({ assigned_staff_id: newStaffId || null })
+                              });
+                              if (res.ok) {
+                                toast.success("Data entry staff assigned successfully!");
+                                await fetchSingleInspection(selectedInspection.id);
+                              }
+                            } catch (err) {
+                              toast.error("Failed to assign staff");
+                            }
+                          }}
+                          className="w-full h-10 px-3 bg-background border border-border rounded-xl text-xs font-semibold focus:outline-none"
+                        >
+                          <option value="">None (Engineer Fills)</option>
+                          {engineers.map(eng => (
+                            <option key={eng.id} value={eng.id}>{eng.name} ({eng.employee_id || eng.designation || 'Staff Member'})</option>
                           ))}
                         </select>
                       </div>
