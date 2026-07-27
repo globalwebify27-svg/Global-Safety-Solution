@@ -54,7 +54,8 @@ export default function SettingsPage() {
     companyName: "",
     gstNumber: "",
     address: "",
-    website: ""
+    website: "",
+    defaultLicenseNo: ""
   });
 
   useEffect(() => {
@@ -72,7 +73,8 @@ export default function SettingsPage() {
             companyName: data.company_name || "",
             gstNumber: data.gst_number || "",
             address: data.address || "",
-            website: data.website || ""
+            website: data.website || "",
+            defaultLicenseNo: data.default_license_no || ""
           });
         }
       } catch (err) {
@@ -134,7 +136,8 @@ export default function SettingsPage() {
           company_name: orgForm.companyName,
           gst_number: orgForm.gstNumber,
           address: orgForm.address,
-          website: orgForm.website
+          website: orgForm.website,
+          default_license_no: orgForm.defaultLicenseNo
         })
       });
 
@@ -335,6 +338,10 @@ export default function SettingsPage() {
                     <Globe className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
                     <Input value={orgForm.website || ""} onChange={(e) => setOrgForm({...orgForm, website: e.target.value})} className="bg-background border-border h-11 pl-10 text-foreground" placeholder="www.globalsafety.com" />
                   </div>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-muted-foreground">Default License / Competency No.</Label>
+                  <Input value={orgForm.defaultLicenseNo || ""} onChange={(e) => setOrgForm({...orgForm, defaultLicenseNo: e.target.value})} placeholder="e.g. 663, dated 11.11.2025, valid upto 10.11.2026" className="bg-background border-border h-11 text-foreground" />
                 </div>
               </div>
 

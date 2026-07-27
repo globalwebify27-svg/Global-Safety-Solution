@@ -460,6 +460,16 @@ export class InspectionsService {
   }
 
   async addItem(data: AddInspectionItemDto) {
+    let compNo = data.cert_competency_no || null;
+    if (!compNo) {
+      const setting = await this.prisma.systemSetting.findUnique({
+        where: { key: 'default_license_no' },
+      });
+      if (setting?.value) {
+        compNo = setting.value;
+      }
+    }
+
     const item = await this.prisma.inspectionItem.create({
       data: {
         inspection_id: data.inspection_id,
@@ -473,7 +483,7 @@ export class InspectionsService {
         cert_ref_no: data.cert_ref_no || null,
         cert_test_date: data.cert_test_date ? new Date(data.cert_test_date) : null,
         cert_expiry_date: data.cert_expiry_date ? new Date(data.cert_expiry_date) : null,
-        cert_competency_no: data.cert_competency_no || null,
+        cert_competency_no: compNo,
       },
     });
 

@@ -264,6 +264,7 @@ export default function FieldTasksPage() {
   // Shared competency & details
   const [certCompetencyNo, setCertCompetencyNo] = useState("663, dated 11.11.2025, valid upto 10.11.2026");
   const [certCompetentPerson, setCertCompetentPerson] = useState("Aqueel Ahmad");
+  const [globalSettings, setGlobalSettings] = useState<Record<string, string>>({});
 
   const token = useAuthStore((state) => state.token);
   const user = useAuthStore((state) => state.user);
@@ -438,11 +439,18 @@ export default function FieldTasksPage() {
     if (!token || !user) return;
     setLoading(true);
     try {
-      const [tRes, tempRes] = await Promise.all([
+      const [tRes, tempRes, sRes] = await Promise.all([
         fetch(`${API_BASE_URL}/inspections/engineer/${user.id}`, { headers: { Authorization: `Bearer ${token}` } }),
-        fetch(`${API_BASE_URL}/certificate-templates`, { headers: { Authorization: `Bearer ${token}` } })
+        fetch(`${API_BASE_URL}/certificate-templates`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`${API_BASE_URL}/settings`, { headers: { Authorization: `Bearer ${token}` } })
       ]);
-      const [tData, tempData] = await Promise.all([tRes.json(), tempRes.json()]);
+      const [tData, tempData, sData] = await Promise.all([tRes.json(), tempRes.json(), sRes.json()]);
+      if (sData) {
+        setGlobalSettings(sData);
+        if (sData.default_license_no) {
+          setCertCompetencyNo(sData.default_license_no);
+        }
+      }
       if (Array.isArray(tData)) {
         setTasks(tData);
       }
@@ -966,7 +974,7 @@ export default function FieldTasksPage() {
                         <Input 
                           placeholder="e.g. 663, valid upto 10.11.2026" 
                           className="bg-background h-10 rounded-xl text-sm text-foreground"
-                          defaultValue={item.cert_competency_no || ""}
+                          defaultValue={item.cert_competency_no || globalSettings.default_license_no || certCompetencyNo || ""}
                           onBlur={(e) => handleUpdateItem(item.id, item.status, item.notes, undefined, item.scope, item.recommendations, item.cert_ref_no, undefined, undefined, e.target.value)}
                         />
                       </div>

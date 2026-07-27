@@ -181,6 +181,7 @@ export default function InspectionsPage() {
   const [openVisit, setOpenVisit] = useState(false);
   const [selectedInspection, setSelectedInspection] = useState<Inspection | null>(null);
   const [previewPdfUrl, setPreviewPdfUrl] = useState<string | null>(null);
+  const [globalSettings, setGlobalSettings] = useState<Record<string, string>>({});
 
   // Certificate Preparation & Review States
   const [draftCertType, setDraftCertType] = useState("FIRE_SAFETY");
@@ -202,6 +203,9 @@ export default function InspectionsPage() {
     }
     if (key.includes("address") || key.includes("factory_address")) {
       return (selectedInspection?.client as any)?.address || (selectedInspection?.client as any)?.city || "";
+    }
+    if (key.includes("competency") || key.includes("license")) {
+      return globalSettings.default_license_no || "";
     }
     return "";
   };
@@ -378,13 +382,22 @@ export default function InspectionsPage() {
     if (!token) return;
     setLoading(true);
     try {
-      const [iRes, cRes, eRes, tempRes] = await Promise.all([
+      const [iRes, cRes, eRes, tempRes, sRes] = await Promise.all([
         fetch(`${API_BASE_URL}/inspections`, { headers: { Authorization: `Bearer ${token}` } }),
         fetch(`${API_BASE_URL}/clients`, { headers: { Authorization: `Bearer ${token}` } }),
         fetch(`${API_BASE_URL}/users`, { headers: { Authorization: `Bearer ${token}` } }), // Changed from /employees to /users as per schema
         fetch(`${API_BASE_URL}/certificate-templates`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`${API_BASE_URL}/settings`, { headers: { Authorization: `Bearer ${token}` } }),
       ]);
-      const [iData, cData, eData, tempData] = await Promise.all([iRes.json(), cRes.json(), eRes.json(), tempRes.json()]);
+      const [iData, cData, eData, tempData, sData] = await Promise.all([
+        iRes.json(),
+        cRes.json(),
+        eRes.json(),
+        tempRes.json(),
+        sRes.json()
+      ]);
+      
+      if (sData) setGlobalSettings(sData);
       
       if (Array.isArray(iData)) setInspections(iData);
       if (Array.isArray(cData)) setClients(cData);
@@ -1821,7 +1834,7 @@ export default function InspectionsPage() {
                                   <Input 
                                     placeholder="e.g. 663, valid upto 10.11.2026" 
                                     className="bg-background h-9 text-xs"
-                                    defaultValue={item.cert_competency_no || ""}
+                                    defaultValue={item.cert_competency_no || globalSettings.default_license_no || ""}
                                     onBlur={(e) => handleUpdateItem(item.id, item.status, item.notes, undefined, undefined, item.scope, item.recommendations, item.cert_ref_no, undefined, undefined, e.target.value)}
                                   />
                                 </div>
