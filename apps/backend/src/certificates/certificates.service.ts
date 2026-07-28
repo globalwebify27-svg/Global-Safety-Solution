@@ -1,5 +1,4 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import * as QRCode from 'qrcode';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   CreateCertificateDto,
@@ -245,6 +244,8 @@ export class CertificatesService {
     }
 
     // 3. QR code generation
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const QRCode = require('qrcode');
     let qrCodeBuffer: Buffer | null = null;
     try {
       const frontendUrl = process.env.FRONTEND_URL || 'https://globalsafetysolution.in';
