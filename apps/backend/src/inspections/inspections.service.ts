@@ -1229,7 +1229,7 @@ export class InspectionsService {
     });
 
     if (!certificates || certificates.length === 0) {
-      return Buffer.alloc(0);
+      throw new NotFoundException('No certificates found for this inspection. Please ensure the inspection is approved and certificates are generated.');
     }
 
     const QRCode = require('qrcode');
