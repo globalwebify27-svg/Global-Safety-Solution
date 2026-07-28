@@ -36,6 +36,36 @@ export class CertificatesService {
       ? JSON.stringify(metadata)
       : metadata;
 
+    const existing = await this.prisma.certificate.findFirst({
+      where: {
+        OR: [
+          ...(rest.inspection_item_id ? [{ inspection_item_id: rest.inspection_item_id }] : []),
+          ...(rest.certificate_no ? [{ certificate_no: rest.certificate_no }] : []),
+        ],
+      },
+    });
+
+    if (existing) {
+      return this.prisma.certificate.update({
+        where: { id: existing.id },
+        data: {
+          ...rest,
+          issue_date: issueDate,
+          expiry_date: expiryDate,
+          validity_period,
+          metadata: metadataStr,
+        },
+        include: {
+          inspection: {
+            include: {
+              client: true,
+              work_order: true,
+            },
+          },
+        },
+      });
+    }
+
     return this.prisma.certificate.create({
       data: {
         ...rest,

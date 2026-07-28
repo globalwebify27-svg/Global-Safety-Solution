@@ -184,6 +184,13 @@ export default function InspectionsPage() {
   const [previewPdfUrl, setPreviewPdfUrl] = useState<string | null>(null);
   const [globalSettings, setGlobalSettings] = useState<Record<string, string>>({});
 
+  const getAbsolutePdfUrl = (url: string | null | undefined) => {
+    if (!url) return null;
+    if (url.startsWith("http://") || url.startsWith("https://")) return url;
+    if (url.includes("localhost") || url.includes("127.0.0.1")) return `http://${url}`;
+    return `https://${url}`;
+  };
+
   // Certificate Preparation & Review States
   const [draftCertType, setDraftCertType] = useState("FIRE_SAFETY");
   const [draftCertValidity, setDraftCertValidity] = useState("1y");
@@ -1671,7 +1678,7 @@ export default function InspectionsPage() {
                     </div>
                     <Button 
                       type="button"
-                      onClick={() => setPreviewPdfUrl(selectedInspection.pdf_url || null)}
+                      onClick={() => setPreviewPdfUrl(getAbsolutePdfUrl(selectedInspection.pdf_url))}
                       className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600/10 text-blue-600 border border-blue-600/20 rounded-xl text-xs font-bold hover:bg-blue-600 hover:text-white transition-all shadow-sm active:scale-95 h-9"
                     >
                       <Eye className="w-4 h-4" /> Preview PDF

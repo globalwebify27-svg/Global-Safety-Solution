@@ -234,6 +234,13 @@ export default function FieldTasksPage() {
   const [itemValidityPeriods, setItemValidityPeriods] = useState<Record<string, string>>({});
   const [previewPdfUrl, setPreviewPdfUrl] = useState<string | null>(null);
 
+  const getAbsolutePdfUrl = (url: string | null | undefined) => {
+    if (!url) return null;
+    if (url.startsWith("http://") || url.startsWith("https://")) return url;
+    if (url.includes("localhost") || url.includes("127.0.0.1")) return `http://${url}`;
+    return `https://${url}`;
+  };
+
   const calculateInitialValidity = (testDateStr?: string | null, expiryDateStr?: string | null) => {
     if (!testDateStr || !expiryDateStr) return "1y";
     const testDate = new Date(testDateStr);
@@ -996,7 +1003,7 @@ export default function FieldTasksPage() {
               </div>
               <Button
                 type="button"
-                onClick={() => setPreviewPdfUrl(selectedTask.pdf_url!)}
+                onClick={() => setPreviewPdfUrl(getAbsolutePdfUrl(selectedTask.pdf_url))}
                 className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600/10 text-blue-600 border border-blue-600/20 rounded-xl text-xs font-bold hover:bg-blue-600 hover:text-white transition-all active:scale-95"
               >
                 <Eye className="w-4 h-4" /> Preview PDF
