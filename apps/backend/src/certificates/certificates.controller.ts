@@ -38,13 +38,18 @@ export class CertificatesController {
 
   @Get(':id/pdf')
   async downloadPdf(@Param('id') id: string, @Res() res: any) {
-    const buffer = await this.certificatesService.generatePdfForCertificate(id);
-    res.set({
-      'Content-Type': 'application/pdf',
-      'Content-Disposition': `attachment; filename=safety-certificate-${id.substring(0, 8)}.pdf`,
-      'Content-Length': buffer.length,
-    });
-    res.end(buffer);
+    try {
+      const buffer = await this.certificatesService.generatePdfForCertificate(id);
+      res.set({
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename=safety-certificate-${id.substring(0, 8)}.pdf`,
+        'Content-Length': buffer.length,
+      });
+      res.end(buffer);
+    } catch (err) {
+      console.error('[PDF Error] certificates/:id/pdf failed:', err?.message, err?.stack);
+      res.status(500).json({ error: err?.message || 'PDF generation failed', detail: err?.stack });
+    }
   }
 
   @Patch(':id')

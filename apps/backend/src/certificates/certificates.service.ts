@@ -280,12 +280,16 @@ export class CertificatesService {
 
     const PDFDocument = require('pdfkit');
 
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       const doc = new PDFDocument({ margin: 40, size: 'A4' });
       const buffers: Buffer[] = [];
 
       doc.on('data', buffers.push.bind(buffers));
       doc.on('end', () => resolve(Buffer.concat(buffers)));
+      doc.on('error', (err: Error) => {
+        console.error('[PDFKit] Document error in generatePdfForCertificate:', err);
+        reject(err);
+      });
 
       // Colors
       const primaryColor = '#0f172a';

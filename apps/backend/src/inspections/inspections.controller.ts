@@ -104,13 +104,18 @@ export class InspectionsController {
     @Param('id') id: string,
     @Res() res: any,
   ) {
-    const buffer = await this.inspectionsService.generateAllCertificatesPdf(id);
-    res.set({
-      'Content-Type': 'application/pdf',
-      'Content-Disposition': `attachment; filename=all-certificates-${id.substring(0, 8)}.pdf`,
-      'Content-Length': buffer.length,
-    });
-    res.end(buffer);
+    try {
+      const buffer = await this.inspectionsService.generateAllCertificatesPdf(id);
+      res.set({
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename=all-certificates-${id.substring(0, 8)}.pdf`,
+        'Content-Length': buffer.length,
+      });
+      res.end(buffer);
+    } catch (err) {
+      console.error('[PDF Error] inspections/:id/certificates/download-all failed:', err?.message, err?.stack);
+      res.status(err?.status || 500).json({ error: err?.message || 'PDF generation failed', detail: err?.stack });
+    }
   }
 
   @Post(':id/approve')
