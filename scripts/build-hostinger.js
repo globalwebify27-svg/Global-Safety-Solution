@@ -9,20 +9,6 @@ execSync('npm run build --workspace=backend', { stdio: 'inherit' });
 
 // 2. Prepare the root-level dist/ folder
 const rootDist = path.join(__dirname, '../dist');
-const uploadsBackup = path.join(__dirname, '../public/uploads');
-
-// Save uploaded files if any exist before cleaning dist
-if (fs.existsSync(rootDist)) {
-  const uploadsInDist = path.join(rootDist, 'public', 'uploads');
-  if (fs.existsSync(uploadsInDist)) {
-    fs.mkdirSync(uploadsBackup, { recursive: true });
-    copyDirSync(uploadsInDist, uploadsBackup);
-    console.log('Backed up existing uploaded files in public/uploads');
-  }
-  fs.rmSync(rootDist, { recursive: true, force: true });
-}
-fs.mkdirSync(rootDist, { recursive: true });
-console.log('Created root-level dist/ folder');
 
 // Helper function to recursively copy directories
 function copyDirSync(src, dest) {
@@ -39,6 +25,30 @@ function copyDirSync(src, dest) {
       fs.copyFileSync(srcPath, destPath);
     }
   }
+}
+
+// Helper: delete everything in a directory EXCEPT specified folder names
+function cleanDirExcept(dir, exceptNames) {
+  if (!fs.existsSync(dir)) return;
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  for (const entry of entries) {
+    if (exceptNames.includes(entry.name)) {
+      console.log(`Preserved: dist/${entry.name}/`);
+      continue;
+    }
+    const fullPath = path.join(dir, entry.name);
+    fs.rmSync(fullPath, { recursive: true, force: true });
+  }
+}
+
+// Clean dist/ but NEVER delete public/ (contains uploaded files from staff)
+// This prevents uploaded images/PDFs from being wiped on every deploy.
+if (fs.existsSync(rootDist)) {
+  cleanDirExcept(rootDist, ['public']);
+  console.log('Cleaned dist/ folder (preserved dist/public/ with uploads)');
+} else {
+  fs.mkdirSync(rootDist, { recursive: true });
+  console.log('Created root-level dist/ folder');
 }
 
 // 3. Copy the compiled backend files to root-level dist/
@@ -76,14 +86,10 @@ if (fs.existsSync(pdfkitDataSrc)) {
   console.log('Copied pdfkit font data (.afm files) to root-level dist/data/');
 }
 
-// 5.2 Restore public/uploads folder into dist/public/uploads
+// 5.2 Ensure public/uploads directory exists (but NEVER delete existing files)
 const destUploads = path.join(__dirname, '../dist/public/uploads');
-if (fs.existsSync(uploadsBackup)) {
-  copyDirSync(uploadsBackup, destUploads);
-  console.log('Restored uploaded files into dist/public/uploads/');
-} else {
-  fs.mkdirSync(destUploads, { recursive: true });
-}
+fs.mkdirSync(destUploads, { recursive: true });
+console.log('Ensured dist/public/uploads/ directory exists');
 
 // 6. Install production dependencies directly inside dist/
 console.log('Installing production dependencies into dist/node_modules...');
