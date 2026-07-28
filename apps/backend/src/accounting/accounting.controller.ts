@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Body, Query, Param, Req, UseGuards } from "@nestjs/common";
+import { Controller, Get, Post, Put, Patch, Body, Query, Param, Req, UseGuards } from "@nestjs/common";
 import { AccountingService } from "./accounting.service";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 
@@ -44,6 +44,35 @@ export class AccountingController {
       ? `${req.user.name}${req.user.employee_id ? " (" + req.user.employee_id + ")" : ""}` 
       : (req.user?.email === "admin@globalsafety.com" || req.user?.email === "amrvbloggers@gmail.com" ? "Super Admin (SYSTEM)" : req.user?.email || "System");
     return this.accountingService.postVoucher({ ...body, created_by: user });
+  }
+
+  @Patch("vouchers/:id/correct")
+  async correctLedgerEntry(
+    @Param("id") id: string,
+    @Body() body: {
+      debit_account_id?: string;
+      credit_account_id?: string;
+      amount?: number;
+      description?: string;
+      reason: string;
+    },
+    @Req() req: any
+  ) {
+    const userName = req.user?.name || req.user?.email || "User";
+    const userRole = req.user?.role || req.user?.roles?.[0]?.role?.name || "Chartered Accountant (CA)";
+    const userId = req.user?.userId || req.user?.id || "user-id";
+
+    return this.accountingService.correctLedgerEntry(id, {
+      ...body,
+      user_id: userId,
+      user_name: userName,
+      user_role: userRole,
+    });
+  }
+
+  @Get("vouchers/:id/audit-trail")
+  async getLedgerAuditLogs(@Param("id") id: string) {
+    return this.accountingService.getLedgerAuditLogs(id);
   }
 
   @Post("transactions")

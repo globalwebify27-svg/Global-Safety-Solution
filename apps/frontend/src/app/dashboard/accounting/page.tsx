@@ -12,7 +12,7 @@ import {
   Plus, Calculator, ArrowUpRight, ArrowDownLeft, Search,
   Download, TrendingUp, DollarSign, ShieldAlert, ChevronDown,
   ChevronRight, Pencil, X, Activity, Scale, Waves, User,
-  FileSpreadsheet, Banknote
+  FileSpreadsheet, Banknote, History
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
@@ -22,7 +22,22 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 interface Account { id: string; name: string; code: string; type: string; balance: number; parent_id?: string | null; }
-interface Voucher { id: string; voucher_no: string; description: string; amount: number; transaction_date: string; debit_account: Account; credit_account: Account; created_by: string; invoice_id?: string; payment_id?: string; }
+interface Voucher {
+  id: string;
+  voucher_no: string;
+  description: string;
+  amount: number;
+  transaction_date: string;
+  debit_account: Account;
+  credit_account: Account;
+  created_by: string;
+  invoice_id?: string;
+  payment_id?: string;
+  is_corrected?: boolean;
+  last_corrected_by?: string;
+  last_corrected_at?: string;
+  audit_logs?: any[];
+}
 type TabType = "ledgers" | "accounts" | "reports" | "trialbalance" | "audit";
 
 export default function AccountingPage() {
@@ -34,6 +49,20 @@ export default function AccountingPage() {
   const [openVoucherDialog, setOpenVoucherDialog] = useState(false);
   const [openAccountDialog, setOpenAccountDialog] = useState(false);
   const [openTransactionDialog, setOpenTransactionDialog] = useState(false);
+
+  // States for Entry Correction & Mandatory Audit Trail
+  const [correctVoucher, setCorrectVoucher] = useState<Voucher | null>(null);
+  const [correctionForm, setCorrectionForm] = useState({
+    debit_account_id: "",
+    credit_account_id: "",
+    amount: "",
+    description: "",
+    reason: "",
+  });
+  const [correctSubmitting, setCorrectSubmitting] = useState(false);
+  const [viewAuditVoucher, setViewAuditVoucher] = useState<Voucher | null>(null);
+  const [voucherAuditLogs, setVoucherAuditLogs] = useState<any[]>([]);
+  const [auditLoadingLogs, setAuditLoadingLogs] = useState(false);
   const [editOBAccount, setEditOBAccount] = useState<Account | null>(null);
   const [editOBAmount, setEditOBAmount] = useState("");
   const [editOBLoading, setEditOBLoading] = useState(false);
@@ -216,6 +245,63 @@ export default function AccountingPage() {
       if (res.ok) { toast.success("Voucher posted!"); setOpenVoucherDialog(false); setVoucherForm({ debit_code: "", credit_code: "", amount: "", description: "", transaction_date: new Date().toISOString().split("T")[0] }); setDebitParentId(""); setCreditParentId(""); fetchAccountsAndVouchers(); }
       else { const err = await res.json(); toast.error(err.message || "Failed."); }
     } catch { toast.error("Network error."); }
+  };
+
+  const handleCorrectVoucher = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!token || !correctVoucher) return;
+    if (!correctionForm.reason || !correctionForm.reason.trim()) {
+      toast.error("Reason for correction is mandatory.");
+      return;
+    }
+    setCorrectSubmitting(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/accounting/vouchers/${correctVoucher.id}/correct`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          debit_account_id: correctionForm.debit_account_id || undefined,
+          credit_account_id: correctionForm.credit_account_id || undefined,
+          amount: correctionForm.amount ? parseFloat(correctionForm.amount) : undefined,
+          description: correctionForm.description || undefined,
+          reason: correctionForm.reason,
+        }),
+      });
+
+      if (res.ok) {
+        toast.success(`Voucher ${correctVoucher.voucher_no} corrected & audit log created!`);
+        setCorrectVoucher(null);
+        setCorrectionForm({ debit_account_id: "", credit_account_id: "", amount: "", description: "", reason: "" });
+        fetchAccountsAndVouchers();
+      } else {
+        const err = await res.json();
+        toast.error(err.message || "Failed to submit correction.");
+      }
+    } catch {
+      toast.error("Network error submitting correction.");
+    } finally {
+      setCorrectSubmitting(false);
+    }
+  };
+
+  const handleViewAuditLogs = async (v: Voucher) => {
+    setViewAuditVoucher(v);
+    setAuditLoadingLogs(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/accounting/vouchers/${v.id}/audit-trail`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (Array.isArray(data)) setVoucherAuditLogs(data);
+      else setVoucherAuditLogs(v.audit_logs || []);
+    } catch {
+      setVoucherAuditLogs(v.audit_logs || []);
+    } finally {
+      setAuditLoadingLogs(false);
+    }
   };
 
   const handleCreateAccount = async (e: React.FormEvent) => {
@@ -681,31 +767,61 @@ export default function AccountingPage() {
                 </div>
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse min-w-[750px]">
-                  <thead><tr className="bg-accent/5 border-b border-border text-muted-foreground text-xs font-black uppercase tracking-wider"><th className="py-4 px-6">Voucher No</th><th className="py-4 px-6">Date</th><th className="py-4 px-6">Particulars (Dr / Cr)</th><th className="py-4 px-6 text-right">Debit (Dr)</th><th className="py-4 px-6 text-right">Credit (Cr)</th><th className="py-4 px-6">Narration</th><th className="py-4 px-6">Source</th><th className="py-4 px-6">Audited By</th></tr></thead>
+                <table className="w-full text-left border-collapse min-w-[850px]">
+                  <thead><tr className="bg-accent/5 border-b border-border text-muted-foreground text-xs font-black uppercase tracking-wider"><th className="py-4 px-6">Voucher No</th><th className="py-4 px-6">Date</th><th className="py-4 px-6">Particulars (Dr / Cr)</th><th className="py-4 px-6 text-right">Debit (Dr)</th><th className="py-4 px-6 text-right">Credit (Cr)</th><th className="py-4 px-6">Narration</th><th className="py-4 px-6">Audited By</th><th className="py-4 px-6 text-center">Actions / Audit</th></tr></thead>
                   <tbody className="divide-y divide-border/60 text-sm">
                     {filteredVouchers.length === 0 ? (<tr><td colSpan={8} className="py-10 text-center text-muted-foreground italic">No vouchers found.</td></tr>) : filteredVouchers.map(v => (
                       <tr key={v.id} className="hover:bg-accent/5 transition-colors">
-                        <td className="py-4 px-6 font-bold text-indigo-500">{v.voucher_no}</td>
+                        <td className="py-4 px-6 font-bold text-indigo-500">
+                          <div>{v.voucher_no}</div>
+                          {v.is_corrected && (
+                            <span className="inline-block text-[10px] font-extrabold bg-amber-500/10 text-amber-500 border border-amber-500/20 px-2 py-0.5 rounded-md mt-1">
+                              Corrected
+                            </span>
+                          )}
+                        </td>
                         <td className="py-4 px-6 text-muted-foreground">{new Date(v.transaction_date).toLocaleDateString()}</td>
                         <td className="py-4 px-6 font-medium space-y-1"><div className="flex items-center gap-1.5 text-emerald-500"><ArrowUpRight className="w-3.5 h-3.5" />{v.debit_account?.name || ""} ({v.debit_account?.code || ""})</div><div className="flex items-center gap-1.5 text-rose-500 pl-4"><ArrowDownLeft className="w-3.5 h-3.5" />{v.credit_account?.name || ""} ({v.credit_account?.code || ""})</div></td>
                         <td className="py-4 px-6 text-right font-bold text-emerald-500">₹{Number(v.amount).toLocaleString()}</td>
                         <td className="py-4 px-6 text-right font-bold text-rose-500">₹{Number(v.amount).toLocaleString()}</td>
                         <td className="py-4 px-6 text-muted-foreground max-w-xs truncate cursor-help" title={v.description}>{v.description}</td>
                         <td className="py-4 px-6">
-                          {v.invoice_id ? (
-                            <Link href={`/dashboard/finance?search=${getInvoiceNumber(v.description)}`} className="text-xs font-bold text-indigo-500 hover:underline inline-flex items-center gap-1">
-                              <FileSpreadsheet className="w-3.5 h-3.5 text-indigo-400" /> Invoice
-                            </Link>
-                          ) : v.payment_id ? (
-                            <Link href={`/dashboard/finance?search=${getInvoiceNumber(v.description)}`} className="text-xs font-bold text-emerald-500 hover:underline inline-flex items-center gap-1">
-                              <Banknote className="w-3.5 h-3.5 text-emerald-400" /> Payment
-                            </Link>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">—</span>
-                          )}
+                          <div className="flex items-center gap-1.5">
+                            <User className="w-3.5 h-3.5 text-indigo-400" />
+                            <span className="text-xs font-bold text-indigo-400">{v.created_by}</span>
+                          </div>
                         </td>
-                        <td className="py-4 px-6"><div className="flex items-center gap-1.5"><User className="w-3.5 h-3.5 text-indigo-400" /><span className="text-xs font-bold text-indigo-400">{v.created_by}</span></div></td>
+                        <td className="py-4 px-6 text-center">
+                          <div className="flex items-center justify-center gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setCorrectVoucher(v);
+                                setCorrectionForm({
+                                  debit_account_id: v.debit_account?.id || "",
+                                  credit_account_id: v.credit_account?.id || "",
+                                  amount: String(v.amount),
+                                  description: v.description,
+                                  reason: "",
+                                });
+                              }}
+                              className="h-8 text-xs font-bold border-amber-500/30 text-amber-500 hover:bg-amber-500/10 rounded-lg"
+                            >
+                              <Pencil className="w-3.5 h-3.5 mr-1" /> Edit / Correct
+                            </Button>
+                            {(v.is_corrected || (v.audit_logs && v.audit_logs.length > 0)) && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleViewAuditLogs(v)}
+                                className="h-8 text-xs font-bold border-indigo-500/30 text-indigo-500 hover:bg-indigo-500/10 rounded-lg"
+                              >
+                                <History className="w-3.5 h-3.5 mr-1" /> Audit Trail
+                              </Button>
+                            )}
+                          </div>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -993,6 +1109,162 @@ export default function AccountingPage() {
           )}
         </>
       )}
+
+      {/* Edit / Correct Voucher Dialog Modal */}
+      <Dialog open={!!correctVoucher} onOpenChange={(open) => { if (!open) setCorrectVoucher(null); }}>
+        <DialogContent className="bg-card border-border text-foreground rounded-2xl max-w-lg p-4 sm:p-6 w-[95vw] sm:w-full">
+          <DialogHeader>
+            <DialogTitle className="text-lg sm:text-xl font-bold flex items-center gap-2 text-amber-500">
+              <Pencil className="w-5 h-5" /> Correct Ledger Entry ({correctVoucher?.voucher_no})
+            </DialogTitle>
+            <DialogDescription className="text-xs sm:text-sm">
+              Authorized CA / Admin correction interface. Modifications will be recorded permanently in the audit trail.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleCorrectVoucher} className="space-y-3 sm:space-y-4 py-2 sm:py-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+              <div className="space-y-1">
+                <Label className="text-xs sm:text-sm">Debit Account (Dr.)</Label>
+                <select
+                  value={correctionForm.debit_account_id}
+                  onChange={(e) => setCorrectionForm({ ...correctionForm, debit_account_id: e.target.value })}
+                  className="w-full h-9 sm:h-10 px-3 rounded-lg border border-border bg-background text-foreground text-xs sm:text-sm"
+                >
+                  <option value="">Keep Original Account</option>
+                  {(accounts || []).map(a => (
+                    <option key={a.id} value={a.id}>{a.name} ({a.code})</option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs sm:text-sm">Credit Account (Cr.)</Label>
+                <select
+                  value={correctionForm.credit_account_id}
+                  onChange={(e) => setCorrectionForm({ ...correctionForm, credit_account_id: e.target.value })}
+                  className="w-full h-9 sm:h-10 px-3 rounded-lg border border-border bg-background text-foreground text-xs sm:text-sm"
+                >
+                  <option value="">Keep Original Account</option>
+                  {(accounts || []).map(a => (
+                    <option key={a.id} value={a.id}>{a.name} ({a.code})</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <Label className="text-xs sm:text-sm">Corrected Amount (INR)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                placeholder="0.00"
+                value={correctionForm.amount}
+                onChange={(e) => setCorrectionForm({ ...correctionForm, amount: e.target.value })}
+                className="bg-background border-border h-9 sm:h-10 text-xs sm:text-sm font-bold text-emerald-500"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <Label className="text-xs sm:text-sm">Description / Narration</Label>
+              <Input
+                placeholder="Enter transactional details"
+                value={correctionForm.description}
+                onChange={(e) => setCorrectionForm({ ...correctionForm, description: e.target.value })}
+                className="bg-background border-border h-9 sm:h-10 text-xs sm:text-sm"
+              />
+            </div>
+
+            <div className="space-y-1 bg-amber-500/5 p-3 rounded-xl border border-amber-500/20">
+              <Label className="text-xs sm:text-sm font-bold text-amber-500 flex items-center gap-1">
+                Reason for Correction <span className="text-rose-500">*</span>
+              </Label>
+              <textarea
+                required
+                rows={3}
+                placeholder="Mandatory: Explain why this entry is being corrected (e.g. Staff entered wrong amount)"
+                value={correctionForm.reason}
+                onChange={(e) => setCorrectionForm({ ...correctionForm, reason: e.target.value })}
+                className="w-full p-2.5 rounded-lg border border-border bg-background text-foreground text-xs sm:text-sm focus:outline-none focus:ring-1 focus:ring-amber-500"
+              />
+            </div>
+
+            <DialogFooter className="pt-2">
+              <Button
+                type="submit"
+                disabled={correctSubmitting}
+                className="bg-amber-600 hover:bg-amber-500 text-white font-bold w-full rounded-xl h-10 text-xs sm:text-sm shadow-lg shadow-amber-600/20"
+              >
+                {correctSubmitting ? "Saving Correction & Audit..." : "Save Ledger Correction"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* View Audit Trail History Dialog Modal */}
+      <Dialog open={!!viewAuditVoucher} onOpenChange={(open) => { if (!open) setViewAuditVoucher(null); }}>
+        <DialogContent className="bg-card border-border text-foreground rounded-2xl max-w-2xl p-4 sm:p-6 w-[95vw] sm:w-full">
+          <DialogHeader>
+            <DialogTitle className="text-lg sm:text-xl font-bold flex items-center gap-2 text-indigo-500">
+              <History className="w-5 h-5" /> Immutable Audit History for Voucher {viewAuditVoucher?.voucher_no}
+            </DialogTitle>
+            <DialogDescription className="text-xs sm:text-sm">
+              Complete history of all modifications made to this financial record.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-2">
+            {auditLoadingLogs ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500"></div>
+              </div>
+            ) : voucherAuditLogs.length === 0 ? (
+              <div className="text-center py-10 text-muted-foreground italic text-xs">
+                No audit logs found for this voucher.
+              </div>
+            ) : (
+              <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
+                {voucherAuditLogs.map((log: any) => (
+                  <div key={log.id} className="p-4 rounded-xl bg-accent/5 border border-border space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-indigo-500 bg-indigo-500/10 px-2.5 py-1 rounded-md">
+                        {log.field_name || "Field Modified"}
+                      </span>
+                      <span className="text-[11px] text-muted-foreground">
+                        {new Date(log.created_at).toLocaleString()}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs pt-1">
+                      <div className="p-2 rounded-lg bg-rose-500/5 border border-rose-500/10">
+                        <span className="text-[10px] font-bold text-rose-500 uppercase block">Original Value</span>
+                        <span className="font-mono text-muted-foreground">{log.old_value || "—"}</span>
+                      </div>
+                      <div className="p-2 rounded-lg bg-emerald-500/5 border border-emerald-500/10">
+                        <span className="text-[10px] font-bold text-emerald-500 uppercase block">Updated Value</span>
+                        <span className="font-mono text-emerald-400 font-bold">{log.new_value || "—"}</span>
+                      </div>
+                    </div>
+
+                    <div className="pt-2 text-xs border-t border-border/50 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 text-muted-foreground">
+                        <User className="w-3.5 h-3.5 text-indigo-400" />
+                        <span className="font-bold text-foreground">{log.edited_by_name}</span>
+                        <span className="text-[10px] bg-card px-2 py-0.5 rounded border border-border text-muted-foreground">
+                          {log.edited_by_role}
+                        </span>
+                      </div>
+                      <div className="text-xs text-amber-500 font-medium bg-amber-500/5 px-2.5 py-1 rounded-lg border border-amber-500/10">
+                        <span className="font-bold text-[10px] uppercase block text-amber-400">Reason:</span>
+                        {log.reason}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

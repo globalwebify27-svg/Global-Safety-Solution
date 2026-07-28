@@ -79,7 +79,142 @@ export class AccountingService {
   }
 
   async getVouchers() {
-    return this.prisma.ledgerEntry.findMany({ include: { debit_account: true, credit_account: true }, orderBy: { transaction_date: "desc" } });
+    return this.prisma.ledgerEntry.findMany({
+      include: {
+        debit_account: true,
+        credit_account: true,
+        audit_logs: {
+          orderBy: { created_at: "desc" },
+        },
+      },
+      orderBy: { transaction_date: "desc" },
+    });
+  }
+
+  async correctLedgerEntry(
+    id: string,
+    data: {
+      debit_account_id?: string;
+      credit_account_id?: string;
+      amount?: number;
+      description?: string;
+      reason: string;
+      user_id: string;
+      user_name: string;
+      user_role: string;
+    },
+  ) {
+    if (!data.reason || !data.reason.trim()) {
+      throw new BadRequestException("Reason for correction is mandatory");
+    }
+
+    const entry = await this.prisma.ledgerEntry.findUnique({
+      where: { id },
+      include: { debit_account: true, credit_account: true },
+    });
+    if (!entry) throw new NotFoundException("Ledger entry not found");
+
+    return this.prisma.$transaction(async (tx) => {
+      const oldAmount = Number(entry.amount);
+      const oldDebitAccId = entry.debit_account_id;
+      const oldCreditAccId = entry.credit_account_id;
+      const oldDesc = entry.description;
+
+      const newAmount = data.amount !== undefined ? Number(data.amount) : oldAmount;
+      const newDebitAccId = data.debit_account_id || oldDebitAccId;
+      const newCreditAccId = data.credit_account_id || oldCreditAccId;
+      const newDesc = data.description !== undefined ? data.description : oldDesc;
+
+      if (isNaN(newAmount) || newAmount <= 0) {
+        throw new BadRequestException("Invalid amount for ledger entry");
+      }
+
+      // Revert old account balance changes
+      const oldDebitAcc = entry.debit_account;
+      const oldCreditAcc = entry.credit_account;
+      const oldDebitMult = (oldDebitAcc.type === "ASSET" || oldDebitAcc.type === "EXPENSE") ? 1 : -1;
+      await tx.account.update({
+        where: { id: oldDebitAccId },
+        data: { balance: { decrement: oldAmount * oldDebitMult } },
+      });
+
+      const oldCreditMult = (oldCreditAcc.type === "ASSET" || oldCreditAcc.type === "EXPENSE") ? -1 : 1;
+      await tx.account.update({
+        where: { id: oldCreditAccId },
+        data: { balance: { decrement: oldAmount * oldCreditMult } },
+      });
+
+      // Fetch new accounts if changed
+      const newDebitAcc = newDebitAccId === oldDebitAccId ? oldDebitAcc : await tx.account.findUnique({ where: { id: newDebitAccId } });
+      const newCreditAcc = newCreditAccId === oldCreditAccId ? oldCreditAcc : await tx.account.findUnique({ where: { id: newCreditAccId } });
+
+      if (!newDebitAcc || !newCreditAcc) {
+        throw new BadRequestException("Debit or Credit account not found");
+      }
+
+      // Apply new account balance changes
+      const newDebitMult = (newDebitAcc.type === "ASSET" || newDebitAcc.type === "EXPENSE") ? 1 : -1;
+      await tx.account.update({
+        where: { id: newDebitAccId },
+        data: { balance: { increment: newAmount * newDebitMult } },
+      });
+
+      const newCreditMult = (newCreditAcc.type === "ASSET" || newCreditAcc.type === "EXPENSE") ? -1 : 1;
+      await tx.account.update({
+        where: { id: newCreditAccId },
+        data: { balance: { increment: newAmount * newCreditMult } },
+      });
+
+      // Log changes into LedgerAuditLog table
+      const changes: { field: string; oldVal: string; newVal: string }[] = [];
+      if (oldAmount !== newAmount) changes.push({ field: "Amount", oldVal: `₹${oldAmount.toLocaleString()}`, newVal: `₹${newAmount.toLocaleString()}` });
+      if (oldDebitAccId !== newDebitAccId) changes.push({ field: "Debit Account", oldVal: `${oldDebitAcc.name} (${oldDebitAcc.code})`, newVal: `${newDebitAcc.name} (${newDebitAcc.code})` });
+      if (oldCreditAccId !== newCreditAccId) changes.push({ field: "Credit Account", oldVal: `${oldCreditAcc.name} (${oldCreditAcc.code})`, newVal: `${newCreditAcc.name} (${newCreditAcc.code})` });
+      if (oldDesc !== newDesc) changes.push({ field: "Description / Narration", oldVal: oldDesc, newVal: newDesc });
+
+      for (const change of changes) {
+        await tx.ledgerAuditLog.create({
+          data: {
+            ledger_entry_id: id,
+            field_name: change.field,
+            old_value: change.oldVal,
+            new_value: change.newVal,
+            reason: data.reason,
+            edited_by_user_id: data.user_id,
+            edited_by_name: data.user_name,
+            edited_by_role: data.user_role,
+          },
+        });
+      }
+
+      // Update LedgerEntry record
+      const updatedEntry = await tx.ledgerEntry.update({
+        where: { id },
+        data: {
+          amount: newAmount,
+          debit_account_id: newDebitAccId,
+          credit_account_id: newCreditAccId,
+          description: newDesc,
+          is_corrected: true,
+          last_corrected_by: data.user_name,
+          last_corrected_at: new Date(),
+        },
+        include: {
+          debit_account: true,
+          credit_account: true,
+          audit_logs: { orderBy: { created_at: "desc" } },
+        },
+      });
+
+      return updatedEntry;
+    });
+  }
+
+  async getLedgerAuditLogs(id: string) {
+    return this.prisma.ledgerAuditLog.findMany({
+      where: { ledger_entry_id: id },
+      orderBy: { created_at: "desc" },
+    });
   }
 
   async getAccountLedger(accountId: string, startDate?: string, endDate?: string) {
