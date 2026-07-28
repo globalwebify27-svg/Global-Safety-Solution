@@ -284,8 +284,24 @@ export class CertificatesService {
     const _PDFDocument = require('pdfkit');
     const PDFDocument = _PDFDocument.default || _PDFDocument;
 
+    // Resolve font data directory path across local ts-node & Hostinger dist deployment
+    const path = require('path');
+    const fs = require('fs');
+    const possibleFontDirs = [
+      path.join(process.cwd(), 'node_modules', 'pdfkit', 'js', 'data'),
+      path.join(process.cwd(), 'dist', 'node_modules', 'pdfkit', 'js', 'data'),
+      path.join(process.cwd(), 'data'),
+      path.join(__dirname, '..', 'node_modules', 'pdfkit', 'js', 'data'),
+    ];
+    let fontDir = possibleFontDirs.find((dir) => fs.existsSync(dir));
+
     return new Promise((resolve, reject) => {
-      const doc = new PDFDocument({ margin: 40, size: 'A4' });
+      const docOptions: any = { margin: 40, size: 'A4' };
+      if (fontDir) {
+        // PDFKit reads standard Helvetica/Courier/Times font .afm files from fontdata path
+        docOptions.font = path.join(fontDir, 'Helvetica.afm');
+      }
+      const doc = new PDFDocument(docOptions);
       const buffers: Buffer[] = [];
 
       doc.on('data', buffers.push.bind(buffers));
