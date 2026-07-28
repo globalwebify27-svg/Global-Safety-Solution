@@ -1273,6 +1273,15 @@ export class InspectionsService {
     const _PDFDocument = require('pdfkit');
     const PDFDocument = _PDFDocument.default || _PDFDocument;
 
+    // Resolve font data directory path across local ts-node & Hostinger dist deployment
+    const possibleFontDirs = [
+      path.join(process.cwd(), 'node_modules', 'pdfkit', 'js', 'data'),
+      path.join(process.cwd(), 'dist', 'node_modules', 'pdfkit', 'js', 'data'),
+      path.join(process.cwd(), 'data'),
+      path.join(__dirname, '..', 'node_modules', 'pdfkit', 'js', 'data'),
+    ];
+    const fontDir = possibleFontDirs.find((dir) => fs.existsSync(dir));
+
     // Pre-fetch all async data BEFORE creating the Promise (await inside new Promise is a bug)
     const certDataList: Array<{
       certificate: typeof certificates[0];

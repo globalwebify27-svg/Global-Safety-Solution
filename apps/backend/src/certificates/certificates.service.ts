@@ -285,8 +285,6 @@ export class CertificatesService {
     const PDFDocument = _PDFDocument.default || _PDFDocument;
 
     // Resolve font data directory path across local ts-node & Hostinger dist deployment
-    const path = require('path');
-    const fs = require('fs');
     const possibleFontDirs = [
       path.join(process.cwd(), 'node_modules', 'pdfkit', 'js', 'data'),
       path.join(process.cwd(), 'dist', 'node_modules', 'pdfkit', 'js', 'data'),
