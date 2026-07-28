@@ -186,9 +186,23 @@ export default function InspectionsPage() {
 
   const getAbsolutePdfUrl = (url: string | null | undefined) => {
     if (!url) return null;
-    if (url.startsWith("http://") || url.startsWith("https://")) return url;
-    if (url.includes("localhost") || url.includes("127.0.0.1")) return `http://${url}`;
-    return `https://${url}`;
+    
+    let cleanPath = url;
+    if (url.startsWith("http://") || url.startsWith("https://")) {
+      try {
+        const parsedUrl = new URL(url);
+        cleanPath = parsedUrl.pathname + parsedUrl.search;
+      } catch (e) {
+        cleanPath = url;
+      }
+    }
+    
+    if (!cleanPath.startsWith("/")) {
+      cleanPath = "/" + cleanPath;
+    }
+    
+    const baseUrl = API_BASE_URL.endsWith("/") ? API_BASE_URL.slice(0, -1) : API_BASE_URL;
+    return `${baseUrl}${cleanPath}`;
   };
 
   // Certificate Preparation & Review States

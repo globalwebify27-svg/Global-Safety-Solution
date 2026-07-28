@@ -236,9 +236,23 @@ export default function FieldTasksPage() {
 
   const getAbsolutePdfUrl = (url: string | null | undefined) => {
     if (!url) return null;
-    if (url.startsWith("http://") || url.startsWith("https://")) return url;
-    if (url.includes("localhost") || url.includes("127.0.0.1")) return `http://${url}`;
-    return `https://${url}`;
+    
+    let cleanPath = url;
+    if (url.startsWith("http://") || url.startsWith("https://")) {
+      try {
+        const parsedUrl = new URL(url);
+        cleanPath = parsedUrl.pathname + parsedUrl.search;
+      } catch (e) {
+        cleanPath = url;
+      }
+    }
+    
+    if (!cleanPath.startsWith("/")) {
+      cleanPath = "/" + cleanPath;
+    }
+    
+    const baseUrl = API_BASE_URL.endsWith("/") ? API_BASE_URL.slice(0, -1) : API_BASE_URL;
+    return `${baseUrl}${cleanPath}`;
   };
 
   const calculateInitialValidity = (testDateStr?: string | null, expiryDateStr?: string | null) => {
@@ -1577,6 +1591,29 @@ export default function FieldTasksPage() {
             </Button>
           )}
         </div>
+
+        {previewPdfUrl && (
+          <Dialog open={!!previewPdfUrl} onOpenChange={(open) => !open && setPreviewPdfUrl(null)}>
+            <DialogContent 
+              style={{ maxWidth: "96vw", width: "96vw", height: "95vh" }}
+              className="p-0 bg-slate-900 border-slate-800 flex flex-col overflow-hidden rounded-2xl shadow-2xl"
+            >
+              <DialogHeader className="p-5 border-b border-slate-800 flex flex-row items-center justify-between shrink-0 bg-slate-950/80 backdrop-blur">
+                <div>
+                  <DialogTitle className="text-lg font-black text-white uppercase tracking-wider flex items-center gap-2">
+                    <Eye className="w-5 h-5 text-blue-500" /> Secure Document Viewer
+                  </DialogTitle>
+                  <DialogDescription className="text-xs text-slate-400 font-medium">
+                    Authorised Personnel Only. Saving, printing, and downloading have been disabled.
+                  </DialogDescription>
+                </div>
+              </DialogHeader>
+              <div className="flex-1 min-h-0 bg-slate-950 overflow-hidden relative">
+                <PdfPreviewer url={previewPdfUrl} />
+              </div>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
     );
   }
@@ -1670,7 +1707,10 @@ export default function FieldTasksPage() {
 
       {previewPdfUrl && (
         <Dialog open={!!previewPdfUrl} onOpenChange={(open) => !open && setPreviewPdfUrl(null)}>
-          <DialogContent className="max-w-none w-[96vw] h-[95vh] p-0 bg-slate-900 border-slate-800 flex flex-col overflow-hidden rounded-2xl shadow-2xl">
+          <DialogContent 
+            style={{ maxWidth: "96vw", width: "96vw", height: "95vh" }}
+            className="p-0 bg-slate-900 border-slate-800 flex flex-col overflow-hidden rounded-2xl shadow-2xl"
+          >
             <DialogHeader className="p-5 border-b border-slate-800 flex flex-row items-center justify-between shrink-0 bg-slate-950/80 backdrop-blur">
               <div>
                 <DialogTitle className="text-lg font-black text-white uppercase tracking-wider flex items-center gap-2">
