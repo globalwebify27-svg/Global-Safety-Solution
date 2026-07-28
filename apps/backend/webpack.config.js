@@ -1,4 +1,5 @@
 const path = require('path');
+const nodeExternals = require('webpack-node-externals');
 
 module.exports = function (options) {
   return {
@@ -9,20 +10,23 @@ module.exports = function (options) {
       filename: 'main.js',
       libraryTarget: 'commonjs2',
     },
-    // Bundle ALL dependencies into main.js — no node_modules needed at runtime.
-    externals: [],
-    // Merge our alias into NestJS's existing resolve config (which handles .ts extensions).
-    // We alias pdfkit to its standalone build which embeds ALL font AFM data inline,
-    // bypassing the fs.readFileSync(__dirname + '/data/...') calls that break when
-    // webpack rewrites __dirname on Hostinger.
+    // Exclude ALL node_modules from the bundle.
+    // They are installed by build-hostinger.js into dist/node_modules/
+    // so Node.js can resolve them at runtime with correct __dirname paths.
+    // This is critical for pdfkit which reads font files from its own directory.
+    externals: [nodeExternals({
+      // Make @prisma/client available as external too (it has its own binary)
+      allowlist: [],
+    })],
     resolve: {
       ...options.resolve,
-      alias: {
-        ...(options.resolve && options.resolve.alias ? options.resolve.alias : {}),
-        'pdfkit': path.resolve(__dirname, '../../node_modules/pdfkit/js/pdfkit.standalone.js'),
-      },
     },
     target: 'node',
+    // Preserve __dirname so pdfkit can find its font data files at runtime
+    node: {
+      __dirname: false,
+      __filename: false,
+    },
     devtool: false,
     performance: false,
     optimization: {
