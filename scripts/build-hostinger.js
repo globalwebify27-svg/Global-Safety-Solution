@@ -51,6 +51,14 @@ if (fs.existsSync(srcPrisma)) {
   console.log('Copied prisma schema folder to root-level dist/');
 }
 
+// 5.1 Copy src/assets (gss-logo.png) to root-level dist/assets/
+const srcAssets = path.join(__dirname, '../apps/backend/src/assets');
+const destAssets = path.join(__dirname, '../dist/assets');
+if (fs.existsSync(srcAssets)) {
+  copyDirSync(srcAssets, destAssets);
+  console.log('Copied src/assets folder to root-level dist/assets/');
+}
+
 // 6. Install production dependencies directly inside dist/
 console.log('Installing production dependencies into dist/node_modules...');
 execSync('npm install --prefix dist --omit=dev', { stdio: 'inherit' });

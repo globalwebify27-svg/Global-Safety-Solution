@@ -657,7 +657,8 @@ export class InspectionsService {
       }
     }
 
-    const PDFDocument = require('pdfkit');
+    const _PDFDocument = require('pdfkit');
+    const PDFDocument = _PDFDocument.default || _PDFDocument;
 
     // Load GSS logo from local assets — try multiple paths for ts-node dev vs compiled dist
     let logoBuffer: Buffer | null = null;
@@ -1255,7 +1256,8 @@ export class InspectionsService {
       console.error('Failed to load GSS logo:', err);
     }
 
-    const PDFDocument = require('pdfkit');
+    const _PDFDocument = require('pdfkit');
+    const PDFDocument = _PDFDocument.default || _PDFDocument;
 
     // Pre-fetch all async data BEFORE creating the Promise (await inside new Promise is a bug)
     const certDataList: Array<{

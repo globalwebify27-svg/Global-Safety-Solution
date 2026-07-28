@@ -266,6 +266,8 @@ export class CertificatesService {
       const possiblePaths = [
         path.join(__dirname, '..', 'assets', 'gss-logo.png'),
         path.join(__dirname, 'assets', 'gss-logo.png'),
+        path.join(process.cwd(), 'assets', 'gss-logo.png'),
+        path.join(process.cwd(), 'dist', 'assets', 'gss-logo.png'),
         path.join(process.cwd(), 'apps/backend/src/assets/gss-logo.png'),
         path.join(process.cwd(), 'src/assets/gss-logo.png'),
       ];
@@ -279,7 +281,8 @@ export class CertificatesService {
       console.error('Failed to load logo:', err);
     }
 
-    const PDFDocument = require('pdfkit');
+    const _PDFDocument = require('pdfkit');
+    const PDFDocument = _PDFDocument.default || _PDFDocument;
 
     return new Promise((resolve, reject) => {
       const doc = new PDFDocument({ margin: 40, size: 'A4' });
