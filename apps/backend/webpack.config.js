@@ -9,19 +9,19 @@ module.exports = function (options) {
       filename: 'main.js',
       libraryTarget: 'commonjs2',
     },
-    // Keep pdfkit, fontkit, and qrcode as externals — they use
-    // fs.readFileSync(__dirname + '/data/...') at runtime to load font/AFM
-    // files. Webpack rewrites __dirname, breaking those file lookups and
-    // causing 500/503 crashes on Hostinger. Loading them from node_modules
-    // at runtime preserves the correct __dirname paths.
-    externals: [
-      function({ request }, callback) {
-        if (/^(pdfkit|fontkit|qrcode|png-js|linebreak)$/.test(request)) {
-          return callback(null, 'commonjs ' + request);
-        }
-        callback();
+    // Bundle ALL dependencies into main.js — no node_modules needed at runtime.
+    externals: [],
+    // Merge our alias into NestJS's existing resolve config (which handles .ts extensions).
+    // We alias pdfkit to its standalone build which embeds ALL font AFM data inline,
+    // bypassing the fs.readFileSync(__dirname + '/data/...') calls that break when
+    // webpack rewrites __dirname on Hostinger.
+    resolve: {
+      ...options.resolve,
+      alias: {
+        ...(options.resolve && options.resolve.alias ? options.resolve.alias : {}),
+        'pdfkit': path.resolve(__dirname, '../../node_modules/pdfkit/js/pdfkit.standalone.js'),
       },
-    ],
+    },
     target: 'node',
     devtool: false,
     performance: false,

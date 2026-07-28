@@ -31,21 +31,6 @@ try {
   }
 }
 
-// Auto-install missing production dependencies (pdfkit, qrcode, etc.) if not present.
-// This handles Hostinger deployments where node_modules may not exist in dist/.
-try {
-  require.resolve('qrcode');
-  require.resolve('pdfkit');
-} catch (missingModule) {
-  try {
-    console.log('[Startup] Missing production dependencies detected. Running npm install...');
-    execSync('npm install --omit=dev --prefer-offline', { stdio: 'inherit', cwd: process.cwd() });
-    console.log('[Startup] npm install completed successfully.');
-  } catch (installError) {
-    console.error('[Startup] Failed to auto-install dependencies:', installError);
-  }
-}
-
 
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
