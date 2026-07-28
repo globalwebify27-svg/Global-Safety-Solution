@@ -9,30 +9,25 @@ module.exports = function (options) {
       filename: 'main.js',
       libraryTarget: 'commonjs2',
     },
-    // In this npm-workspace monorepo, most packages are hoisted to the root
-    // node_modules, so webpack-node-externals with default settings doesn't
-    // see them and bundles everything into main.js. This is INTENTIONAL —
-    // it means dist/ is self-contained and only needs native/binary deps
-    // installed via npm install.
-    //
-    // EXCEPTION: pdfkit must be external because its source code uses
-    // __dirname + readFileSync() to load .afm font files at runtime.
-    // When bundled, __dirname becomes dist/ instead of pdfkit's own
-    // package dir, causing ENOENT errors on Hostinger.
-    externals: [
-      function({ request }, callback) {
-        if (/^pdfkit(\/.*)?$/.test(request)) {
-          return callback(null, 'commonjs ' + request);
-        }
-        callback();
-      },
-    ],
+    // No externals — everything is bundled into main.js.
+    // This makes dist/ fully self-contained (just main.js + native deps).
+    // This is required because npm workspaces hoists packages to the root
+    // node_modules, and Hostinger's dist/node_modules/ doesn't have them.
+    externals: [],
     resolve: {
       ...options.resolve,
+      alias: {
+        ...((options.resolve && options.resolve.alias) || {}),
+        // CRITICAL FIX: Redirect pdfkit to its standalone build.
+        // The normal pdfkit.js uses fs.readFileSync(__dirname + '/data/Helvetica.afm')
+        // to load font metrics at runtime. When webpack bundles it, __dirname
+        // becomes the dist/ directory, and the .afm files don't exist there
+        // on Hostinger. The standalone build has ALL font data embedded inline
+        // as strings — zero filesystem reads, works everywhere.
+        'pdfkit': path.resolve(__dirname, '..', '..', 'node_modules', 'pdfkit', 'js', 'pdfkit.standalone.js'),
+      },
     },
     target: 'node',
-    // Preserve __dirname so pdfkit (loaded from node_modules at runtime)
-    // can find its font data files relative to its own package directory
     node: {
       __dirname: false,
       __filename: false,

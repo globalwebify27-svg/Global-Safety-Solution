@@ -662,13 +662,6 @@ export class InspectionsService {
 
     const path = require('path');
     const fs = require('fs');
-    const possibleFontDirs = [
-      path.join(process.cwd(), 'node_modules', 'pdfkit', 'js', 'data'),
-      path.join(process.cwd(), 'dist', 'node_modules', 'pdfkit', 'js', 'data'),
-      path.join(process.cwd(), 'data'),
-      path.join(__dirname, '..', 'node_modules', 'pdfkit', 'js', 'data'),
-    ];
-    let fontDir = possibleFontDirs.find((dir) => fs.existsSync(dir));
 
     // Load GSS logo from local assets — try multiple paths for ts-node dev vs compiled dist
     let logoBuffer: Buffer | null = null;
@@ -693,9 +686,6 @@ export class InspectionsService {
 
     return new Promise((resolve) => {
       const docOptions: any = { margin: 40, size: 'A4' };
-      if (fontDir) {
-        docOptions.font = path.join(fontDir, 'Helvetica.afm');
-      }
       const doc = new PDFDocument(docOptions);
       const buffers: Buffer[] = [];
 
@@ -1273,15 +1263,6 @@ export class InspectionsService {
     const _PDFDocument = require('pdfkit');
     const PDFDocument = _PDFDocument.default || _PDFDocument;
 
-    // Resolve font data directory path across local ts-node & Hostinger dist deployment
-    const possibleFontDirs = [
-      path.join(process.cwd(), 'node_modules', 'pdfkit', 'js', 'data'),
-      path.join(process.cwd(), 'dist', 'node_modules', 'pdfkit', 'js', 'data'),
-      path.join(process.cwd(), 'data'),
-      path.join(__dirname, '..', 'node_modules', 'pdfkit', 'js', 'data'),
-    ];
-    const fontDir = possibleFontDirs.find((dir) => fs.existsSync(dir));
-
     // Pre-fetch all async data BEFORE creating the Promise (await inside new Promise is a bug)
     const certDataList: Array<{
       certificate: typeof certificates[0];
@@ -1322,9 +1303,6 @@ export class InspectionsService {
 
     return new Promise((resolve, reject) => {
       const docOptions: any = { margin: 40, size: 'A4' };
-      if (fontDir) {
-        docOptions.font = path.join(fontDir, 'Helvetica.afm');
-      }
       const doc = new PDFDocument(docOptions);
       const buffers: Buffer[] = [];
 
