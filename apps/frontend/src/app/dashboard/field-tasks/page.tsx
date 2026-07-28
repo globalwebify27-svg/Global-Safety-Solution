@@ -234,16 +234,27 @@ export default function FieldTasksPage() {
   const [itemValidityPeriods, setItemValidityPeriods] = useState<Record<string, string>>({});
   const [previewPdfUrl, setPreviewPdfUrl] = useState<string | null>(null);
 
-  const getAbsolutePdfUrl = (url: string | null | undefined) => {
-    if (!url) return null;
+  const getAbsoluteFileUrl = (url: string | null | undefined) => {
+    if (!url) return "";
     
-    let cleanPath = url;
-    if (url.startsWith("http://") || url.startsWith("https://")) {
+    let cleanPath = url.trim();
+    
+    // Remove wrapping quotes/brackets
+    cleanPath = cleanPath.replace(/[\[\]"']/g, '').trim();
+
+    // Check if it already starts with http:// or https://
+    if (cleanPath.startsWith("http://") || cleanPath.startsWith("https://")) {
       try {
-        const parsedUrl = new URL(url);
+        const parsedUrl = new URL(cleanPath);
         cleanPath = parsedUrl.pathname + parsedUrl.search;
       } catch (e) {
-        cleanPath = url;
+        // Fallback
+      }
+    } else {
+      // If it contains domain/public/uploads/xxx, find the public/uploads segment
+      const idx = cleanPath.indexOf("public/uploads");
+      if (idx !== -1) {
+        cleanPath = "/" + cleanPath.substring(idx);
       }
     }
     
@@ -1017,7 +1028,7 @@ export default function FieldTasksPage() {
               </div>
               <Button
                 type="button"
-                onClick={() => setPreviewPdfUrl(getAbsolutePdfUrl(selectedTask.pdf_url))}
+                onClick={() => setPreviewPdfUrl(getAbsoluteFileUrl(selectedTask.pdf_url))}
                 className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600/10 text-blue-600 border border-blue-600/20 rounded-xl text-xs font-bold hover:bg-blue-600 hover:text-white transition-all active:scale-95"
               >
                 <Eye className="w-4 h-4" /> Preview PDF
@@ -1303,10 +1314,10 @@ export default function FieldTasksPage() {
                         {parseItemPhotos(item.photo_url).map((url, index) => (
                           <div key={index} className="relative aspect-square rounded-xl overflow-hidden border border-border group shadow-sm bg-background">
                             <img 
-                              src={url} 
+                              src={getAbsoluteFileUrl(url)} 
                               alt={`Item photo ${index + 1}`} 
                               className="w-full h-full object-cover transition-all duration-300 group-hover:scale-110 cursor-pointer" 
-                              onClick={() => openImageInNewTab(url)}
+                              onClick={() => openImageInNewTab(getAbsoluteFileUrl(url))}
                             />
                             <button
                               type="button"
