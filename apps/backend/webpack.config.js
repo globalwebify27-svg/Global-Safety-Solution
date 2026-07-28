@@ -14,8 +14,11 @@ module.exports = function (options) {
     // They are installed by build-hostinger.js into dist/node_modules/
     // so Node.js can resolve them at runtime with correct __dirname paths.
     // This is critical for pdfkit which reads font files from its own directory.
+    // modulesDir includes both backend-local AND root workspace node_modules
+    // because npm workspaces hoists packages (like pdfkit) to the root.
     externals: [nodeExternals({
-      // Make @prisma/client available as external too (it has its own binary)
+      modulesDir: path.join(__dirname, 'node_modules'),
+      additionalModuleDirs: [path.join(__dirname, '..', '..', 'node_modules')],
       allowlist: [],
     })],
     resolve: {
