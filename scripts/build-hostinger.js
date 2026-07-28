@@ -9,7 +9,16 @@ execSync('npm run build --workspace=backend', { stdio: 'inherit' });
 
 // 2. Prepare the root-level dist/ folder
 const rootDist = path.join(__dirname, '../dist');
+const uploadsBackup = path.join(__dirname, '../public/uploads');
+
+// Save uploaded files if any exist before cleaning dist
 if (fs.existsSync(rootDist)) {
+  const uploadsInDist = path.join(rootDist, 'public', 'uploads');
+  if (fs.existsSync(uploadsInDist)) {
+    fs.mkdirSync(uploadsBackup, { recursive: true });
+    copyDirSync(uploadsInDist, uploadsBackup);
+    console.log('Backed up existing uploaded files in public/uploads');
+  }
   fs.rmSync(rootDist, { recursive: true, force: true });
 }
 fs.mkdirSync(rootDist, { recursive: true });
@@ -57,6 +66,23 @@ const destAssets = path.join(__dirname, '../dist/assets');
 if (fs.existsSync(srcAssets)) {
   copyDirSync(srcAssets, destAssets);
   console.log('Copied src/assets folder to root-level dist/assets/');
+}
+
+// 5.1.1 Copy pdfkit font data files to root-level dist/data/
+const pdfkitDataSrc = path.join(__dirname, '../node_modules/pdfkit/js/data');
+const pdfkitDataDest = path.join(__dirname, '../dist/data');
+if (fs.existsSync(pdfkitDataSrc)) {
+  copyDirSync(pdfkitDataSrc, pdfkitDataDest);
+  console.log('Copied pdfkit font data (.afm files) to root-level dist/data/');
+}
+
+// 5.2 Restore public/uploads folder into dist/public/uploads
+const destUploads = path.join(__dirname, '../dist/public/uploads');
+if (fs.existsSync(uploadsBackup)) {
+  copyDirSync(uploadsBackup, destUploads);
+  console.log('Restored uploaded files into dist/public/uploads/');
+} else {
+  fs.mkdirSync(destUploads, { recursive: true });
 }
 
 // 6. Install production dependencies directly inside dist/
