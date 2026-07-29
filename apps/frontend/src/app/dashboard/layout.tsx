@@ -10,23 +10,38 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { NotificationCenter } from "@/components/notification-center";
 
 const navigation = [
-  { name: "Overview",          href: "/dashboard",             icon: Home,            module: "DASHBOARD" },
-  { name: "Quotation Hub",     href: "/dashboard/quotations",  icon: FileSpreadsheet, module: "QUOTATIONS" },
-  { name: "Sales Pipeline",    href: "/dashboard/leads",       icon: Target,          module: "LEADS" },
-  { name: "Client Management", href: "/dashboard/clients",     icon: Users,           module: "CLIENTS" },
-  { name: "Finance & Invoices",href: "/dashboard/finance",     icon: Banknote,        module: "FINANCE" },
-  { name: "Accounting Hub",    href: "/dashboard/accounting",  icon: Calculator,      module: "FINANCE" },
-  { name: "Staff Directory",   href: "/dashboard/employees",   icon: UserCircle,      module: "HR",         isHrGroup: true },
-  { name: "Payroll Hub",       href: "/dashboard/payroll",     icon: Banknote,        module: "PAYROLL",    isHrGroup: true },
-  { name: "Attendance Hub",    href: "/dashboard/attendance",  icon: BadgeCheck,      module: "ATTENDANCE", isHrGroup: true },
-  { name: "Site Inspections",  href: "/dashboard/inspections", icon: ClipboardCheck,  module: "INSPECTIONS" },
-  { name: "Operations",        href: "/dashboard/operations",  icon: FolderKanban,    module: "OPERATIONS" },
-  { name: "Compliance",        href: "/dashboard/compliance",  icon: ShieldCheck,     module: "COMPLIANCE" },
-  { name: "Digital Vault",     href: "/dashboard/documents",   icon: FolderLock,      module: "VAULT" },
-  { name: "Inventory Ledger",  href: "/dashboard/inventory",   icon: Package,         module: "INVENTORY" },
-  { name: "Asset Registry",    href: "/dashboard/assets",      icon: Monitor,         module: "ASSETS" },
-  { name: "Settings",          href: "/dashboard/settings",    icon: Settings,        module: "SYSTEM" },
-  { name: "Field Task Board",  href: "/dashboard/field-tasks", icon: ClipboardCheck,  module: "FIELD_TASKS" },
+  // MAIN
+  { name: "Overview",          category: "MAIN",                 href: "/dashboard",             icon: Home,            module: "DASHBOARD" },
+
+  // SALES & CRM
+  { name: "Sales Pipeline",    category: "SALES & CRM",          href: "/dashboard/leads",       icon: Target,          module: "LEADS" },
+  { name: "Quotation Hub",     category: "SALES & CRM",          href: "/dashboard/quotations",  icon: FileSpreadsheet, module: "QUOTATIONS" },
+
+  // CLIENTS & OPERATIONS
+  { name: "Client Management", category: "CLIENTS & OPERATIONS", href: "/dashboard/clients",     icon: Users,           module: "CLIENTS" },
+  { name: "Operations",        category: "CLIENTS & OPERATIONS", href: "/dashboard/operations",  icon: FolderKanban,    module: "OPERATIONS" },
+  { name: "Site Inspections",  category: "CLIENTS & OPERATIONS", href: "/dashboard/inspections", icon: ClipboardCheck,  module: "INSPECTIONS" },
+
+  // COMPLIANCE & VAULT
+  { name: "Compliance",        category: "COMPLIANCE & VAULT",   href: "/dashboard/compliance",  icon: ShieldCheck,     module: "COMPLIANCE" },
+  { name: "Digital Vault",     category: "COMPLIANCE & VAULT",   href: "/dashboard/documents",   icon: FolderLock,      module: "VAULT" },
+
+  // FINANCE & ACCOUNTING
+  { name: "Finance & Invoices",category: "FINANCE & ACCOUNTING",href: "/dashboard/finance",     icon: Banknote,        module: "FINANCE" },
+  { name: "Accounting Hub",    category: "FINANCE & ACCOUNTING",href: "/dashboard/accounting",  icon: Calculator,      module: "FINANCE" },
+
+  // ASSETS & INVENTORY
+  { name: "Inventory Ledger",  category: "ASSETS & INVENTORY",  href: "/dashboard/inventory",   icon: Package,         module: "INVENTORY" },
+  { name: "Asset Registry",    category: "ASSETS & INVENTORY",  href: "/dashboard/assets",      icon: Monitor,         module: "ASSETS" },
+
+  // HR & TEAM
+  { name: "Staff Directory",   category: "HR & TEAM",            href: "/dashboard/employees",   icon: UserCircle,      module: "HR",         isHrGroup: true },
+  { name: "Payroll Hub",       category: "HR & TEAM",            href: "/dashboard/payroll",     icon: Banknote,        module: "PAYROLL",    isHrGroup: true },
+  { name: "Attendance Hub",    category: "HR & TEAM",            href: "/dashboard/attendance",  icon: BadgeCheck,      module: "ATTENDANCE", isHrGroup: true },
+
+  // SYSTEM
+  { name: "Settings",          category: "SYSTEM",               href: "/dashboard/settings",    icon: Settings,        module: "SYSTEM" },
+  { name: "Field Task Board",  category: "SYSTEM",               href: "/dashboard/field-tasks", icon: ClipboardCheck,  module: "FIELD_TASKS" },
 ];
 
 export default function DashboardLayout({
@@ -171,6 +186,27 @@ export default function DashboardLayout({
     });
   }, [user]);
 
+  const groupedNav = useMemo(() => {
+    const groups: { category: string; items: any[] }[] = [];
+    const categoryOrder = [
+      "MAIN",
+      "SALES & CRM",
+      "CLIENTS & OPERATIONS",
+      "COMPLIANCE & VAULT",
+      "FINANCE & ACCOUNTING",
+      "ASSETS & INVENTORY",
+      "HR & TEAM",
+      "SYSTEM"
+    ];
+
+    categoryOrder.forEach(cat => {
+      const items = filteredNavigation.filter((item: any) => item.category === cat);
+      if (items.length > 0) {
+        groups.push({ category: cat, items });
+      }
+    });
+    return groups;
+  }, [filteredNavigation]);
 
   const [hydrated, setHydrated] = useState(false);
 
@@ -225,69 +261,73 @@ export default function DashboardLayout({
           <span className="font-bold text-lg tracking-tight truncate">{orgName}</span>
         </div>
         
-        <nav className="flex-1 px-4 py-6 space-y-1.5 overflow-y-auto scrollbar-hide">
-          {filteredNavigation.map((item: any) => {
-            const isActive = pathname === item.href;
-            
-            // Check if Super Admin & HR Group item
-            const isSuperAdmin = user?.email === "admin@globalsafety.com" || user?.roles?.[0]?.role?.name === "SUPER_ADMIN";
-            
-            if (isSuperAdmin && item.isHrGroup) {
-              // Only render the dropdown header once (on the first HR item)
-              if (item.module === "HR") {
-                const hrItems = filteredNavigation.filter((i: any) => i.isHrGroup);
-                const hasActiveChild = hrItems.some((i: any) => pathname === i.href);
-                return (
-                  <div key="hr-group" className="space-y-1 mt-2 mb-2">
-                    <button 
-                      onClick={() => setIsHrMenuOpen(!isHrMenuOpen)}
-                      className={`flex items-center justify-between w-full px-3 py-2.5 rounded-xl text-sm font-bold transition-all ${hasActiveChild ? "bg-primary/5 text-primary" : "text-muted-foreground hover:bg-accent/5 hover:text-foreground"}`}
-                    >
-                      <span className="flex items-center gap-3">
-                        <Users className="w-5 h-5" /> Employees
-                      </span>
-                      {isHrMenuOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                    </button>
-                    {isHrMenuOpen && (
-                      <div className="pl-4 ml-2 border-l-2 border-border/50 space-y-1 mt-1">
-                        {hrItems.map((child: any) => {
-                          const childActive = pathname === child.href;
-                          return (
-                            <Link
-                              key={child.name}
-                              href={child.href}
-                              className={`flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-bold transition-all ${childActive ? "bg-primary/10 text-primary ring-1 ring-primary/20" : "text-muted-foreground hover:bg-accent/5 hover:text-foreground"}`}
-                            >
-                              <child.icon className={`w-4 h-4 ${childActive ? "text-primary" : ""}`} />
-                              {child.name}
-                            </Link>
-                          );
-                        })}
+        <nav className="flex-1 px-4 py-4 space-y-4 overflow-y-auto scrollbar-hide">
+          {groupedNav.map((group) => (
+            <div key={group.category} className="space-y-1">
+              {group.category !== "MAIN" && (
+                <div className="px-3 pt-2 pb-1 text-[10px] font-black uppercase tracking-wider text-muted-foreground/60">
+                  {group.category}
+                </div>
+              )}
+              {group.items.map((item: any) => {
+                const isActive = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
+                const isSuperAdmin = user?.email === "admin@globalsafety.com" || user?.roles?.[0]?.role?.name === "SUPER_ADMIN";
+                
+                if (isSuperAdmin && item.isHrGroup) {
+                  if (item.module === "HR") {
+                    const hrItems = group.items.filter((i: any) => i.isHrGroup);
+                    const hasActiveChild = hrItems.some((i: any) => pathname.startsWith(i.href));
+                    return (
+                      <div key="hr-group" className="space-y-1 mt-1 mb-1">
+                        <button 
+                          onClick={() => setIsHrMenuOpen(!isHrMenuOpen)}
+                          className={`flex items-center justify-between w-full px-3 py-2 rounded-xl text-sm font-bold transition-all ${hasActiveChild ? "bg-primary/5 text-primary" : "text-muted-foreground hover:bg-accent/5 hover:text-foreground"}`}
+                        >
+                          <span className="flex items-center gap-3">
+                            <Users className="w-4 h-4" /> Employees
+                          </span>
+                          {isHrMenuOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                        </button>
+                        {isHrMenuOpen && (
+                          <div className="pl-4 ml-2 border-l-2 border-border/50 space-y-1 mt-1">
+                            {hrItems.map((child: any) => {
+                              const childActive = pathname === child.href || pathname.startsWith(child.href);
+                              return (
+                                <Link
+                                  key={child.name}
+                                  href={child.href}
+                                  className={`flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-bold transition-all ${childActive ? "bg-primary/10 text-primary ring-1 ring-primary/20" : "text-muted-foreground hover:bg-accent/5 hover:text-foreground"}`}
+                                >
+                                  <child.icon className={`w-4 h-4 ${childActive ? "text-primary" : ""}`} />
+                                  {child.name}
+                                </Link>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                );
-              }
-              // Skip rendering individual HR items in the main loop if we are Super Admin
-              return null;
-            }
+                    );
+                  }
+                  return null;
+                }
 
-            // Normal item rendering
-            return (
-              <Link
-                key={item.name}
-                href={item.href}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all ${
-                  isActive 
-                    ? "bg-primary/10 text-primary ring-1 ring-primary/20" 
-                    : "text-muted-foreground hover:bg-accent/5 hover:text-foreground"
-                }`}
-              >
-                <item.icon className={`w-5 h-5 ${isActive ? "text-primary" : ""}`} />
-                {item.name}
-              </Link>
-            );
-          })}
+                return (
+                  <Link
+                    key={item.name}
+                    href={item.href}
+                    className={`flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-bold transition-all ${
+                      isActive 
+                        ? "bg-primary/10 text-primary ring-1 ring-primary/20" 
+                        : "text-muted-foreground hover:bg-accent/5 hover:text-foreground"
+                    }`}
+                  >
+                    <item.icon className={`w-4 h-4 ${isActive ? "text-primary" : ""}`} />
+                    {item.name}
+                  </Link>
+                );
+              })}
+            </div>
+          ))}
         </nav>
 
         <div className="p-4 border-t border-border">
@@ -324,70 +364,82 @@ export default function DashboardLayout({
           </button>
         </div>
         
-        <nav className="flex-1 px-4 py-6 space-y-1.5 overflow-y-auto">
-          {filteredNavigation.map((item: any) => {
-            const isActive = pathname === item.href;
-            const isSuperAdmin = user?.email === "admin@globalsafety.com" || user?.roles?.[0]?.role?.name === "SUPER_ADMIN";
-            
-            if (isSuperAdmin && item.isHrGroup) {
-              if (item.module === "HR") {
-                const hrItems = filteredNavigation.filter((i: any) => i.isHrGroup);
-                const hasActiveChild = hrItems.some((i: any) => pathname === i.href);
-                return (
-                  <div key="hr-group-mobile" className="space-y-1 mt-2 mb-2">
-                    <button 
-                      onClick={() => setIsHrMenuOpen(!isHrMenuOpen)}
-                      className={`flex items-center justify-between w-full px-4 py-3.5 rounded-2xl text-base font-bold transition-all ${hasActiveChild ? "bg-primary/5 text-primary" : "text-muted-foreground hover:bg-accent/5"}`}
-                    >
-                      <span className="flex items-center gap-3">
-                        <Users className="w-5 h-5" /> Employees
-                      </span>
-                      {isHrMenuOpen ? <ChevronDown className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
-                    </button>
-                    {isHrMenuOpen && (
-                      <div className="pl-6 ml-2 border-l-2 border-border/50 space-y-1 mt-2">
-                        {hrItems.map((child: any) => {
-                          const childActive = pathname === child.href;
-                          return (
-                            <Link
-                              key={child.name}
-                              href={child.href}
-                              className={`flex items-center gap-3 px-4 py-3 rounded-2xl text-base font-bold transition-all ${childActive ? "bg-primary/10 text-primary ring-1 ring-primary/20 shadow-lg shadow-primary/5" : "text-muted-foreground hover:bg-accent/5"}`}
-                            >
-                              <child.icon className={`w-4 h-4 ${childActive ? "text-primary" : ""}`} />
-                              {child.name}
-                            </Link>
-                          );
-                        })}
+        <nav className="flex-1 px-4 py-4 space-y-4 overflow-y-auto">
+          {groupedNav.map((group) => (
+            <div key={group.category} className="space-y-1">
+              {group.category !== "MAIN" && (
+                <div className="px-4 pt-2 pb-1 text-[10px] font-black uppercase tracking-wider text-muted-foreground/60">
+                  {group.category}
+                </div>
+              )}
+              {group.items.map((item: any) => {
+                const isActive = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
+                const isSuperAdmin = user?.email === "admin@globalsafety.com" || user?.roles?.[0]?.role?.name === "SUPER_ADMIN";
+                
+                if (isSuperAdmin && item.isHrGroup) {
+                  if (item.module === "HR") {
+                    const hrItems = group.items.filter((i: any) => i.isHrGroup);
+                    const hasActiveChild = hrItems.some((i: any) => pathname.startsWith(i.href));
+                    return (
+                      <div key="hr-group-mobile" className="space-y-1 mt-1 mb-1">
+                        <button 
+                          onClick={() => setIsHrMenuOpen(!isHrMenuOpen)}
+                          className={`flex items-center justify-between w-full px-4 py-3.5 rounded-2xl text-base font-bold transition-all ${hasActiveChild ? "bg-primary/5 text-primary" : "text-muted-foreground hover:bg-accent/5"}`}
+                        >
+                          <span className="flex items-center gap-3">
+                            <Users className="w-5 h-5" /> Employees
+                          </span>
+                          {isHrMenuOpen ? <ChevronDown className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
+                        </button>
+                        {isHrMenuOpen && (
+                          <div className="pl-6 ml-2 border-l-2 border-border/50 space-y-1 mt-2">
+                            {hrItems.map((child: any) => {
+                              const childActive = pathname === child.href || pathname.startsWith(child.href);
+                              return (
+                                <Link
+                                  key={child.name}
+                                  href={child.href}
+                                  className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${childActive ? "bg-primary/10 text-primary ring-1 ring-primary/20" : "text-muted-foreground hover:bg-accent/5"}`}
+                                >
+                                  <child.icon className={`w-4 h-4 ${childActive ? "text-primary" : ""}`} />
+                                  {child.name}
+                                </Link>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                );
-              }
-              return null;
-            }
+                    );
+                  }
+                  return null;
+                }
 
-            return (
-              <Link
-                key={item.name}
-                href={item.href}
-                className={`flex items-center gap-3 px-4 py-3.5 rounded-2xl text-base font-bold transition-all ${
-                  isActive 
-                    ? "bg-primary/10 text-primary ring-1 ring-primary/20 shadow-lg shadow-primary/5" 
-                    : "text-muted-foreground"
-                }`}
-              >
-                <item.icon className={`w-5 h-5 ${isActive ? "text-primary" : ""}`} />
-                {item.name}
-              </Link>
-            );
-          })}
+                return (
+                  <Link
+                    key={item.name}
+                    href={item.href}
+                    className={`flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-bold transition-all ${
+                      isActive 
+                        ? "bg-primary/10 text-primary ring-1 ring-primary/20" 
+                        : "text-muted-foreground hover:bg-accent/5 hover:text-foreground"
+                    }`}
+                  >
+                    <item.icon className={`w-5 h-5 ${isActive ? "text-primary" : ""}`} />
+                    {item.name}
+                  </Link>
+                );
+              })}
+            </div>
+          ))}
         </nav>
 
-        <div className="p-6 border-t border-border">
+        <div className="p-4 border-t border-border">
           <button 
-            onClick={() => { logout(); window.location.href = "/login"; }}
-            className="flex items-center gap-3 px-4 py-3.5 rounded-2xl w-full text-base font-bold text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-all"
+            onClick={() => {
+              logout();
+              window.location.href = "/login";
+            }}
+            className="flex items-center gap-3 px-4 py-3 rounded-2xl w-full text-sm font-bold text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-all"
           >
             <LogOut className="w-5 h-5" />
             Sign Out
