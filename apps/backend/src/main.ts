@@ -41,6 +41,20 @@ async function bootstrap() {
     prefix: '/public',
   });
 
+  // Serve static assets from external persistent_uploads folder (outside git root)
+  const fs = require('fs');
+  const persistentUploadsDir = join(process.cwd(), '..', 'persistent_uploads');
+  if (!fs.existsSync(persistentUploadsDir)) {
+    try {
+      fs.mkdirSync(persistentUploadsDir, { recursive: true });
+    } catch (e) {
+      // Ignore permissions issue
+    }
+  }
+  app.useStaticAssets(persistentUploadsDir, {
+    prefix: '/public/uploads',
+  });
+
   // Enable Global Validation Pipe
   app.useGlobalPipes(
     new ValidationPipe({
