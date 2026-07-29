@@ -8,6 +8,7 @@ import {
   Query,
   UseGuards,
   Req,
+  Header,
   UseInterceptors,
   UploadedFile,
   InternalServerErrorException,
@@ -46,6 +47,9 @@ export class DocumentsController {
 
   @Get('hierarchy')
   @Permissions('READ_DOCUMENT')
+  @Header('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+  @Header('Pragma', 'no-cache')
+  @Header('Expires', '0')
   getVaultHierarchy(@Req() req: any) {
     return this.documentsService.getVaultHierarchy(req.user);
   }
@@ -108,6 +112,24 @@ export class DocumentsController {
       console.error('Error details:', error);
       throw new InternalServerErrorException(error?.message || 'Document creation failed');
     }
+  }
+
+  @Post(':id/delivery-receipt')
+  @Permissions('UPDATE_DOCUMENT')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadDeliveryReceipt(
+    @Param('id') id: string,
+    @UploadedFile() file: any,
+    @Req() req: any,
+  ) {
+    const uploaderId = req.user?.userId || req.user?.id || req.user?.sub || null;
+    return this.documentsService.uploadDeliveryReceipt(id, file, uploaderId);
+  }
+
+  @Delete(':id/delivery-receipt')
+  @Permissions('UPDATE_DOCUMENT')
+  deleteDeliveryReceipt(@Param('id') id: string) {
+    return this.documentsService.deleteDeliveryReceipt(id);
   }
 
   @Delete(':id')

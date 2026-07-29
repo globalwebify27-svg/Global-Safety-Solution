@@ -38,7 +38,10 @@ import {
   Sparkles,
   LayoutGrid,
   ListFilter,
-  X
+  X,
+  UploadCloud,
+  Upload,
+  Image as ImageIcon
 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -88,6 +91,14 @@ interface VaultCertificateItem {
   file_type: string;
   file_size: number;
   created_at: string;
+  updated_at?: string;
+  delivery_receipt_url?: string | null;
+  delivery_receipt_name?: string | null;
+  delivery_receipt_type?: string | null;
+  delivery_receipt_size?: number | null;
+  delivery_receipt_uploaded_at?: string | null;
+  delivery_receipt_uploaded_by?: string | null;
+  receipt_uploader_name?: string | null;
 }
 
 interface VaultProjectNode {
@@ -149,11 +160,106 @@ export default function DocumentVaultPage() {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [selectedPreviewCert, setSelectedPreviewCert] = useState<VaultCertificateItem | null>(null);
 
+  // Delivery Receipt Upload / Delete State
+  const [uploadingReceipt, setUploadingReceipt] = useState(false);
+  const [deletingReceipt, setDeletingReceipt] = useState(false);
+
   const token = useAuthStore((state) => state.token);
   const user = useAuthStore((state) => state.user);
   const roleName = user?.roles?.[0]?.role?.name || "";
   const designation = (user?.designation || "").toUpperCase();
   const isClient = roleName === "CLIENT" || designation.includes("CLIENT");
+
+  const handleDeliveryReceiptUpload = async (file: File) => {
+    if (!selectedPreviewCert || !token) return;
+    
+    // Client-side validation
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSize) {
+      alert("File size exceeds maximum allowed limit of 10MB.");
+      return;
+    }
+
+    const ext = (file.name || '').split('.').pop()?.toLowerCase();
+    if (!['jpg', 'jpeg', 'png', 'pdf'].includes(ext || '')) {
+      alert("Invalid file format. Only JPG, PNG, and PDF files are allowed for delivery receipts.");
+      return;
+    }
+
+    setUploadingReceipt(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const res = await fetch(`${API_BASE_URL}/documents/${selectedPreviewCert.id}/delivery-receipt`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      if (res.ok) {
+        const updatedDoc = await res.json();
+        setSelectedPreviewCert((prev) => prev ? {
+          ...prev,
+          delivery_receipt_url: updatedDoc.delivery_receipt_url,
+          delivery_receipt_name: updatedDoc.delivery_receipt_name,
+          delivery_receipt_type: updatedDoc.delivery_receipt_type,
+          delivery_receipt_size: updatedDoc.delivery_receipt_size,
+          delivery_receipt_uploaded_at: updatedDoc.delivery_receipt_uploaded_at,
+          delivery_receipt_uploaded_by: updatedDoc.delivery_receipt_uploaded_by,
+          receipt_uploader_name: updatedDoc.receipt_uploader?.name || user?.name || 'Staff'
+        } : null);
+
+        if (typeof fetchData === 'function') fetchData();
+      } else {
+        const errorData = await res.json();
+        alert(errorData.message || "Failed to upload delivery receipt.");
+      }
+    } catch (e: any) {
+      alert(`Network error: ${e?.message || 'Upload failed'}`);
+    } finally {
+      setUploadingReceipt(false);
+    }
+  };
+
+  const handleDeliveryReceiptDelete = async () => {
+    if (!selectedPreviewCert || !token) return;
+    if (!confirm("Are you sure you want to delete this physical delivery receipt proof?")) return;
+
+    setDeletingReceipt(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/documents/${selectedPreviewCert.id}/delivery-receipt`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+
+      if (res.ok) {
+        setSelectedPreviewCert((prev) => prev ? {
+          ...prev,
+          delivery_receipt_url: null,
+          delivery_receipt_name: null,
+          delivery_receipt_type: null,
+          delivery_receipt_size: null,
+          delivery_receipt_uploaded_at: null,
+          delivery_receipt_uploaded_by: null,
+          receipt_uploader_name: null
+        } : null);
+
+        if (typeof fetchData === 'function') fetchData();
+      } else {
+        const errorData = await res.json();
+        alert(errorData.message || "Failed to delete delivery receipt.");
+      }
+    } catch (e: any) {
+      alert(`Network error: ${e?.message || 'Delete failed'}`);
+    } finally {
+      setDeletingReceipt(false);
+    }
+  };
 
   const [formData, setFormData] = useState({
     name: "",
@@ -177,17 +283,18 @@ export default function DocumentVaultPage() {
     setLoading(true);
     try {
       const catParam = categoryFilter !== "ALL" ? `?category=${categoryFilter}` : "";
+      const timestamp = Date.now();
       const [docRes, clientRes, projectRes, hierarchyRes] = await Promise.all([
         fetch(`${API_BASE_URL}/documents${catParam}`, {
           headers: { Authorization: `Bearer ${token}` }
         }),
-        fetch(`${API_BASE_URL}/clients`, {
+        fetch(`${API_BASE_URL}/clients?_t=${timestamp}`, {
           headers: { Authorization: `Bearer ${token}` }
         }),
-        fetch(`${API_BASE_URL}/projects`, {
+        fetch(`${API_BASE_URL}/projects?_t=${timestamp}`, {
           headers: { Authorization: `Bearer ${token}` }
         }),
-        fetch(`${API_BASE_URL}/documents/hierarchy`, {
+        fetch(`${API_BASE_URL}/documents/hierarchy?_t=${timestamp}`, {
           headers: { Authorization: `Bearer ${token}` }
         })
       ]);
@@ -987,6 +1094,144 @@ export default function DocumentVaultPage() {
                   <div className="space-y-1 col-span-2 border-t border-border/50 pt-2">
                     <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block">Renewal Due Date</span>
                     <span className="font-bold text-amber-600 dark:text-amber-400">{selectedPreviewCert.due_date}</span>
+                  </div>
+                )}
+                {selectedPreviewCert.updated_at && (
+                  <div className="space-y-1 col-span-2 border-t border-border/50 pt-2 flex items-center justify-between text-[11px]">
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block">Last Updated Date</span>
+                    <span className="font-medium text-muted-foreground">{new Date(selectedPreviewCert.updated_at).toLocaleDateString([], { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Delivery Receipt Section */}
+              <div className="p-5 rounded-2xl bg-card border border-border/80 shadow-sm space-y-4 relative overflow-hidden">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 rounded-xl bg-amber-500/10 text-amber-500">
+                      <FileCheck2 className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-foreground">Delivery Receipt</h3>
+                      <p className="text-[10px] text-muted-foreground font-medium">Physical proof of client delivery</p>
+                    </div>
+                  </div>
+
+                  {selectedPreviewCert.delivery_receipt_url ? (
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                      ✓ RECEIPT VERIFIED
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-muted text-muted-foreground border border-border">
+                      NO RECEIPT ATTACHED
+                    </span>
+                  )}
+                </div>
+
+                {selectedPreviewCert.delivery_receipt_url ? (
+                  /* Existing Receipt View */
+                  <div className="p-4 rounded-xl bg-muted/30 border border-border/60 space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="p-3 rounded-lg bg-background border border-border shrink-0">
+                          {selectedPreviewCert.delivery_receipt_type === 'IMAGE' ? (
+                            <ImageIcon className="w-5 h-5 text-purple-500" />
+                          ) : (
+                            <FileText className="w-5 h-5 text-red-500" />
+                          )}
+                        </div>
+                        <div className="space-y-0.5">
+                          <p className="text-xs font-bold text-foreground line-clamp-1">
+                            {selectedPreviewCert.delivery_receipt_name || 'Delivery Receipt'}
+                          </p>
+                          <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                            <span>Uploaded by: <strong className="text-foreground">{selectedPreviewCert.receipt_uploader_name || 'Staff'}</strong></span>
+                            <span>•</span>
+                            <span>{selectedPreviewCert.delivery_receipt_uploaded_at ? new Date(selectedPreviewCert.delivery_receipt_uploaded_at).toLocaleDateString([], { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A'}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Receipt Action Buttons */}
+                    <div className="flex flex-wrap items-center justify-end gap-2 pt-2 border-t border-border/40">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleView(selectedPreviewCert.delivery_receipt_url!)}
+                        className="h-8 px-3 text-xs font-bold text-blue-600 hover:text-blue-500 hover:bg-blue-500/10 rounded-lg"
+                      >
+                        <Eye className="w-3.5 h-3.5 mr-1" /> View Receipt
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleDownload(selectedPreviewCert.delivery_receipt_url!, selectedPreviewCert.delivery_receipt_name || 'Delivery-Receipt')}
+                        className="h-8 px-3 text-xs font-bold text-emerald-600 hover:text-emerald-500 hover:bg-emerald-500/10 rounded-lg"
+                      >
+                        <Download className="w-3.5 h-3.5 mr-1" /> Download
+                      </Button>
+
+                      {!isClient && (
+                        <>
+                          <label className="cursor-pointer">
+                            <input
+                              type="file"
+                              accept=".jpg,.jpeg,.png,.pdf"
+                              disabled={uploadingReceipt}
+                              onChange={(e) => {
+                                const f = e.target.files?.[0];
+                                if (f) handleDeliveryReceiptUpload(f);
+                              }}
+                              className="hidden"
+                            />
+                            <span className="inline-flex items-center justify-center h-8 px-3 text-xs font-bold text-amber-600 hover:text-amber-500 hover:bg-amber-500/10 rounded-lg transition-colors">
+                              <RefreshCw className={cn("w-3.5 h-3.5 mr-1", uploadingReceipt && "animate-spin")} />
+                              {uploadingReceipt ? "Replacing..." : "Replace"}
+                            </span>
+                          </label>
+
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            disabled={deletingReceipt}
+                            onClick={handleDeliveryReceiptDelete}
+                            className="h-8 px-3 text-xs font-bold text-rose-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg"
+                          >
+                            <Trash2 className="w-3.5 h-3.5 mr-1" /> Delete
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  /* Upload Receipt Button / Dropzone */
+                  <div>
+                    {!isClient ? (
+                      <label className="block cursor-pointer group">
+                        <input
+                          type="file"
+                          accept=".jpg,.jpeg,.png,.pdf"
+                          disabled={uploadingReceipt}
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            if (f) handleDeliveryReceiptUpload(f);
+                          }}
+                          className="hidden"
+                        />
+                        <div className="p-4 rounded-xl border-2 border-dashed border-border group-hover:border-amber-500/50 bg-muted/20 group-hover:bg-amber-500/5 transition-all flex flex-col items-center justify-center space-y-2">
+                          <UploadCloud className="w-6 h-6 text-muted-foreground group-hover:text-amber-500 transition-colors" />
+                          <div className="text-center">
+                            <p className="text-xs font-bold text-foreground">
+                              {uploadingReceipt ? "Uploading Delivery Receipt..." : "Upload Physical Delivery Receipt"}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground font-medium">Supported Formats: JPG, PNG, PDF (Max 10MB)</p>
+                          </div>
+                        </div>
+                      </label>
+                    ) : (
+                      <p className="text-xs text-muted-foreground italic text-center py-2">No physical delivery receipt uploaded yet.</p>
+                    )}
                   </div>
                 )}
               </div>

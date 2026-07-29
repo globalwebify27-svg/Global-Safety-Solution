@@ -41,6 +41,7 @@ model User {
   assigned_clients        Client[]              @relation("ClientStaff")
   compliance_logs         ComplianceLog[]
   documents_uploaded      Document[]            @relation("DocumentUploader")
+  delivery_receipts_uploaded Document[]          @relation("DeliveryReceiptUploader")
   approved_expenses       Expense[]             @relation("ExpenseApprover")
   expenses                Expense[]
   inspections             Inspection[]
@@ -624,19 +625,27 @@ model Document {
   created_at    DateTime    @default(now()) @db.DateTime(6)
   updated_at    DateTime    @updatedAt @db.DateTime(6)
   lead_id       String?     @db.VarChar(36)
-  notes         String?     @db.Text
-  test_date     DateTime?   @db.Date
-  client        Client?     @relation(fields: [client_id], references: [id])
-  compliance    Compliance? @relation(fields: [compliance_id], references: [id])
-  lead          Lead?       @relation(fields: [lead_id], references: [id])
-  project       Project?    @relation(fields: [project_id], references: [id])
-  uploader      User?       @relation("DocumentUploader", fields: [uploaded_by], references: [id])
+  notes                         String?   @db.Text
+  test_date                     DateTime? @db.Date
+  delivery_receipt_url          String?   @db.LongText
+  delivery_receipt_name         String?   @db.VarChar(255)
+  delivery_receipt_type         String?   @db.VarChar(50)
+  delivery_receipt_size         Int?
+  delivery_receipt_uploaded_at  DateTime? @db.DateTime(6)
+  delivery_receipt_uploaded_by  String?   @db.VarChar(36)
+  client                        Client?     @relation(fields: [client_id], references: [id])
+  compliance                    Compliance? @relation(fields: [compliance_id], references: [id])
+  lead                          Lead?       @relation(fields: [lead_id], references: [id])
+  project                       Project?    @relation(fields: [project_id], references: [id])
+  uploader                      User?       @relation("DocumentUploader", fields: [uploaded_by], references: [id])
+  receipt_uploader              User?       @relation("DeliveryReceiptUploader", fields: [delivery_receipt_uploaded_by], references: [id])
 
   @@index([client_id], map: "documents_client_id_fkey")
   @@index([compliance_id], map: "documents_compliance_id_fkey")
   @@index([lead_id], map: "documents_lead_id_fkey")
   @@index([project_id], map: "documents_project_id_fkey")
   @@index([uploaded_by], map: "documents_uploaded_by_fkey")
+  @@index([delivery_receipt_uploaded_by], map: "documents_delivery_receipt_uploaded_by_fkey")
   @@map("documents")
 }
 
