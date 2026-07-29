@@ -486,7 +486,7 @@ export default function DocumentVaultPage() {
               <DialogTrigger render={<Button className="bg-blue-600 hover:bg-blue-500 text-white font-bold shadow-xl shadow-blue-500/20 px-6 h-11 transition-all active:scale-95 border-0 rounded-xl" />}>
                 <FilePlus className="w-4 h-4 mr-2" /> Deposit Document
               </DialogTrigger>
-              <DialogContent className="sm:max-w-[600px] bg-card border-border text-foreground shadow-2xl rounded-[2rem]">
+              <DialogContent className="sm:max-w-[600px] bg-card border-border text-foreground shadow-2xl rounded-[2rem] max-h-[85vh] overflow-y-auto p-6 relative">
                 <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-600 via-cyan-500 to-emerald-600" />
                 <DialogHeader>
                   <DialogTitle className="text-2xl font-bold">Secure Document Deposit</DialogTitle>
@@ -932,7 +932,7 @@ export default function DocumentVaultPage() {
 
       {/* Certificate Details Preview Modal */}
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
-        <DialogContent className="sm:max-w-[650px] bg-card border-border text-foreground shadow-2xl rounded-3xl overflow-hidden p-6 relative">
+        <DialogContent className="sm:max-w-[650px] bg-card border-border text-foreground shadow-2xl rounded-3xl p-6 relative max-h-[85vh] overflow-y-auto">
           <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-blue-600 via-cyan-500 to-emerald-500" />
           
           {selectedPreviewCert && (
