@@ -7,40 +7,7 @@ import { NestFactory, HttpAdapterHost } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { execSync } from 'child_process';
 
-// Force Prisma to generate the library engine client on startup only if not already generated
-try {
-  require.resolve('@prisma/client');
-  // Check if it's actually generated (sometimes a dummy index.js exists but no runtime)
-  const fs = require('fs');
-  const path = require('path');
-  const clientPath = path.dirname(require.resolve('@prisma/client'));
-  if (!fs.existsSync(path.join(clientPath, 'schema.prisma')) && !fs.existsSync(path.join(clientPath, 'index.d.ts'))) {
-    throw new Error('Prisma Client not fully generated');
-  }
-} catch (error) {
-  try {
-    const fs = require('fs');
-    let schemaPath = 'dist/prisma/schema.prisma';
-    if (!fs.existsSync(schemaPath)) {
-      schemaPath = 'prisma/schema.prisma';
-    }
-    console.log(`Generating Prisma Client on startup using schema: ${schemaPath}`);
-    execSync(`npx prisma generate --schema=${schemaPath}`, { stdio: 'inherit' });
-  } catch (genError) {
-    console.error('Failed to generate Prisma client on startup:', genError);
-  }
-}
 
-// Push schema changes to remote database if columns are missing
-try {
-  const fs = require('fs');
-  let schemaPath = 'dist/prisma/schema.prisma';
-  if (!fs.existsSync(schemaPath)) schemaPath = 'prisma/schema.prisma';
-  console.log('Synchronizing database columns with schema...');
-  execSync(`npx prisma db push --schema=${schemaPath} --skip-generate --accept-data-loss`, { stdio: 'inherit' });
-} catch (dbPushError) {
-  console.warn('Startup db push skipped/warning:', dbPushError?.message);
-}
 
 
 import { NestExpressApplication } from '@nestjs/platform-express';
