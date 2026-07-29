@@ -44,9 +44,28 @@ export class CertificatesService {
       },
     });
 
+    let cert: any;
     if (existing) {
-      return this.prisma.certificate.update({
+      cert = await this.prisma.certificate.update({
         where: { id: existing.id },
+        data: {
+          ...rest,
+          issue_date: issueDate,
+          expiry_date: expiryDate,
+          validity_period,
+          metadata: metadataStr,
+        },
+        include: {
+          inspection: {
+            include: {
+              client: true,
+              work_order: true,
+            },
+          },
+        },
+      });
+    } else {
+      cert = await this.prisma.certificate.create({
         data: {
           ...rest,
           issue_date: issueDate,
@@ -65,23 +84,67 @@ export class CertificatesService {
       });
     }
 
-    return this.prisma.certificate.create({
-      data: {
-        ...rest,
-        issue_date: issueDate,
-        expiry_date: expiryDate,
-        validity_period,
-        metadata: metadataStr,
-      },
-      include: {
-        inspection: {
-          include: {
-            client: true,
-            work_order: true,
-          },
+    await this.syncCertificateToVault(cert);
+    return cert;
+  }
+
+  private async syncCertificateToVault(certificate: any) {
+    if (!certificate || !certificate.inspection) return;
+
+    const clientId = certificate.inspection.client_id;
+    const projectId = certificate.inspection.project_id || certificate.inspection.work_order?.project_id || null;
+    const certNo = certificate.certificate_no;
+    const clientName = certificate.inspection.client?.name || 'Client';
+    const certName = `${clientName} - Certificate ${certNo}`;
+    const fileUrl = certificate.pdf_url || `/certificates/${certificate.id}/pdf`;
+
+    try {
+      const existingDoc = await this.prisma.document.findFirst({
+        where: {
+          OR: [
+            { certificate_id: certificate.id },
+            { file_url: fileUrl },
+          ],
         },
-      },
-    });
+      });
+
+      if (existingDoc) {
+        await this.prisma.document.update({
+          where: { id: existingDoc.id },
+          data: {
+            name: certName,
+            file_url: fileUrl,
+            file_type: 'PDF',
+            category: 'CERTIFICATE',
+            client_id: clientId,
+            project_id: projectId,
+            expiry_date: certificate.expiry_date,
+            test_date: certificate.issue_date,
+            certificate_id: certificate.id,
+            notes: `Certificate No. ${certNo} | Status: ${certificate.status || 'ACTIVE'}`,
+          },
+        });
+      } else {
+        await this.prisma.document.create({
+          data: {
+            name: certName,
+            file_url: fileUrl,
+            file_type: 'PDF',
+            file_size: 102400,
+            category: 'CERTIFICATE',
+            client_id: clientId,
+            project_id: projectId,
+            expiry_date: certificate.expiry_date,
+            test_date: certificate.issue_date,
+            certificate_id: certificate.id,
+            notes: `Certificate No. ${certNo} | Status: ${certificate.status || 'ACTIVE'}`,
+            uploaded_by: certificate.inspection.engineer_id || null,
+          },
+        });
+      }
+    } catch (e) {
+      console.error('Failed to sync certificate to Digital Vault:', e);
+    }
   }
 
   async findAll() {

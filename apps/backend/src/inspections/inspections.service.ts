@@ -250,7 +250,7 @@ export class InspectionsService {
         // Generate a certificate number (e.g., GSS-YEAR-RANDOM)
         const certNo = `GSS-${new Date().getFullYear()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
 
-        await this.prisma.certificate.create({
+        const createdCert = await this.prisma.certificate.create({
           data: {
             inspection_id: id,
             certificate_no: certNo,
@@ -288,6 +288,7 @@ export class InspectionsService {
             project_id: inspection.project_id,
             expiry_date: expiryDate,
             test_date: new Date(),
+            certificate_id: createdCert.id,
             notes: `Auto-generated Certificate No. ${certNo} for completed inspection.`,
             uploaded_by: inspection.engineer_id || null,
           },
@@ -1199,7 +1200,7 @@ export class InspectionsService {
 
         if (!existingCert) {
           try {
-            await this.prisma.certificate.create({
+            const newCert = await this.prisma.certificate.create({
               data: {
                 inspection_id: id,
                 inspection_item_id: item.id,
@@ -1211,6 +1212,26 @@ export class InspectionsService {
                   template_id: item.cert_template_id,
                   field_values: item.cert_template_fields ? JSON.parse(item.cert_template_fields) : {}
                 })
+              }
+            });
+
+            // Also auto-sync to Digital Vault (Documents table)
+            const certExpDate = item.cert_expiry_date || new Date(new Date().setFullYear(new Date().getFullYear() + 1));
+            const certTestDate = item.cert_test_date || new Date();
+            await this.prisma.document.create({
+              data: {
+                name: `${inspection.client_id} - Certificate ${item.cert_ref_no}`,
+                file_url: `/certificates/${newCert.id}/pdf`,
+                file_type: 'PDF',
+                file_size: 102400,
+                category: 'CERTIFICATE',
+                client_id: inspection.client_id,
+                project_id: inspection.project_id,
+                expiry_date: certExpDate,
+                test_date: certTestDate,
+                certificate_id: newCert.id,
+                notes: `Auto-generated Section Certificate No. ${item.cert_ref_no}`,
+                uploaded_by: inspection.engineer_id || null,
               }
             });
           } catch (e) {

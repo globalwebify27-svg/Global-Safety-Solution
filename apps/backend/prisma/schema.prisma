@@ -626,12 +626,15 @@ model Document {
   lead_id       String?     @db.VarChar(36)
   notes         String?     @db.Text
   test_date     DateTime?   @db.Date
+  certificate_id String?      @db.VarChar(36)
   client        Client?     @relation(fields: [client_id], references: [id])
   compliance    Compliance? @relation(fields: [compliance_id], references: [id])
   lead          Lead?       @relation(fields: [lead_id], references: [id])
   project       Project?    @relation(fields: [project_id], references: [id])
   uploader      User?       @relation("DocumentUploader", fields: [uploaded_by], references: [id])
+  certificate   Certificate? @relation(fields: [certificate_id], references: [id], onDelete: SetNull)
 
+  @@index([certificate_id], map: "documents_certificate_id_fkey")
   @@index([client_id], map: "documents_client_id_fkey")
   @@index([compliance_id], map: "documents_compliance_id_fkey")
   @@index([lead_id], map: "documents_lead_id_fkey")
@@ -851,6 +854,7 @@ model Certificate {
   updated_at         DateTime        @updatedAt @db.DateTime(6)
   inspection         Inspection      @relation(fields: [inspection_id], references: [id], onDelete: Cascade)
   inspection_item    InspectionItem? @relation(fields: [inspection_item_id], references: [id], onDelete: Cascade)
+  documents          Document[]
 
   @@index([inspection_id], map: "certificates_inspection_id_fkey")
   @@map("certificates")

@@ -72,12 +72,16 @@ export class PermissionsGuard implements CanActivate {
     if (!requiredPermissions) {
       return true;
     }
-    const request = context.switchToHttp().getRequest();
-    const userPayload = request.user;
-    if (!userPayload) return false;
+    try {
+      const request = context.switchToHttp().getRequest();
+      const userPayload = request.user;
+      if (!userPayload) return false;
 
-    const user = await this.usersService.findById(userPayload.userId);
-    if (!user || !user.is_active) return false;
+      const userId = userPayload.userId || userPayload.id || userPayload.sub;
+      if (!userId) return false;
+
+      const user = await this.usersService.findById(userId);
+      if (!user || !user.is_active) return false;
 
     if (user.is_on_hold && request.method !== 'GET') {
       return false;
@@ -116,5 +120,9 @@ export class PermissionsGuard implements CanActivate {
     return requiredPermissions.some((permission) =>
       checkPermission(permission),
     );
+    } catch (error) {
+      console.error('Error in PermissionsGuard:', error);
+      return false;
+    }
   }
 }

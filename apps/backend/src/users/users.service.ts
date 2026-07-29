@@ -8,8 +8,9 @@ export class UsersService {
   constructor(private prisma: PrismaService) {}
 
   async findByEmail(email: string): Promise<any | null> {
+    if (!email || typeof email !== 'string' || !email.trim()) return null;
     return this.prisma.user.findUnique({
-      where: { email },
+      where: { email: email.trim() },
       include: {
         roles: {
           include: {
@@ -27,8 +28,9 @@ export class UsersService {
   }
 
   async findById(id: string): Promise<any | null> {
+    if (!id || typeof id !== 'string' || !id.trim()) return null;
     return this.prisma.user.findUnique({
-      where: { id },
+      where: { id: id.trim() },
       include: {
         attendance: {
           take: 10,

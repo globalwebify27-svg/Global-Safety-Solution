@@ -5,50 +5,324 @@ import { PrismaService } from '../prisma/prisma.service';
 export class DocumentsService {
   constructor(private readonly prisma: PrismaService) { }
 
-  async findAll(filters: any, userPayload?: any) {
-    let clientId: string | undefined;
-
-    if (userPayload) {
-      const user = await this.prisma.user.findUnique({
-        where: { id: userPayload.userId },
+  // Automatically sync any existing DB certificates that are missing from Digital Vault
+  async syncExistingCertificatesToVault() {
+    try {
+      const certificates = await this.prisma.certificate.findMany({
         include: {
-          roles: {
+          inspection: {
             include: {
-              role: true,
+              client: true,
+              work_order: true,
             },
           },
         },
       });
 
-      const isClient =
-        user?.roles?.some(
-          (ur: any) =>
-            ur.role.name === 'CLIENT' || ur.role.name === 'CLIENTS',
-        ) || (user?.designation || '').toUpperCase().includes('CLIENT');
+      for (const cert of certificates) {
+        if (!cert.inspection) continue;
+        const clientId = cert.inspection.client_id;
+        const projectId = cert.inspection.project_id || cert.inspection.work_order?.project_id || null;
+        const fileUrl = cert.pdf_url || `/certificates/${cert.id}/pdf`;
+        const certName = `${cert.inspection.client?.name || 'Safety'} - Certificate ${cert.certificate_no}`;
 
-      if (isClient && user?.email) {
-        const clientRecord = await this.prisma.client.findFirst({
-          where: { email: user.email },
+        // Validate Foreign Keys exist in target tables to avoid Foreign Key Constraint errors
+        let validClientId: string | null = null;
+        if (clientId) {
+          const c = await this.prisma.client.findUnique({ where: { id: clientId } });
+          if (c) validClientId = clientId;
+        }
+
+        let validProjectId: string | null = null;
+        if (projectId) {
+          const p = await this.prisma.project.findUnique({ where: { id: projectId } });
+          if (p) validProjectId = projectId;
+        }
+
+        let validEngineerId: string | null = null;
+        if (cert.inspection.engineer_id) {
+          const u = await this.prisma.user.findUnique({ where: { id: cert.inspection.engineer_id } });
+          if (u) validEngineerId = cert.inspection.engineer_id;
+        }
+
+        const existingDoc = await this.prisma.document.findFirst({
+          where: {
+            OR: [
+              { certificate_id: cert.id },
+              { file_url: fileUrl },
+            ],
+          },
         });
-        clientId = clientRecord?.id;
-      }
-    }
 
-    return this.prisma.document.findMany({
-      where: {
-        category: filters.category,
-        client_id: clientId ? clientId : filters.client_id,
-        project_id: filters.project_id,
-        lead_id: filters.lead_id,
-      },
-      include: {
-        client: { select: { id: true, name: true } },
-        project: { select: { id: true, name: true } },
-        lead: { select: { id: true, company_name: true } },
-        uploader: { select: { id: true, name: true } },
-      },
-      orderBy: { created_at: 'desc' },
-    });
+        if (!existingDoc) {
+          await this.prisma.document.create({
+            data: {
+              name: certName,
+              file_url: fileUrl,
+              file_type: 'PDF',
+              file_size: 102400,
+              category: 'CERTIFICATE',
+              client_id: validClientId,
+              project_id: validProjectId,
+              expiry_date: cert.expiry_date,
+              test_date: cert.issue_date,
+              certificate_id: cert.id,
+              notes: `Certificate No. ${cert.certificate_no} | Status: ${cert.status || 'ACTIVE'}`,
+              uploaded_by: validEngineerId,
+            },
+          });
+        } else if (!existingDoc.certificate_id || !existingDoc.project_id) {
+          await this.prisma.document.update({
+            where: { id: existingDoc.id },
+            data: {
+              certificate_id: cert.id,
+              project_id: existingDoc.project_id || validProjectId,
+              client_id: existingDoc.client_id || validClientId,
+            },
+          });
+        }
+      }
+    } catch (e) {
+      console.error('Error syncing existing certificates to vault:', e);
+    }
+  }
+
+  async getVaultHierarchy(userPayload?: any) {
+    try {
+      // 1. Ensure pre-existing certificates are synced to Digital Vault
+      await this.syncExistingCertificatesToVault();
+
+      // 2. Identify if request is from a Client user
+      let userClientId: string | undefined;
+
+      const userId = userPayload?.userId || userPayload?.id || userPayload?.sub;
+      if (userId) {
+        const user = await this.prisma.user.findUnique({
+          where: { id: userId },
+          include: {
+            roles: {
+              include: {
+                role: true,
+              },
+            },
+          },
+        });
+
+        const isClient =
+          user?.roles?.some(
+            (ur: any) =>
+              ur.role.name === 'CLIENT' || ur.role.name === 'CLIENTS',
+          ) || (user?.designation || '').toUpperCase().includes('CLIENT');
+
+        if (isClient && user?.email) {
+          const clientRecord = await this.prisma.client.findFirst({
+            where: { email: user.email },
+          });
+          userClientId = clientRecord?.id;
+        }
+      }
+
+      // 3. Query Clients, Projects, and Certificates
+      const clients = await this.prisma.client.findMany({
+        where: userClientId ? { id: userClientId } : { is_active: true },
+        include: {
+          projects: {
+            orderBy: { created_at: 'desc' },
+          },
+          documents: {
+            where: { category: 'CERTIFICATE' },
+            include: {
+              certificate: true,
+            },
+            orderBy: { created_at: 'desc' },
+          },
+        },
+        orderBy: { name: 'asc' },
+      });
+
+      const now = new Date();
+      const thirtyDaysFromNow = new Date();
+      thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+
+      let totalCertificates = 0;
+      let activeCount = 0;
+      let dueSoonCount = 0;
+      let expiredCount = 0;
+
+      const hierarchy = clients.map((client) => {
+        const clientDocs = client.documents || [];
+
+        // Group certificates under projects
+        const projectMap = new Map<string, any>();
+
+        // Initialize all known projects for this client
+        for (const project of client.projects) {
+          projectMap.set(project.id, {
+            project_id: project.id,
+            project_name: project.name,
+            description: project.description,
+            status: project.status,
+            certificates: [],
+          });
+        }
+
+        // "General / Direct Client Documents" bucket for documents without project_id
+        const generalProjectKey = 'general';
+        projectMap.set(generalProjectKey, {
+          project_id: 'general',
+          project_name: 'General / Direct Client Certificates',
+          description: 'Certificates linked directly to the client',
+          status: 'ACTIVE',
+          certificates: [],
+        });
+
+        for (const doc of clientDocs) {
+          totalCertificates++;
+
+          // Status calculation
+          let computedStatus = 'ACTIVE';
+          if (doc.expiry_date) {
+            const exp = new Date(doc.expiry_date);
+            if (exp.getTime() < now.getTime()) {
+              computedStatus = 'EXPIRED';
+              expiredCount++;
+            } else if (exp.getTime() <= thirtyDaysFromNow.getTime()) {
+              computedStatus = 'DUE_SOON';
+              dueSoonCount++;
+            } else {
+              computedStatus = 'ACTIVE';
+              activeCount++;
+            }
+          } else {
+            activeCount++;
+          }
+
+          // Calculate Due Date (15 days before expiry, if expiry exists)
+          let dueDateStr: string | null = null;
+          if (doc.expiry_date) {
+            const dueDateObj = new Date(doc.expiry_date);
+            dueDateObj.setDate(dueDateObj.getDate() - 15);
+            dueDateStr = dueDateObj.toISOString().split('T')[0];
+          }
+
+          // Extract cert number from doc.certificate or notes/name
+          let certNumber = doc.certificate?.certificate_no || null;
+          if (!certNumber && doc.notes) {
+            const match = doc.notes.match(/Certificate No\.\s*([A-Za-z0-9\/-]+)/i);
+            if (match) certNumber = match[1];
+          }
+
+          const certItem = {
+            id: doc.id,
+            certificate_id: doc.certificate_id || doc.id,
+            name: doc.name,
+            certificate_number: certNumber || 'GSS-CERT-' + doc.id.substring(0, 6).toUpperCase(),
+            certificate_type: doc.certificate?.validity_period ? `${doc.certificate.validity_period} Certificate` : 'Safety Certificate',
+            client_id: client.id,
+            client_name: client.name,
+            project_id: doc.project_id || 'general',
+            project_name: (doc.project_id && projectMap.has(doc.project_id))
+              ? projectMap.get(doc.project_id).project_name
+              : 'General / Direct Client Certificates',
+            issue_date: doc.test_date ? doc.test_date.toISOString().split('T')[0] : doc.created_at.toISOString().split('T')[0],
+            expiry_date: doc.expiry_date ? doc.expiry_date.toISOString().split('T')[0] : null,
+            due_date: dueDateStr,
+            status: computedStatus,
+            file_url: doc.file_url,
+            file_type: doc.file_type || 'PDF',
+            file_size: doc.file_size || 0,
+            created_at: doc.created_at,
+          };
+
+          const targetProjKey = (doc.project_id && projectMap.has(doc.project_id)) ? doc.project_id : generalProjectKey;
+          projectMap.get(targetProjKey).certificates.push(certItem);
+        }
+
+        // Convert projectMap to array, filtering out empty general bucket if there are other projects with certificates
+        const projectsList = Array.from(projectMap.values()).filter(p => {
+          if (p.project_id === 'general' && p.certificates.length === 0) return false;
+          return true;
+        });
+
+        return {
+          client_id: client.id,
+          client_name: client.name,
+          industry: client.industry,
+          city: client.city,
+          projects: projectsList,
+          total_certificates: clientDocs.length,
+        };
+      }).filter(c => c.total_certificates > 0 || c.projects.length > 0);
+
+      return {
+        hierarchy,
+        stats: {
+          total_certificates: totalCertificates,
+          active: activeCount,
+          due_soon: dueSoonCount,
+          expired: expiredCount,
+        },
+      };
+    } catch (error) {
+      console.error('Error in getVaultHierarchy:', error);
+      return {
+        hierarchy: [],
+        stats: { total_certificates: 0, active: 0, due_soon: 0, expired: 0 }
+      };
+    }
+  }
+
+  async findAll(filters: any, userPayload?: any) {
+    try {
+      let clientId: string | undefined;
+
+      const userId = userPayload?.userId || userPayload?.id || userPayload?.sub;
+      if (userId) {
+        const user = await this.prisma.user.findUnique({
+          where: { id: userId },
+          include: {
+            roles: {
+              include: {
+                role: true,
+              },
+            },
+          },
+        });
+
+        const isClient =
+          user?.roles?.some(
+            (ur: any) =>
+              ur.role.name === 'CLIENT' || ur.role.name === 'CLIENTS',
+          ) || (user?.designation || '').toUpperCase().includes('CLIENT');
+
+        if (isClient && user?.email) {
+          const clientRecord = await this.prisma.client.findFirst({
+            where: { email: user.email },
+          });
+          clientId = clientRecord?.id;
+        }
+      }
+
+      return await this.prisma.document.findMany({
+        where: {
+          category: filters.category,
+          client_id: clientId ? clientId : filters.client_id,
+          project_id: filters.project_id,
+          lead_id: filters.lead_id,
+        },
+        include: {
+          client: { select: { id: true, name: true } },
+          project: { select: { id: true, name: true } },
+          lead: { select: { id: true, company_name: true } },
+          uploader: { select: { id: true, name: true } },
+          certificate: true,
+        },
+        orderBy: { created_at: 'desc' },
+      });
+    } catch (error) {
+      console.error('Error in DocumentsService.findAll:', error);
+      return [];
+    }
   }
 
   async findOne(id: string) {
@@ -59,30 +333,87 @@ export class DocumentsService {
         project: true,
         compliance: true,
         uploader: true,
+        certificate: true,
       },
     });
     if (!doc) throw new NotFoundException('Document not found');
     return doc;
   }
 
-  async create(data: any, uploaderId: string) {
-    return this.prisma.document.create({
-      data: {
-        name: data.name,
-        file_url: data.file_url,
-        file_type: data.file_type || 'PDF',
-        file_size: Number(data.file_size) || 0,
-        category: data.category || 'OTHER',
-        client_id: data.client_id || null,
-        lead_id: data.lead_id || null,
-        project_id: data.project_id || null,
-        compliance_id: data.compliance_id || null,
-        expiry_date: data.expiry_date ? new Date(data.expiry_date) : null,
-        test_date: data.test_date ? new Date(data.test_date) : null,
-        notes: data.notes || null,
-        uploaded_by: uploaderId,
-      },
-    });
+  async create(data: any, uploaderId?: string) {
+    try {
+      const cleanUuid = (val: any): string | null => {
+        if (!val || val === 'null' || val === 'undefined' || val === 'None' || typeof val !== 'string') return null;
+        const trimmed = val.trim();
+        return (trimmed === '' || trimmed === 'null' || trimmed === 'undefined') ? null : trimmed;
+      };
+
+      const clientId = cleanUuid(data.client_id);
+      const projectId = cleanUuid(data.project_id);
+      const leadId = cleanUuid(data.lead_id);
+      const complianceId = cleanUuid(data.compliance_id);
+      const certificateId = cleanUuid(data.certificate_id);
+      const uploadedBy = cleanUuid(uploaderId);
+
+      // Validate foreign keys against DB to prevent 500 Foreign Key Constraint Violation errors
+      let validClientId: string | null = null;
+      if (clientId) {
+        const c = await this.prisma.client.findUnique({ where: { id: clientId } });
+        if (c) validClientId = clientId;
+      }
+
+      let validProjectId: string | null = null;
+      if (projectId) {
+        const p = await this.prisma.project.findUnique({ where: { id: projectId } });
+        if (p) validProjectId = projectId;
+      }
+
+      let validLeadId: string | null = null;
+      if (leadId) {
+        const l = await this.prisma.lead.findUnique({ where: { id: leadId } });
+        if (l) validLeadId = leadId;
+      }
+
+      let validComplianceId: string | null = null;
+      if (complianceId) {
+        const c = await this.prisma.compliance.findUnique({ where: { id: complianceId } });
+        if (c) validComplianceId = complianceId;
+      }
+
+      let validCertificateId: string | null = null;
+      if (certificateId) {
+        const cert = await this.prisma.certificate.findUnique({ where: { id: certificateId } });
+        if (cert) validCertificateId = certificateId;
+      }
+
+      let validUploadedBy: string | null = null;
+      if (uploadedBy) {
+        const u = await this.prisma.user.findUnique({ where: { id: uploadedBy } });
+        if (u) validUploadedBy = uploadedBy;
+      }
+
+      return await this.prisma.document.create({
+        data: {
+          name: data.name || 'Untitled Document',
+          file_url: data.file_url || '#',
+          file_type: data.file_type || 'PDF',
+          file_size: Number(data.file_size) || 0,
+          category: data.category || 'OTHER',
+          client_id: validClientId,
+          lead_id: validLeadId,
+          project_id: validProjectId,
+          compliance_id: validComplianceId,
+          certificate_id: validCertificateId,
+          expiry_date: data.expiry_date && !isNaN(Date.parse(data.expiry_date)) ? new Date(data.expiry_date) : null,
+          test_date: data.test_date && !isNaN(Date.parse(data.test_date)) ? new Date(data.test_date) : null,
+          notes: data.notes || null,
+          uploaded_by: validUploadedBy,
+        },
+      });
+    } catch (error) {
+      console.error('Error creating document in DB:', error);
+      throw error;
+    }
   }
 
   async delete(id: string) {

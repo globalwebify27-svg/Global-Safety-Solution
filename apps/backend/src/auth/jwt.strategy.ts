@@ -1,4 +1,4 @@
-﻿import { ExtractJwt, Strategy } from 'passport-jwt';
+import { ExtractJwt, Strategy } from 'passport-jwt';
 import { PassportStrategy } from '@nestjs/passport';
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { UsersService } from '../users/users.service';
@@ -19,7 +19,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('User account is deactivated');
     }
     return { 
-      userId: payload.sub, 
+      userId: payload.sub,
+      id: payload.sub,
       email: payload.email,
       name: user.name,
       employee_id: user.employee_id

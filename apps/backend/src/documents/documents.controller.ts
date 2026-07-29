@@ -10,6 +10,7 @@ import {
   Req,
   UseInterceptors,
   UploadedFile,
+  InternalServerErrorException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { DocumentsService } from './documents.service';
@@ -41,6 +42,12 @@ export class DocumentsController {
     );
   }
 
+  @Get('hierarchy')
+  @Permissions('READ_DOCUMENT')
+  getVaultHierarchy(@Req() req: any) {
+    return this.documentsService.getVaultHierarchy(req.user);
+  }
+
   @Get(':id')
   @Permissions('READ_DOCUMENT')
   findOne(@Param('id') id: string) {
@@ -63,28 +70,29 @@ export class DocumentsController {
 
       let fileUrl = data.file_url;
       if (file && file.buffer) {
-        // Save file to local filesystem (or Hostinger disk) instead of converting to Base64
-        fileUrl = await this.localStorageService.saveFile(file.buffer, file.originalname);
+        const safeOriginalName = file.originalname || 'document.pdf';
+        fileUrl = await this.localStorageService.saveFile(file.buffer, safeOriginalName);
         console.log('File successfully saved to local storage URL:', fileUrl);
       } else {
         console.warn('Warning: No file buffer found to save');
       }
 
+      const uploaderId = req.user?.userId || req.user?.id || req.user?.sub || null;
       const result = await this.documentsService.create(
         {
           ...data,
-          file_url: fileUrl,
-          file_size: file?.size || data.file_size,
+          file_url: fileUrl || data.file_url || '#',
+          file_size: file?.size || Number(data.file_size) || 0,
         },
-        req.user.userId,
+        uploaderId,
       );
       console.log('Document successfully saved in database. ID:', result.id);
       console.log('--- UPLOAD SUCCESS ---');
       return result;
-    } catch (error) {
+    } catch (error: any) {
       console.error('--- UPLOAD FAILED ---');
       console.error('Error details:', error);
-      throw error;
+      throw new InternalServerErrorException(error?.message || 'Document creation failed');
     }
   }
 
