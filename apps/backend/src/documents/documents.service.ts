@@ -392,24 +392,37 @@ export class DocumentsService {
         if (u) validUploadedBy = uploadedBy;
       }
 
-      return await this.prisma.document.create({
-        data: {
-          name: data.name || 'Untitled Document',
-          file_url: data.file_url || '#',
-          file_type: data.file_type || 'PDF',
-          file_size: Number(data.file_size) || 0,
-          category: data.category || 'OTHER',
-          client_id: validClientId,
-          lead_id: validLeadId,
-          project_id: validProjectId,
-          compliance_id: validComplianceId,
-          certificate_id: validCertificateId,
-          expiry_date: data.expiry_date && !isNaN(Date.parse(data.expiry_date)) ? new Date(data.expiry_date) : null,
-          test_date: data.test_date && !isNaN(Date.parse(data.test_date)) ? new Date(data.test_date) : null,
-          notes: data.notes || null,
-          uploaded_by: validUploadedBy,
-        },
-      });
+      const docData: any = {
+        name: data.name || 'Untitled Document',
+        file_url: data.file_url || '#',
+        file_type: data.file_type || 'PDF',
+        file_size: Number(data.file_size) || 0,
+        category: data.category || 'OTHER',
+        client_id: validClientId,
+        lead_id: validLeadId,
+        project_id: validProjectId,
+        compliance_id: validComplianceId,
+        expiry_date: data.expiry_date && !isNaN(Date.parse(data.expiry_date)) ? new Date(data.expiry_date) : null,
+        test_date: data.test_date && !isNaN(Date.parse(data.test_date)) ? new Date(data.test_date) : null,
+        notes: data.notes || null,
+        uploaded_by: validUploadedBy,
+      };
+
+      if (validCertificateId) {
+        docData.certificate_id = validCertificateId;
+      }
+
+      try {
+        return await this.prisma.document.create({ data: docData });
+      } catch (dbError: any) {
+        // If Hostinger's remote MySQL database table hasn't added column certificate_id yet, retry without it
+        if (dbError?.message?.includes('certificate_id') || dbError?.message?.includes('does not exist')) {
+          console.warn('certificate_id column missing on DB table. Saving document without certificate_id relation.');
+          delete docData.certificate_id;
+          return await this.prisma.document.create({ data: docData });
+        }
+        throw dbError;
+      }
     } catch (error) {
       console.error('Error creating document in DB:', error);
       throw error;

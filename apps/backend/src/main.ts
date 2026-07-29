@@ -31,6 +31,17 @@ try {
   }
 }
 
+// Push schema changes to remote database if columns are missing
+try {
+  const fs = require('fs');
+  let schemaPath = 'dist/prisma/schema.prisma';
+  if (!fs.existsSync(schemaPath)) schemaPath = 'prisma/schema.prisma';
+  console.log('Synchronizing database columns with schema...');
+  execSync(`npx prisma db push --schema=${schemaPath} --skip-generate --accept-data-loss`, { stdio: 'inherit' });
+} catch (dbPushError) {
+  console.warn('Startup db push skipped/warning:', dbPushError?.message);
+}
+
 
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
