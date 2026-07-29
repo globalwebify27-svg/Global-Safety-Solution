@@ -26,6 +26,14 @@ export class PrismaClientExceptionFilter extends BaseExceptionFilter {
         });
         break;
       }
+      case 'P2003': {
+        const status = HttpStatus.BAD_REQUEST;
+        response.status(status).json({
+          statusCode: status,
+          message: `Foreign key constraint failed: Invalid related record ID provided.`,
+        });
+        break;
+      }
       default:
         // default 500 error code
         super.catch(exception, host);
