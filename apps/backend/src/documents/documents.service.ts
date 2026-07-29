@@ -48,8 +48,8 @@ export class DocumentsService {
         const existingDoc = await this.prisma.document.findFirst({
           where: {
             OR: [
-              { certificate_id: cert.id },
               { file_url: fileUrl },
+              { notes: { contains: cert.certificate_no } },
             ],
           },
         });
@@ -66,18 +66,8 @@ export class DocumentsService {
               project_id: validProjectId,
               expiry_date: cert.expiry_date,
               test_date: cert.issue_date,
-              certificate_id: cert.id,
               notes: `Certificate No. ${cert.certificate_no} | Status: ${cert.status || 'ACTIVE'}`,
               uploaded_by: validEngineerId,
-            },
-          });
-        } else if (!existingDoc.certificate_id || !existingDoc.project_id) {
-          await this.prisma.document.update({
-            where: { id: existingDoc.id },
-            data: {
-              certificate_id: cert.id,
-              project_id: existingDoc.project_id || validProjectId,
-              client_id: existingDoc.client_id || validClientId,
             },
           });
         }
@@ -131,9 +121,6 @@ export class DocumentsService {
           },
           documents: {
             where: { category: 'CERTIFICATE' },
-            include: {
-              certificate: true,
-            },
             orderBy: { created_at: 'desc' },
           },
         },
@@ -205,19 +192,19 @@ export class DocumentsService {
             dueDateStr = dueDateObj.toISOString().split('T')[0];
           }
 
-          // Extract cert number from doc.certificate or notes/name
-          let certNumber = doc.certificate?.certificate_no || null;
-          if (!certNumber && doc.notes) {
+          // Extract cert number from notes/name
+          let certNumber = null;
+          if (doc.notes) {
             const match = doc.notes.match(/Certificate No\.\s*([A-Za-z0-9\/-]+)/i);
             if (match) certNumber = match[1];
           }
 
           const certItem = {
             id: doc.id,
-            certificate_id: doc.certificate_id || doc.id,
+            certificate_id: doc.id,
             name: doc.name,
             certificate_number: certNumber || 'GSS-CERT-' + doc.id.substring(0, 6).toUpperCase(),
-            certificate_type: doc.certificate?.validity_period ? `${doc.certificate.validity_period} Certificate` : 'Safety Certificate',
+            certificate_type: 'Safety Certificate',
             client_id: client.id,
             client_name: client.name,
             project_id: doc.project_id || 'general',
@@ -315,7 +302,6 @@ export class DocumentsService {
           project: { select: { id: true, name: true } },
           lead: { select: { id: true, company_name: true } },
           uploader: { select: { id: true, name: true } },
-          certificate: true,
         },
         orderBy: { created_at: 'desc' },
       });
@@ -333,7 +319,6 @@ export class DocumentsService {
         project: true,
         compliance: true,
         uploader: true,
-        certificate: true,
       },
     });
     if (!doc) throw new NotFoundException('Document not found');
@@ -352,7 +337,6 @@ export class DocumentsService {
       const projectId = cleanUuid(data.project_id);
       const leadId = cleanUuid(data.lead_id);
       const complianceId = cleanUuid(data.compliance_id);
-      const certificateId = cleanUuid(data.certificate_id);
       const uploadedBy = cleanUuid(uploaderId);
 
       // Validate foreign keys against DB to prevent 500 Foreign Key Constraint Violation errors
@@ -380,49 +364,29 @@ export class DocumentsService {
         if (c) validComplianceId = complianceId;
       }
 
-      let validCertificateId: string | null = null;
-      if (certificateId) {
-        const cert = await this.prisma.certificate.findUnique({ where: { id: certificateId } });
-        if (cert) validCertificateId = certificateId;
-      }
-
       let validUploadedBy: string | null = null;
       if (uploadedBy) {
         const u = await this.prisma.user.findUnique({ where: { id: uploadedBy } });
         if (u) validUploadedBy = uploadedBy;
       }
 
-      const docData: any = {
-        name: data.name || 'Untitled Document',
-        file_url: data.file_url || '#',
-        file_type: data.file_type || 'PDF',
-        file_size: Number(data.file_size) || 0,
-        category: data.category || 'OTHER',
-        client_id: validClientId,
-        lead_id: validLeadId,
-        project_id: validProjectId,
-        compliance_id: validComplianceId,
-        expiry_date: data.expiry_date && !isNaN(Date.parse(data.expiry_date)) ? new Date(data.expiry_date) : null,
-        test_date: data.test_date && !isNaN(Date.parse(data.test_date)) ? new Date(data.test_date) : null,
-        notes: data.notes || null,
-        uploaded_by: validUploadedBy,
-      };
-
-      if (validCertificateId) {
-        docData.certificate_id = validCertificateId;
-      }
-
-      try {
-        return await this.prisma.document.create({ data: docData });
-      } catch (dbError: any) {
-        // If Hostinger's remote MySQL database table hasn't added column certificate_id yet, retry without it
-        if (dbError?.message?.includes('certificate_id') || dbError?.message?.includes('does not exist')) {
-          console.warn('certificate_id column missing on DB table. Saving document without certificate_id relation.');
-          delete docData.certificate_id;
-          return await this.prisma.document.create({ data: docData });
-        }
-        throw dbError;
-      }
+      return await this.prisma.document.create({
+        data: {
+          name: data.name || 'Untitled Document',
+          file_url: data.file_url || '#',
+          file_type: data.file_type || 'PDF',
+          file_size: Number(data.file_size) || 0,
+          category: data.category || 'OTHER',
+          client_id: validClientId,
+          lead_id: validLeadId,
+          project_id: validProjectId,
+          compliance_id: validComplianceId,
+          expiry_date: data.expiry_date && !isNaN(Date.parse(data.expiry_date)) ? new Date(data.expiry_date) : null,
+          test_date: data.test_date && !isNaN(Date.parse(data.test_date)) ? new Date(data.test_date) : null,
+          notes: data.notes || null,
+          uploaded_by: validUploadedBy,
+        },
+      });
     } catch (error) {
       console.error('Error creating document in DB:', error);
       throw error;

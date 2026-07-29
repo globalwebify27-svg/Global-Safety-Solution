@@ -102,8 +102,8 @@ export class CertificatesService {
       const existingDoc = await this.prisma.document.findFirst({
         where: {
           OR: [
-            { certificate_id: certificate.id },
             { file_url: fileUrl },
+            { notes: { contains: certNo } },
           ],
         },
       });
@@ -120,7 +120,6 @@ export class CertificatesService {
             project_id: projectId,
             expiry_date: certificate.expiry_date,
             test_date: certificate.issue_date,
-            certificate_id: certificate.id,
             notes: `Certificate No. ${certNo} | Status: ${certificate.status || 'ACTIVE'}`,
           },
         });
@@ -136,7 +135,6 @@ export class CertificatesService {
             project_id: projectId,
             expiry_date: certificate.expiry_date,
             test_date: certificate.issue_date,
-            certificate_id: certificate.id,
             notes: `Certificate No. ${certNo} | Status: ${certificate.status || 'ACTIVE'}`,
             uploaded_by: certificate.inspection.engineer_id || null,
           },

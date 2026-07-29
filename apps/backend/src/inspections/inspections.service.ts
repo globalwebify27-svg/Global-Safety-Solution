@@ -288,7 +288,6 @@ export class InspectionsService {
             project_id: inspection.project_id,
             expiry_date: expiryDate,
             test_date: new Date(),
-            certificate_id: createdCert.id,
             notes: `Auto-generated Certificate No. ${certNo} for completed inspection.`,
             uploaded_by: inspection.engineer_id || null,
           },
@@ -1229,7 +1228,6 @@ export class InspectionsService {
                 project_id: inspection.project_id,
                 expiry_date: certExpDate,
                 test_date: certTestDate,
-                certificate_id: newCert.id,
                 notes: `Auto-generated Section Certificate No. ${item.cert_ref_no}`,
                 uploaded_by: inspection.engineer_id || null,
               }
