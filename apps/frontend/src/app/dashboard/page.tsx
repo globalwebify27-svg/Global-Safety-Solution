@@ -33,7 +33,10 @@ import {
   Target,
   FileSpreadsheet,
   Package,
-  ClipboardCheck
+  ClipboardCheck,
+  AlertTriangle,
+  CalendarClock,
+  XCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { 
@@ -816,6 +819,9 @@ export default function DashboardPage() {
         ))}
       </div>
 
+      {/* Certificate Expiry Alert Widget */}
+      <CertificateExpiryWidget token={token} router={router} />
+
       {/* Charts & Activity Section */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         {/* Main Chart */}
@@ -929,6 +935,72 @@ export default function DashboardPage() {
               <p className="text-xs text-muted-foreground leading-tight font-medium">All compliance frameworks are currently synchronized and active.</p>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Certificate Expiry Widget Component
+function CertificateExpiryWidget({ token, router }: { token: string | null; router: any }) {
+  const [dueStats, setDueStats] = useState<{ total: number; active: number; due_soon: number; expired: number } | null>(null);
+
+  useEffect(() => {
+    if (!token) return;
+    fetch(`${API_BASE_URL}/documents/due/stats`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data && typeof data.total === 'number') setDueStats(data);
+      })
+      .catch(() => {});
+  }, [token]);
+
+  if (!dueStats || (dueStats.due_soon === 0 && dueStats.expired === 0)) return null;
+
+  return (
+    <div
+      className="group p-6 rounded-[2rem] bg-gradient-to-r from-amber-500/5 via-card/40 to-rose-500/5 border border-amber-500/20 hover:border-amber-500/40 transition-all cursor-pointer relative overflow-hidden"
+      onClick={() => router.push('/dashboard/documents/due')}
+    >
+      <div className="absolute top-0 right-0 w-40 h-40 blur-[100px] opacity-20 bg-amber-500" />
+      <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <div className="p-3 rounded-2xl bg-amber-500/10 text-amber-500">
+            <CalendarClock className="w-6 h-6" />
+          </div>
+          <div className="space-y-1">
+            <h3 className="text-lg font-black text-foreground tracking-tight">Certificate Expiry Monitor</h3>
+            <p className="text-xs text-muted-foreground font-medium">
+              {dueStats.due_soon > 0 && <span className="text-amber-500 font-bold">{dueStats.due_soon} due soon</span>}
+              {dueStats.due_soon > 0 && dueStats.expired > 0 && <span> · </span>}
+              {dueStats.expired > 0 && <span className="text-rose-500 font-bold">{dueStats.expired} expired</span>}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-6">
+            <div className="text-center">
+              <p className="text-2xl font-black text-emerald-500 tracking-tighter">{dueStats.active}</p>
+              <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Active</p>
+            </div>
+            <div className="text-center">
+              <p className="text-2xl font-black text-amber-500 tracking-tighter">{dueStats.due_soon}</p>
+              <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Due Soon</p>
+            </div>
+            <div className="text-center">
+              <p className="text-2xl font-black text-rose-500 tracking-tighter">{dueStats.expired}</p>
+              <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Expired</p>
+            </div>
+          </div>
+          <Button
+            variant="ghost"
+            className="h-10 px-4 text-xs font-bold text-amber-500 hover:text-amber-400 hover:bg-amber-500/10 rounded-xl"
+          >
+            View All <ArrowRight className="w-4 h-4 ml-1" />
+          </Button>
         </div>
       </div>
     </div>

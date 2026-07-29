@@ -78,6 +78,8 @@ export function NotificationCenter() {
         destination = "/dashboard/employees";
       } else if (titleLower.includes("payroll") || messageLower.includes("payroll")) {
         destination = "/dashboard/payroll";
+      } else if ((titleLower.includes("certificate") && (titleLower.includes("expir") || titleLower.includes("due"))) || messageLower.includes("certificate expir") || messageLower.includes("certificate due")) {
+        destination = "/dashboard/documents/due";
       } else if (titleLower.includes("document") || titleLower.includes("vault") || messageLower.includes("vault")) {
         destination = "/dashboard/documents";
       } else if (titleLower.includes("asset") || messageLower.includes("asset")) {

@@ -18,6 +18,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { LocalStorageService } from '../common/services/local-storage.service';
+import { ExpiryCronService } from './expiry-cron.service';
 
 @Controller('documents')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
@@ -25,6 +26,7 @@ export class DocumentsController {
   constructor(
     private readonly documentsService: DocumentsService,
     private readonly localStorageService: LocalStorageService,
+    private readonly expiryCronService: ExpiryCronService,
   ) {}
 
   @Get()
@@ -46,6 +48,18 @@ export class DocumentsController {
   @Permissions('READ_DOCUMENT')
   getVaultHierarchy(@Req() req: any) {
     return this.documentsService.getVaultHierarchy(req.user);
+  }
+
+  @Get('due/stats')
+  @Permissions('READ_DOCUMENT')
+  getDueStats() {
+    return this.expiryCronService.getDueStats();
+  }
+
+  @Get('due')
+  @Permissions('READ_DOCUMENT')
+  getDueCertificates() {
+    return this.expiryCronService.getDueCertificates();
   }
 
   @Get(':id')

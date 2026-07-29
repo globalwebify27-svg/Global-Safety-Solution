@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useAuthStore } from "@/store/auth";
 import { API_BASE_URL } from "@/lib/config";
 import { Button } from "@/components/ui/button";
+import { useRouter } from "next/navigation";
 import {
   FileText,
   FilePlus,
@@ -107,6 +108,7 @@ interface VaultClientNode {
 }
 
 export default function DocumentVaultPage() {
+  const router = useRouter();
   const [documents, setDocuments] = useState<Document[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -481,12 +483,19 @@ export default function DocumentVaultPage() {
             </button>
           </div>
 
+          <Button 
+            onClick={() => router.push('/dashboard/documents/due')} 
+            className="bg-amber-600 hover:bg-amber-500 text-white font-bold shadow-xl shadow-amber-500/20 px-6 h-11 transition-all active:scale-95 border-0 rounded-xl"
+          >
+            <CalendarClock className="w-4 h-4 mr-2" /> Expiry Monitor
+          </Button>
+
           {!isClient && (
             <Dialog open={open} onOpenChange={setOpen}>
               <DialogTrigger render={<Button className="bg-blue-600 hover:bg-blue-500 text-white font-bold shadow-xl shadow-blue-500/20 px-6 h-11 transition-all active:scale-95 border-0 rounded-xl" />}>
                 <FilePlus className="w-4 h-4 mr-2" /> Deposit Document
               </DialogTrigger>
-              <DialogContent className="sm:max-w-[600px] bg-card border-border text-foreground shadow-2xl rounded-[2rem] max-h-[85vh] overflow-y-auto p-6 relative">
+              <DialogContent className="sm:max-w-[600px] bg-card border-border text-foreground shadow-2xl rounded-[2rem] max-h-[80vh] overflow-y-auto p-6 relative">
                 <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-600 via-cyan-500 to-emerald-600" />
                 <DialogHeader>
                   <DialogTitle className="text-2xl font-bold">Secure Document Deposit</DialogTitle>
@@ -584,12 +593,19 @@ export default function DocumentVaultPage() {
       {/* Summary KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         {[
-          { label: "Total Vault Certificates", value: vaultStats.total_certificates || documents.filter(d => d.category === 'CERTIFICATE').length, icon: FolderOpen, color: "text-blue-600 dark:text-blue-400", bg: "bg-blue-500/10" },
-          { label: "Active Certificates", value: vaultStats.active || documents.filter(d => d.category === 'CERTIFICATE' && (!d.expiry_date || new Date(d.expiry_date).getTime() > new Date().getTime())).length, icon: ShieldCheck, color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-500/10" },
-          { label: "Due Soon (Within 30d)", value: vaultStats.due_soon || documents.filter(d => d.expiry_date && new Date(d.expiry_date).getTime() - new Date().getTime() > 0 && new Date(d.expiry_date).getTime() - new Date().getTime() < 30 * 24 * 60 * 60 * 1000).length, icon: Clock, color: "text-amber-600 dark:text-amber-400", bg: "bg-amber-500/10" },
-          { label: "Expired Certificates", value: vaultStats.expired || documents.filter(d => d.expiry_date && new Date(d.expiry_date).getTime() < new Date().getTime()).length, icon: AlertCircle, color: "text-rose-600 dark:text-rose-400", bg: "bg-rose-500/10" }
+          { label: "Total Vault Certificates", value: vaultStats.total_certificates || documents.filter(d => d.category === 'CERTIFICATE').length, icon: FolderOpen, color: "text-blue-600 dark:text-blue-400", bg: "bg-blue-500/10", clickable: false },
+          { label: "Active Certificates", value: vaultStats.active || documents.filter(d => d.category === 'CERTIFICATE' && (!d.expiry_date || new Date(d.expiry_date).getTime() > new Date().getTime())).length, icon: ShieldCheck, color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-500/10", clickable: false },
+          { label: "Due Soon (Within 30d)", value: vaultStats.due_soon || documents.filter(d => d.expiry_date && new Date(d.expiry_date).getTime() - new Date().getTime() > 0 && new Date(d.expiry_date).getTime() - new Date().getTime() < 30 * 24 * 60 * 60 * 1000).length, icon: Clock, color: "text-amber-600 dark:text-amber-400", bg: "bg-amber-500/10", clickable: true },
+          { label: "Expired Certificates", value: vaultStats.expired || documents.filter(d => d.expiry_date && new Date(d.expiry_date).getTime() < new Date().getTime()).length, icon: AlertCircle, color: "text-rose-600 dark:text-rose-400", bg: "bg-rose-500/10", clickable: true }
         ].map((stat, i) => (
-          <div key={i} className="bg-card/40 border border-border rounded-2xl p-5 flex items-center justify-between shadow-sm backdrop-blur-md hover:border-primary/20 transition-all group">
+          <div 
+            key={i} 
+            onClick={() => stat.clickable && router.push('/dashboard/documents/due')}
+            className={cn(
+              "bg-card/40 border border-border rounded-2xl p-5 flex items-center justify-between shadow-sm backdrop-blur-md hover:border-primary/20 transition-all group",
+              stat.clickable && "cursor-pointer hover:bg-accent/10 active:scale-95"
+            )}
+          >
             <div className="space-y-1">
               <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">{stat.label}</p>
               <p className="text-3xl font-black text-foreground group-hover:text-primary transition-colors">{stat.value}</p>
@@ -932,7 +948,7 @@ export default function DocumentVaultPage() {
 
       {/* Certificate Details Preview Modal */}
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
-        <DialogContent className="sm:max-w-[650px] bg-card border-border text-foreground shadow-2xl rounded-3xl p-6 relative max-h-[85vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-[650px] bg-card border-border text-foreground shadow-2xl rounded-3xl p-6 relative max-h-[80vh] overflow-y-auto">
           <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-blue-600 via-cyan-500 to-emerald-500" />
           
           {selectedPreviewCert && (
