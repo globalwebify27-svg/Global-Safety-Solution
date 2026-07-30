@@ -270,17 +270,17 @@ export default function DashboardLayout({
   return (
     <div className="min-h-screen bg-background text-foreground flex overflow-hidden">
       {/* Desktop Sidebar (Hidden on Mobile) */}
-      <aside className="hidden lg:flex w-64 border-r border-border bg-card/50 flex-col backdrop-blur-xl shrink-0">
+      <aside className="hidden lg:flex w-64 border-r border-border bg-card flex-col backdrop-blur-xl shrink-0 shadow-xs">
         <div className="h-16 flex items-center px-6 border-b border-border gap-3">
           <img src="/logo.png" alt="Logo" className="w-8 h-8 rounded-lg" />
-          <span className="font-bold text-lg tracking-tight truncate">{orgName}</span>
+          <span className="font-bold text-lg tracking-tight truncate text-foreground">{orgName}</span>
         </div>
         
         <nav className="flex-1 px-4 py-4 space-y-4 overflow-y-auto scrollbar-hide">
           {groupedNav.map((group) => (
             <div key={group.category} className="space-y-1">
               {group.category !== "MAIN" && (
-                <div className="px-3 pt-2 pb-1 text-[10px] font-black uppercase tracking-wider text-muted-foreground/60">
+                <div className="px-3 pt-2 pb-1 text-[10px] font-black uppercase tracking-wider text-muted-foreground">
                   {group.category}
                 </div>
               )}
@@ -296,7 +296,7 @@ export default function DashboardLayout({
                       <div key="hr-group" className="space-y-1 mt-1 mb-1">
                         <button 
                           onClick={() => setIsHrMenuOpen(!isHrMenuOpen)}
-                          className={`flex items-center justify-between w-full px-3 py-2 rounded-xl text-sm font-bold transition-all ${hasActiveChild ? "bg-primary/5 text-primary" : "text-muted-foreground hover:bg-accent/5 hover:text-foreground"}`}
+                          className={`flex items-center justify-between w-full px-3 py-2 rounded-xl text-sm font-bold transition-all ${hasActiveChild ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-accent hover:text-foreground"}`}
                         >
                           <span className="flex items-center gap-3">
                             <Users className="w-4 h-4" /> Employees
@@ -304,14 +304,14 @@ export default function DashboardLayout({
                           {isHrMenuOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                         </button>
                         {isHrMenuOpen && (
-                          <div className="pl-4 ml-2 border-l-2 border-border/50 space-y-1 mt-1">
+                          <div className="pl-4 ml-2 border-l-2 border-border space-y-1 mt-1">
                             {hrItems.map((child: any) => {
                               const childActive = pathname === child.href || pathname.startsWith(child.href);
                               return (
                                 <Link
                                   key={child.name}
                                   href={child.href}
-                                  className={`flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-bold transition-all ${childActive ? "bg-primary/10 text-primary ring-1 ring-primary/20" : "text-muted-foreground hover:bg-accent/5 hover:text-foreground"}`}
+                                  className={`flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-bold transition-all ${childActive ? "bg-primary/10 text-primary ring-1 ring-primary/20" : "text-muted-foreground hover:bg-accent hover:text-foreground"}`}
                                 >
                                   <child.icon className={`w-4 h-4 ${childActive ? "text-primary" : ""}`} />
                                   {child.name}
@@ -333,7 +333,7 @@ export default function DashboardLayout({
                     className={`flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-bold transition-all ${
                       isActive 
                         ? "bg-primary/10 text-primary ring-1 ring-primary/20" 
-                        : "text-muted-foreground hover:bg-accent/5 hover:text-foreground"
+                        : "text-muted-foreground hover:bg-accent hover:text-foreground"
                     }`}
                   >
                     <item.icon className={`w-4 h-4 ${isActive ? "text-primary" : ""}`} />
@@ -372,7 +372,7 @@ export default function DashboardLayout({
         <div className="h-16 flex items-center justify-between px-6 border-b border-border">
           <div className="flex items-center gap-3">
             <img src="/logo.png" alt="Logo" className="w-8 h-8 rounded-lg" />
-            <span className="font-bold text-lg tracking-tight truncate">{orgName}</span>
+            <span className="font-bold text-lg tracking-tight truncate text-foreground">{orgName}</span>
           </div>
           <button onClick={() => setIsMobileMenuOpen(false)} className="text-muted-foreground hover:text-foreground p-1">
             <X className="w-6 h-6" />

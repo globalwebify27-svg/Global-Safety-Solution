@@ -211,7 +211,7 @@ export default function DashboardPage() {
         {/* Content sections */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           {/* Recent Audits & Inspections */}
-          <div className="lg:col-span-6 p-8 rounded-[2.5rem] bg-card/30 border border-border backdrop-blur-md">
+          <div className="lg:col-span-6 p-8 rounded-[2.5rem] bg-card border border-border shadow-xs backdrop-blur-md">
             <h3 className="text-xl font-bold text-foreground mb-6 flex items-center gap-2">
               <ClipboardCheck className="w-5 h-5 text-emerald-500" /> Recent Site Inspections
             </h3>
@@ -235,7 +235,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Recent Safety Quotations */}
-          <div className="lg:col-span-6 p-8 rounded-[2.5rem] bg-card/30 border border-border backdrop-blur-md">
+          <div className="lg:col-span-6 p-8 rounded-[2.5rem] bg-card border border-border shadow-xs backdrop-blur-md">
             <h3 className="text-xl font-bold text-foreground mb-6 flex items-center gap-2">
               <FileText className="w-5 h-5 text-blue-500" /> Safety Quotations
             </h3>
@@ -258,7 +258,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Financial Summary & Invoices */}
-          <div className="lg:col-span-12 p-8 rounded-[2.5rem] bg-card/30 border border-border backdrop-blur-md">
+          <div className="lg:col-span-12 p-8 rounded-[2.5rem] bg-card border border-border shadow-xs backdrop-blur-md">
             <h3 className="text-xl font-bold text-foreground mb-6 flex items-center gap-2">
               <FileSpreadsheet className="w-5 h-5 text-purple-500" /> Invoices & Billing
             </h3>
@@ -477,16 +477,16 @@ export default function DashboardPage() {
 
         {/* Schedule & Tasks lists */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <div className="p-8 rounded-[2.5rem] bg-card/30 border border-border backdrop-blur-md">
+          <div className="p-8 rounded-[2.5rem] bg-card border border-border shadow-xs backdrop-blur-md">
             <h3 className="text-xl font-bold text-foreground mb-6 flex items-center gap-2">
               <ClipboardCheck className="w-5 h-5 text-blue-500" /> My Inspection Schedule
             </h3>
             <div className="space-y-4 max-h-[360px] overflow-y-auto pr-2">
               {stats.inspections?.map((insp: any) => (
-                <div key={insp.id} className="p-4 rounded-2xl bg-muted/30 border border-border flex justify-between items-center hover:border-blue-500/30 transition-all">
+                <div key={insp.id} className="p-4 rounded-2xl bg-muted/50 border border-border flex justify-between items-center hover:border-blue-500/30 transition-all">
                   <div>
                     <p className="font-bold text-foreground">{insp.client}</p>
-                    <p className="text-xs text-muted-foreground">Date: {new Date(insp.scheduledDate).toLocaleDateString()}</p>
+                    <p className="text-xs text-muted-foreground font-medium">Date: {new Date(insp.scheduledDate).toLocaleDateString()}</p>
                   </div>
                   <span className="text-[10px] font-black uppercase bg-blue-500/10 text-blue-500 px-3 py-1 rounded-full">{insp.status}</span>
                 </div>
@@ -497,7 +497,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <div className="p-8 rounded-[2.5rem] bg-card/30 border border-border backdrop-blur-md">
+          <div className="p-8 rounded-[2.5rem] bg-card border border-border shadow-xs backdrop-blur-md">
             <h3 className="text-xl font-bold text-foreground mb-6 flex items-center gap-2">
               <Briefcase className="w-5 h-5 text-emerald-500" /> My Assigned Tasks
             </h3>

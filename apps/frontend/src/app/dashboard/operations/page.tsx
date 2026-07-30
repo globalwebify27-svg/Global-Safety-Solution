@@ -508,7 +508,7 @@ export default function OperationsPage() {
               const currentStageIdx = getStageIndex(proj.stage);
 
               return (
-                <div key={proj.id} className="bg-card/40 border border-border rounded-3xl overflow-hidden hover:border-indigo-500/30 transition-all group backdrop-blur-md shadow-sm">
+                <div key={proj.id} className="bg-card border border-border rounded-3xl overflow-hidden hover:border-indigo-500/40 transition-all group shadow-xs">
                   <div className="p-6 space-y-6">
                     {/* Top Row: Info & Main Actions */}
                     <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">

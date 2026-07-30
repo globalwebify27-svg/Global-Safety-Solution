@@ -158,7 +158,7 @@ export default function DueCertificatesPage() {
 
       {/* Stats Cards Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="p-6 rounded-xl border bg-card/50 backdrop-blur flex items-center space-x-4">
+        <div className="p-6 rounded-xl border border-border bg-card shadow-xs flex items-center space-x-4">
           <div className="p-3 bg-blue-500/10 rounded-lg">
             <FileText className="w-6 h-6 text-blue-500" />
           </div>
@@ -167,7 +167,7 @@ export default function DueCertificatesPage() {
             <h3 className="text-2xl font-bold">{stats.total}</h3>
           </div>
         </div>
-        <div className="p-6 rounded-xl border bg-card/50 backdrop-blur flex items-center space-x-4">
+        <div className="p-6 rounded-xl border border-border bg-card shadow-xs flex items-center space-x-4">
           <div className="p-3 bg-emerald-500/10 rounded-lg">
             <ShieldCheck className="w-6 h-6 text-emerald-500" />
           </div>
@@ -176,7 +176,7 @@ export default function DueCertificatesPage() {
             <h3 className="text-2xl font-bold">{stats.active}</h3>
           </div>
         </div>
-        <div className="p-6 rounded-xl border bg-card/50 backdrop-blur flex items-center space-x-4">
+        <div className="p-6 rounded-xl border border-border bg-card shadow-xs flex items-center space-x-4">
           <div className="p-3 bg-amber-500/10 rounded-lg">
             <AlertTriangle className="w-6 h-6 text-amber-500" />
           </div>
@@ -185,7 +185,7 @@ export default function DueCertificatesPage() {
             <h3 className="text-2xl font-bold">{stats.due_soon}</h3>
           </div>
         </div>
-        <div className="p-6 rounded-xl border bg-card/50 backdrop-blur flex items-center space-x-4">
+        <div className="p-6 rounded-xl border border-border bg-card shadow-xs flex items-center space-x-4">
           <div className="p-3 bg-rose-500/10 rounded-lg">
             <XCircle className="w-6 h-6 text-rose-500" />
           </div>
@@ -197,7 +197,7 @@ export default function DueCertificatesPage() {
       </div>
 
       {/* Filters Section */}
-      <div className="flex flex-col sm:flex-row gap-4 items-center justify-between bg-card/30 p-4 rounded-lg border">
+      <div className="flex flex-col sm:flex-row gap-4 items-center justify-between bg-card p-4 rounded-lg border border-border shadow-xs">
         <div className="relative w-full sm:w-72">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
