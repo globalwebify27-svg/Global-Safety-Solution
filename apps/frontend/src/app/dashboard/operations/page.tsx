@@ -78,6 +78,7 @@ interface Project {
   stage?: string;
   contract_value?: number;
   created_at: string;
+  client_id?: string;
   client?: { id: string; name: string };
   quotation?: { id: string; quote_number: string; total_amount: number; status: string };
   tasks?: Task[];
