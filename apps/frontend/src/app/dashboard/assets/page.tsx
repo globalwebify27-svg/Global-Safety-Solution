@@ -181,15 +181,6 @@ export default function AssetsPage() {
     e.preventDefault();
     if (!token) return;
 
-    if (!calibUrl) {
-      toast.error("Calibration Certificate PDF is required.");
-      return;
-    }
-    if (!invoiceUrl) {
-      toast.error("Invoice PDF is required.");
-      return;
-    }
-
     setSubmitting(true);
     try {
       const res = await fetch(`${API_BASE_URL}/assets`, {
@@ -200,8 +191,8 @@ export default function AssetsPage() {
         },
         body: JSON.stringify({
           ...formData,
-          calibration_cert_url: calibUrl,
-          invoice_url: invoiceUrl,
+          calibration_cert_url: calibUrl || undefined,
+          invoice_url: invoiceUrl || undefined,
         })
       });
       if (res.ok) {
@@ -488,50 +479,14 @@ export default function AssetsPage() {
                 </select>
               </div>
 
-              {/* PDF Upload Section */}
-              <div className="border border-border rounded-xl p-4 space-y-4 bg-muted/20">
-                <p className="text-xs font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
-                  <FileText className="w-3.5 h-3.5" /> Required Documents
-                </p>
-                <div className="grid grid-cols-2 gap-4">
-                  <FileUploadField
-                    label="Calibration Certificate"
-                    required
-                    file={calibFile}
-                    uploading={calibUploading}
-                    uploadedUrl={calibUrl}
-                    onChange={handleCalibFileChange}
-                    icon={<FileText className="w-3.5 h-3.5 text-indigo-500" />}
-                    color="text-indigo-500"
-                  />
-                  <FileUploadField
-                    label="Invoice / Bill"
-                    required
-                    file={invoiceFile}
-                    uploading={invoiceUploading}
-                    uploadedUrl={invoiceUrl}
-                    onChange={handleInvoiceFileChange}
-                    icon={<FileText className="w-3.5 h-3.5 text-violet-500" />}
-                    color="text-violet-500"
-                  />
-                </div>
-                {(!calibUrl || !invoiceUrl) && (
-                  <p className="text-[10px] text-rose-500 font-medium flex items-center gap-1">
-                    <AlertCircle className="w-3 h-3" /> Both PDFs must be uploaded before registering the asset.
-                  </p>
-                )}
-              </div>
-
               <DialogFooter className="pt-2">
                 <Button
                   type="submit"
-                  disabled={submitting || calibUploading || invoiceUploading || !calibUrl || !invoiceUrl}
+                  disabled={submitting}
                   className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold w-full h-12 shadow-xl shadow-indigo-500/20 border-0 disabled:opacity-50"
                 >
                   {submitting ? (
                     <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Processing...</>
-                  ) : (calibUploading || invoiceUploading) ? (
-                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Uploading Files...</>
                   ) : (
                     "Authorize Registry"
                   )}

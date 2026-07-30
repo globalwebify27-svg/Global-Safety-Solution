@@ -558,18 +558,21 @@ model Payment {
 }
 
 model InventoryItem {
-  id             String             @id @default(uuid()) @db.VarChar(36)
-  sku            String             @unique @db.VarChar(50)
-  name           String             @db.VarChar(255)
-  category       String             @db.VarChar(100)
-  description    String?
-  unit           String             @default("PCS") @db.VarChar(20)
-  min_stock      Int                @default(0)
-  current_stock  Int                @default(0)
-  price_per_unit Decimal?           @db.Decimal(15, 2)
-  created_at     DateTime           @default(now()) @db.DateTime(6)
-  updated_at     DateTime           @updatedAt @db.DateTime(6)
-  transactions   StockTransaction[]
+  id                   String             @id @default(uuid()) @db.VarChar(36)
+  sku                  String             @unique @db.VarChar(50)
+  name                 String             @db.VarChar(255)
+  category             String             @db.VarChar(100)
+  description          String?
+  unit                 String             @default("PCS") @db.VarChar(20)
+  min_stock            Int                @default(0)
+  current_stock        Int                @default(0)
+  price_per_unit       Decimal?           @db.Decimal(15, 2)
+  status               String?            @default("AVAILABLE") @db.VarChar(50)
+  calibration_cert_url String?            @db.LongText
+  invoice_url          String?            @db.LongText
+  created_at           DateTime           @default(now()) @db.DateTime(6)
+  updated_at           DateTime           @updatedAt @db.DateTime(6)
+  transactions         StockTransaction[]
 
   @@map("inventory_items")
 }

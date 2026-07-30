@@ -32,4 +32,16 @@ export class CreateInventoryDto {
   @IsNumber()
   @Min(0)
   price_per_unit?: number;
+
+  @IsOptional()
+  @IsString()
+  status?: string;
+
+  @IsOptional()
+  @IsString()
+  calibration_cert_url?: string;
+
+  @IsOptional()
+  @IsString()
+  invoice_url?: string;
 }

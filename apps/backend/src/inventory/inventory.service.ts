@@ -44,6 +44,9 @@ export class InventoryService {
         min_stock: Number(data.min_stock) || 0,
         current_stock: Number(data.current_stock) || 0,
         price_per_unit: data.price_per_unit,
+        status: data.status || 'AVAILABLE',
+        calibration_cert_url: data.calibration_cert_url || null,
+        invoice_url: data.invoice_url || null,
       },
     });
   }
