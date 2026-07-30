@@ -66,6 +66,22 @@ export class InspectionsService {
       }
     }
 
+    if (inspection.engineer_id) {
+      try {
+        const clientName = inspection.client?.name || 'Client';
+        const formattedDate = new Date(inspection.scheduled_date).toLocaleDateString();
+        await this.notificationsService.create({
+          user_id: inspection.engineer_id,
+          title: '📅 Site Inspection Scheduled',
+          message: `You have been scheduled for a Safety Audit inspection for ${clientName} on ${formattedDate}.`,
+          type: 'INFO',
+          link: '/dashboard/inspections',
+        });
+      } catch (err) {
+        console.warn('[InspectionsService] Failed to notify engineer on schedule:', err?.message);
+      }
+    }
+
     return inspection;
   }
 

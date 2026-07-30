@@ -44,7 +44,8 @@ export class TasksService {
       include: { assignee: true, project: true },
     });
 
-    if (task.assigned_to && task.project_id) {
+    const assignedUserId = task.assigned_to;
+    if (assignedUserId && task.project_id) {
       try {
         const project = await this.prisma.project.findUnique({
           where: { id: task.project_id },
@@ -70,7 +71,7 @@ export class TasksService {
         // Send In-App Notification to assigned staff/engineer
         const clientName = project?.client?.name || project?.name || 'Project';
         await this.notificationsService.create({
-          user_id: task.assigned_to,
+          user_id: assignedUserId,
           title: '📋 New Task Assigned',
           message: `You have been assigned a new operational task "${task.title}" for ${clientName}.`,
           type: 'INFO',
@@ -91,7 +92,8 @@ export class TasksService {
       include: { assignee: true, project: true },
     });
 
-    if (data.assigned_to && task.project_id) {
+    const assignedUserId = task.assigned_to;
+    if (assignedUserId && task.project_id) {
       try {
         await this.prisma.projectActivity.create({
           data: {
@@ -103,7 +105,7 @@ export class TasksService {
         });
 
         await this.notificationsService.create({
-          user_id: task.assigned_to,
+          user_id: assignedUserId,
           title: '📋 Task Updated',
           message: `Task "${task.title}" assigned to you has been updated.`,
           type: 'INFO',
