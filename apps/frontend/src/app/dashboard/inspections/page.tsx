@@ -410,6 +410,17 @@ export default function InspectionsPage() {
 
   useEffect(() => {
     fetchData();
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const cId = params.get('client_id');
+      const openSched = params.get('openSchedule');
+      if (cId) {
+        setScheduleForm(prev => ({ ...prev, client_id: cId }));
+      }
+      if (openSched === 'true') {
+        setOpenSchedule(true);
+      }
+    }
   }, [token]);
 
   const fetchData = async () => {

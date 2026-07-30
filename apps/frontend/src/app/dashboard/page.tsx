@@ -481,9 +481,9 @@ export default function DashboardPage() {
             <h3 className="text-xl font-bold text-foreground mb-6 flex items-center gap-2">
               <ClipboardCheck className="w-5 h-5 text-blue-500" /> My Inspection Schedule
             </h3>
-            <div className="space-y-4">
+            <div className="space-y-4 max-h-[360px] overflow-y-auto pr-2">
               {stats.inspections?.map((insp: any) => (
-                <div key={insp.id} className="p-4 rounded-2xl bg-muted/30 border border-border flex justify-between items-center">
+                <div key={insp.id} className="p-4 rounded-2xl bg-muted/30 border border-border flex justify-between items-center hover:border-blue-500/30 transition-all">
                   <div>
                     <p className="font-bold text-foreground">{insp.client}</p>
                     <p className="text-xs text-muted-foreground">Date: {new Date(insp.scheduledDate).toLocaleDateString()}</p>
@@ -501,15 +501,19 @@ export default function DashboardPage() {
             <h3 className="text-xl font-bold text-foreground mb-6 flex items-center gap-2">
               <Briefcase className="w-5 h-5 text-emerald-500" /> My Assigned Tasks
             </h3>
-            <div className="space-y-4">
+            <div className="space-y-4 max-h-[360px] overflow-y-auto pr-2">
               {stats.tasks?.map((task: any) => (
-                <div key={task.id} className="p-4 rounded-2xl bg-muted/30 border border-border flex justify-between items-center">
+                <div 
+                  key={task.id} 
+                  onClick={() => router.push(`/dashboard/operations?search=${encodeURIComponent(task.project || '')}&expand=${task.projectId || ''}`)}
+                  className="p-4 rounded-2xl bg-muted/30 border border-border flex justify-between items-center cursor-pointer hover:border-emerald-500/50 hover:bg-muted/50 transition-all group"
+                >
                   <div>
-                    <p className="font-bold text-foreground">{task.title}</p>
+                    <p className="font-bold text-foreground group-hover:text-emerald-500 transition-colors">{task.title}</p>
                     <p className="text-xs text-muted-foreground">Project: {task.project}</p>
                   </div>
-                  <span className={cn("text-[9px] font-black uppercase px-2 py-0.5 rounded-md", 
-                    task.priority === 'HIGH' ? 'bg-rose-500/10 text-rose-500' : 'bg-amber-500/10 text-amber-500'
+                  <span className={cn("text-[9px] font-black uppercase px-2.5 py-1 rounded-md shadow-sm", 
+                    task.priority === 'HIGH' ? 'bg-rose-500/10 text-rose-500 border border-rose-500/20' : 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
                   )}>{task.priority}</span>
                 </div>
               ))}
@@ -575,15 +579,19 @@ export default function DashboardPage() {
           <h3 className="text-xl font-bold text-foreground mb-6 flex items-center gap-2">
             <Briefcase className="w-5 h-5 text-blue-500" /> My Active Tasks
           </h3>
-          <div className="space-y-4">
+          <div className="space-y-4 max-h-[360px] overflow-y-auto pr-2">
             {stats.tasks?.map((task: any) => (
-              <div key={task.id} className="p-4 rounded-2xl bg-muted/30 border border-border flex justify-between items-center">
+              <div 
+                key={task.id} 
+                onClick={() => router.push(`/dashboard/operations?search=${encodeURIComponent(task.project || '')}&expand=${task.projectId || ''}`)}
+                className="p-4 rounded-2xl bg-muted/30 border border-border flex justify-between items-center cursor-pointer hover:border-blue-500/50 hover:bg-muted/50 transition-all group"
+              >
                 <div>
-                  <p className="font-bold text-foreground">{task.title}</p>
+                  <p className="font-bold text-foreground group-hover:text-blue-500 transition-colors">{task.title}</p>
                   <p className="text-xs text-muted-foreground">Project: {task.project}</p>
                 </div>
-                <span className={cn("text-[9px] font-black uppercase px-2 py-0.5 rounded-md", 
-                  task.priority === 'HIGH' ? 'bg-rose-500/10 text-rose-500' : 'bg-amber-500/10 text-amber-500'
+                <span className={cn("text-[9px] font-black uppercase px-2.5 py-1 rounded-md shadow-sm", 
+                  task.priority === 'HIGH' ? 'bg-rose-500/10 text-rose-500 border border-rose-500/20' : 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
                 )}>{task.priority}</span>
               </div>
             ))}

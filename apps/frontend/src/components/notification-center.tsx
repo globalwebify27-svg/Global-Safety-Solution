@@ -58,11 +58,16 @@ export function NotificationCenter() {
     
     // 2. Determine redirect destination
     let destination = n.link;
-    if (!destination) {
-      const titleLower = n.title.toLowerCase();
-      const messageLower = n.message.toLowerCase();
-      
-      if (titleLower.includes("quotation") || messageLower.includes("quotation")) {
+    const titleLower = n.title.toLowerCase();
+    const messageLower = n.message.toLowerCase();
+
+    // If destination is missing or plain /dashboard/operations, construct smart deep-link
+    if (!destination || destination === '/dashboard/operations') {
+      if (titleLower.includes("task") || messageLower.includes("task") || messageLower.includes("assigned")) {
+        const match = n.message.match(/for ([^.]+)/i) || n.message.match(/quotation ([^.]+)/i);
+        const searchVal = match ? match[1].trim() : "";
+        destination = searchVal ? `/dashboard/operations?search=${encodeURIComponent(searchVal)}` : "/dashboard/operations";
+      } else if (titleLower.includes("quotation") || messageLower.includes("quotation")) {
         destination = "/dashboard/quotations";
       } else if (titleLower.includes("inspection") || messageLower.includes("inspection")) {
         destination = "/dashboard/inspections";
@@ -87,7 +92,7 @@ export function NotificationCenter() {
       } else if (titleLower.includes("compliance") || messageLower.includes("compliance")) {
         destination = "/dashboard/compliance";
       } else {
-        destination = "/dashboard";
+        destination = "/dashboard/operations";
       }
     }
     

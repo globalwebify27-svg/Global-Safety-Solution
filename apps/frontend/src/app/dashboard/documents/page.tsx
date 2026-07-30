@@ -276,6 +276,22 @@ export default function DocumentVaultPage() {
 
   useEffect(() => {
     fetchData();
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const cName = params.get('client_name');
+      const cId = params.get('client_id');
+      const pId = params.get('project_id');
+      const q = params.get('search');
+      if (cName) {
+        setSearchQuery(cName);
+      } else if (q) {
+        setSearchQuery(q);
+      } else if (cId) {
+        setSearchQuery(cId);
+      } else if (pId) {
+        setSearchQuery(pId);
+      }
+    }
   }, [token, categoryFilter]);
 
   const fetchData = async () => {
@@ -525,9 +541,15 @@ export default function DocumentVaultPage() {
     const q = searchQuery.toLowerCase().trim();
     if (!q) return clientNode;
 
-    const matchesClient = clientNode.client_name.toLowerCase().includes(q);
+    const matchesClient = 
+      clientNode.client_name.toLowerCase().includes(q) || 
+      clientNode.client_id.toLowerCase().includes(q);
+
     const filteredProjects = clientNode.projects.map(proj => {
-      const matchesProj = proj.project_name.toLowerCase().includes(q);
+      const matchesProj = 
+        proj.project_name.toLowerCase().includes(q) || 
+        proj.project_id.toLowerCase().includes(q);
+
       const filteredCerts = proj.certificates.filter(cert =>
         cert.name.toLowerCase().includes(q) ||
         cert.certificate_number.toLowerCase().includes(q) ||
@@ -548,17 +570,18 @@ export default function DocumentVaultPage() {
   return (
     <div className="space-y-8 pb-10">
       {/* Top Header & Navigation */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="space-y-1">
-          <div className="flex items-center gap-3">
-            <h1 className="text-4xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-600 via-cyan-500 to-emerald-600">
-              Digital Vault
-            </h1>
-            <span className="px-3 py-1 rounded-full bg-gradient-to-r from-blue-600/10 to-emerald-600/10 border border-blue-500/20 text-xs font-black uppercase tracking-widest text-blue-600 dark:text-blue-400 shadow-sm">
-              Client & Project Vault
-            </span>
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 pb-2 border-b border-border/50">
+        <div className="space-y-1.5 max-w-xl">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400">
+            <ShieldCheck className="w-3.5 h-3.5" />
+            <span className="text-[10px] font-black uppercase tracking-widest">Enterprise Compliance Vault</span>
           </div>
-          <p className="text-muted-foreground font-medium">Centralized repository for automatic certificate management & structured client storage.</p>
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-500 via-cyan-400 to-emerald-400 leading-tight">
+            Compliance & Digital Vault
+          </h1>
+          <p className="text-xs sm:text-sm text-muted-foreground font-medium leading-relaxed">
+            Centralized institutional compliance registry, expiry monitoring, and encrypted document vault.
+          </p>
         </div>
 
         <div className="flex items-center gap-3">

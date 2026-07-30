@@ -21,7 +21,7 @@ export class InspectionsService {
 
   async create(data: CreateInspectionDto) {
     const { items, ...inspectionData } = data;
-    return this.prisma.inspection.create({
+    const inspection = await this.prisma.inspection.create({
       data: {
         ...inspectionData,
         scheduled_date: new Date(inspectionData.scheduled_date),
@@ -31,6 +31,42 @@ export class InspectionsService {
       },
       include: { items: true, client: true, engineer: true, work_order: true },
     });
+
+    let targetProjectId = inspection.project_id;
+    if (!targetProjectId && inspection.client_id) {
+      const activeProj = await this.prisma.project.findFirst({
+        where: { client_id: inspection.client_id, status: { not: 'COMPLETED' } },
+        orderBy: { created_at: 'desc' },
+      });
+      if (activeProj) {
+        targetProjectId = activeProj.id;
+        await this.prisma.inspection.update({
+          where: { id: inspection.id },
+          data: { project_id: activeProj.id },
+        });
+      }
+    }
+
+    if (targetProjectId) {
+      try {
+        await this.prisma.project.update({
+          where: { id: targetProjectId },
+          data: { stage: 'INSPECTION_SCHEDULED' },
+        });
+        await this.prisma.projectActivity.create({
+          data: {
+            project_id: targetProjectId,
+            action: 'Site Inspection Scheduled',
+            performed_by: 'Operations Manager',
+            remarks: `Site inspection scheduled for ${new Date(inspection.scheduled_date).toLocaleDateString()}`,
+          },
+        });
+      } catch (err) {
+        console.warn('[InspectionsService] Failed to update project stage on creation:', err?.message);
+      }
+    }
+
+    return inspection;
   }
 
   async findAll(userPayload?: any) {
@@ -587,10 +623,31 @@ export class InspectionsService {
   }
 
   async approve(id: string) {
-    return this.update(id, {
+    const inspection = await this.update(id, {
       status: 'COMPLETED' as any,
       completed_date: new Date().toISOString(),
     });
+
+    if (inspection.project_id) {
+      try {
+        await this.prisma.project.update({
+          where: { id: inspection.project_id },
+          data: { stage: 'INSPECTION_COMPLETED' },
+        });
+        await this.prisma.projectActivity.create({
+          data: {
+            project_id: inspection.project_id,
+            action: 'Site Inspection Approved & Completed',
+            performed_by: 'Super Admin',
+            remarks: `Site inspection for ${inspection.client?.name || 'Client'} approved successfully`,
+          },
+        });
+      } catch (err) {
+        console.warn('[InspectionsService] Failed to update project stage on approve:', err?.message);
+      }
+    }
+
+    return inspection;
   }
 
   async reject(id: string, feedback: string) {
@@ -1232,6 +1289,36 @@ export class InspectionsService {
                 uploaded_by: inspection.engineer_id || null,
               }
             });
+
+            let certProjId = inspection.project_id;
+            if (!certProjId && inspection.client_id) {
+              const activeProj = await this.prisma.project.findFirst({
+                where: { client_id: inspection.client_id, status: { not: 'COMPLETED' } },
+                orderBy: { created_at: 'desc' },
+              });
+              if (activeProj) {
+                certProjId = activeProj.id;
+              }
+            }
+
+            if (certProjId) {
+              try {
+                await this.prisma.project.update({
+                  where: { id: certProjId },
+                  data: { stage: 'CERTIFICATE_GENERATED' }
+                });
+                await this.prisma.projectActivity.create({
+                  data: {
+                    project_id: certProjId,
+                    action: 'Safety Certificate Generated',
+                    performed_by: 'System Automation',
+                    remarks: `Certificate ${item.cert_ref_no} generated and deposited in Digital Vault.`
+                  }
+                });
+              } catch (err) {
+                console.warn('[InspectionsService] Failed to update project stage on cert gen:', err?.message);
+              }
+            }
           } catch (e) {
             console.error('Failed to auto-create certificate for item:', item.id, e);
           }

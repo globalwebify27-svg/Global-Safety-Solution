@@ -320,23 +320,42 @@ model Reminder {
 }
 
 model Project {
-  id          String       @id @default(uuid()) @db.VarChar(36)
-  client_id   String       @db.VarChar(36)
-  name        String       @db.VarChar(255)
-  description String?
-  start_date  DateTime?    @db.Date
-  end_date    DateTime?    @db.Date
-  status      String       @default("PENDING") @db.VarChar(50)
-  created_at  DateTime     @default(now()) @db.DateTime(6)
-  updated_at  DateTime     @updatedAt @db.DateTime(6)
-  documents   Document[]
-  inspections Inspection[]
-  client      Client       @relation(fields: [client_id], references: [id], onDelete: Cascade)
-  tasks       Task[]
-  work_orders WorkOrder[]
+  id             String            @id @default(uuid()) @db.VarChar(36)
+  client_id      String            @db.VarChar(36)
+  quotation_id   String?           @db.VarChar(36)
+  name           String            @db.VarChar(255)
+  description    String?
+  contract_value Decimal?          @default(0.00) @db.Decimal(15, 2)
+  stage          String            @default("PROJECT_CREATED") @db.VarChar(50)
+  start_date     DateTime?         @db.Date
+  end_date       DateTime?         @db.Date
+  status         String            @default("PENDING") @db.VarChar(50)
+  created_at     DateTime          @default(now()) @db.DateTime(6)
+  updated_at     DateTime          @updatedAt @db.DateTime(6)
+  documents      Document[]
+  inspections    Inspection[]
+  client         Client            @relation(fields: [client_id], references: [id], onDelete: Cascade)
+  quotation      Quotation?        @relation(fields: [quotation_id], references: [id])
+  tasks          Task[]
+  work_orders    WorkOrder[]
+  activities     ProjectActivity[]
 
   @@index([client_id], map: "projects_client_id_fkey")
+  @@index([quotation_id], map: "projects_quotation_id_fkey")
   @@map("projects")
+}
+
+model ProjectActivity {
+  id           String   @id @default(uuid()) @db.VarChar(36)
+  project_id   String   @db.VarChar(36)
+  action       String   @db.VarChar(255)
+  performed_by String?  @db.VarChar(255)
+  performed_at DateTime @default(now()) @db.DateTime(6)
+  remarks      String?  @db.Text
+  project      Project  @relation(fields: [project_id], references: [id], onDelete: Cascade)
+
+  @@index([project_id], map: "project_activities_project_id_fkey")
+  @@map("project_activities")
 }
 
 model Task {
@@ -473,6 +492,7 @@ model Quotation {
   lead         Lead?       @relation(fields: [lead_id], references: [id])
   items        QuoteItem[]
   work_orders  WorkOrder[]
+  projects     Project[]
 
   @@index([client_id], map: "quotations_client_id_fkey")
   @@index([lead_id], map: "quotations_lead_id_fkey")

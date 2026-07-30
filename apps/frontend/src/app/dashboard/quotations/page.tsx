@@ -32,7 +32,7 @@ import {
   DropdownMenuItem, 
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 interface QuoteItem {
@@ -55,6 +55,7 @@ interface Quotation {
 }
 
 function QuotationsContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const leadIdFromQuery = searchParams.get("leadId");
 
@@ -303,8 +304,9 @@ function QuotationsContent() {
       });
 
       if (res.ok) {
-        toast.success("Success! Project and Invoice generated.");
+        toast.success("Success! Operations Project and Invoice generated.");
         fetchData();
+        router.push("/dashboard/operations");
       } else {
         const err = await res.json();
         toast.error(err.message || "Failed to finalize project conversion. Please check system logs.");

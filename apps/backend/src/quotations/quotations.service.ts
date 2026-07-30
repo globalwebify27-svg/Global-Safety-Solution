@@ -423,8 +423,11 @@ export class QuotationsService {
           const project = await tx.project.create({
             data: {
               client_id: clientId,
+              quotation_id: id,
               name: `Project: ${quotation.quote_number}`,
               description: `Automatically created from Quotation ${quotation.quote_number}. ${quotation.notes || ''}`,
+              contract_value: quotation.total_amount,
+              stage: 'PROJECT_CREATED',
               status: 'PENDING',
               tasks: {
                 create: quotation.items.map((item) => ({
@@ -433,6 +436,13 @@ export class QuotationsService {
                   priority: 'MEDIUM',
                   status: 'TODO',
                 })),
+              },
+              activities: {
+                create: {
+                  action: 'Project Initialized from Quotation',
+                  performed_by: 'System Automation',
+                  remarks: `Project converted automatically from approved Proposal ${quotation.quote_number} for total amount ₹${Number(quotation.total_amount).toLocaleString()}`,
+                },
               },
             },
           });

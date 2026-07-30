@@ -24,8 +24,7 @@ const navigation = [
   { name: "Site Inspections",  category: "CLIENTS & OPERATIONS", href: "/dashboard/inspections", icon: ClipboardCheck,  module: "INSPECTIONS" },
 
   // COMPLIANCE & VAULT
-  { name: "Compliance",        category: "COMPLIANCE & VAULT",   href: "/dashboard/compliance",  icon: ShieldCheck,     module: "COMPLIANCE" },
-  { name: "Digital Vault",     category: "COMPLIANCE & VAULT",   href: "/dashboard/documents",   icon: FolderLock,      module: "VAULT" },
+  { name: "Compliance & Digital Vault", category: "COMPLIANCE & VAULT", href: "/dashboard/documents", icon: FolderLock, module: "VAULT" },
 
   // FINANCE & ACCOUNTING
   { name: "Finance & Invoices",category: "FINANCE & ACCOUNTING",href: "/dashboard/finance",     icon: Banknote,        module: "FINANCE" },
@@ -138,10 +137,10 @@ export default function DashboardLayout({
           return effectiveRole === "CLIENT" || userPermissions.has("VIEW_INSPECTIONS") || userPermissions.has("MANAGE_INSPECTIONS");
         case "Operations":
           return userPermissions.has("VIEW_PROJECTS") || userPermissions.has("MANAGE_PROJECTS");
-        case "Compliance":
-          return userPermissions.has("VIEW_COMPLIANCE") || userPermissions.has("MANAGE_COMPLIANCE");
+        case "Compliance & Digital Vault":
         case "Digital Vault":
-          return userPermissions.has("READ_DOCUMENT") || effectiveRole === "CLIENT";
+        case "Compliance":
+          return userPermissions.has("READ_DOCUMENT") || userPermissions.has("VIEW_COMPLIANCE") || effectiveRole === "CLIENT";
         case "Inventory Ledger":
           return userPermissions.has("MANAGE_SYSTEM_SETTINGS") || userPermissions.has("VIEW_INSPECTIONS");
         case "Asset Registry":

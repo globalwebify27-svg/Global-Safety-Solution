@@ -495,7 +495,7 @@ export class DocumentsService {
 
     const fileType = ext === 'pdf' ? 'PDF' : 'IMAGE';
 
-    return this.prisma.document.update({
+    const updatedDoc = await this.prisma.document.update({
       where: { id },
       data: {
         delivery_receipt_url: receiptUrl,
@@ -509,6 +509,27 @@ export class DocumentsService {
         receipt_uploader: { select: { id: true, name: true } },
       },
     });
+
+    if (doc.project_id) {
+      try {
+        await this.prisma.project.update({
+          where: { id: doc.project_id },
+          data: { stage: 'DOCUMENTS_DELIVERED' },
+        });
+        await this.prisma.projectActivity.create({
+          data: {
+            project_id: doc.project_id,
+            action: 'Document Delivery Receipt Uploaded',
+            performed_by: 'Staff',
+            remarks: `Physical delivery receipt (${originalName}) uploaded and verified.`,
+          },
+        });
+      } catch (err) {
+        console.warn('[DocumentsService] Failed to update project stage on delivery receipt upload:', err?.message);
+      }
+    }
+
+    return updatedDoc;
   }
 
   async deleteDeliveryReceipt(id: string) {

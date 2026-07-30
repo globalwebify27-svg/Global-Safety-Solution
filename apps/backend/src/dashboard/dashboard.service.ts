@@ -232,15 +232,15 @@ export class DashboardService {
           : '100%';
 
       const myTasks = await this.prisma.task.findMany({
-        where: { assigned_to: user.id, status: { not: 'COMPLETED' } },
-        take: 5,
-        orderBy: { due_date: 'asc' },
-        include: { project: true },
+        where: { assigned_to: user.id },
+        take: 10,
+        orderBy: { created_at: 'desc' },
+        include: { project: { include: { client: true } } },
       });
 
       const myInspections = await this.prisma.inspection.findMany({
-        where: { engineer_id: user.id, status: 'SCHEDULED' },
-        take: 5,
+        where: { engineer_id: user.id },
+        take: 10,
         orderBy: { scheduled_date: 'asc' },
         include: { client: true },
       });
@@ -250,13 +250,13 @@ export class DashboardService {
           id: t.id,
           type: 'TASK',
           title: t.title,
-          detail: `Priority: ${t.priority} • Due: ${t.due_date ? new Date(t.due_date).toLocaleDateString() : 'N/A'}`,
+          detail: `Priority: ${t.priority || 'NORMAL'} • Due: ${t.due_date ? new Date(t.due_date).toLocaleDateString() : 'N/A'}`,
           date: t.updated_at,
         })),
         ...myInspections.map((i) => ({
           id: i.id,
           type: 'INSPECTION',
-          title: `Inspection for ${i.client.name}`,
+          title: `Inspection for ${i.client?.name || 'Client'}`,
           detail: `Scheduled: ${new Date(i.scheduled_date).toLocaleDateString()}`,
           date: i.updated_at,
         })),
@@ -269,6 +269,21 @@ export class DashboardService {
         pendingInspections,
         pendingTasks,
         attendanceRate,
+        tasks: myTasks.map(t => ({
+          id: t.id,
+          title: t.title,
+          project: t.project?.client?.name || t.project?.name || 'Operations Project',
+          projectId: t.project_id,
+          priority: t.priority || 'MEDIUM',
+          status: t.status,
+          dueDate: t.due_date,
+        })),
+        inspections: myInspections.map(i => ({
+          id: i.id,
+          client: i.client?.name || 'Client',
+          scheduledDate: i.scheduled_date,
+          status: i.status,
+        })),
         recentActivity,
       };
     }
@@ -297,17 +312,17 @@ export class DashboardService {
         : '100%';
 
     const myTasks = await this.prisma.task.findMany({
-      where: { assigned_to: user.id, status: { not: 'COMPLETED' } },
-      take: 8,
-      orderBy: { due_date: 'asc' },
-      include: { project: true },
+      where: { assigned_to: user.id },
+      take: 10,
+      orderBy: { created_at: 'desc' },
+      include: { project: { include: { client: true } } },
     });
 
     const recentActivity = myTasks.map((t) => ({
       id: t.id,
       type: 'TASK',
       title: t.title,
-      detail: `Project: ${t.project.name} • Priority: ${t.priority}`,
+      detail: `Project: ${t.project?.name || 'Operations Project'} • Priority: ${t.priority || 'NORMAL'}`,
       date: t.updated_at,
     }));
 
@@ -316,6 +331,15 @@ export class DashboardService {
       pendingTasks,
       attendanceRate,
       leaveBalance: user.leave_balance,
+      tasks: myTasks.map(t => ({
+        id: t.id,
+        title: t.title,
+        project: t.project?.client?.name || t.project?.name || 'Operations Project',
+        projectId: t.project_id,
+        priority: t.priority || 'MEDIUM',
+        status: t.status,
+        dueDate: t.due_date,
+      })),
       recentActivity,
     };
   }

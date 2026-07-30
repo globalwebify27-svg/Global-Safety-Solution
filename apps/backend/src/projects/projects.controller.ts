@@ -30,10 +30,26 @@ export class ProjectsController {
     return this.projectsService.findAll();
   }
 
+  @Get(':id/dashboard')
+  @Permissions('READ_PROJECT')
+  getProjectDashboard(@Param('id') id: string) {
+    return this.projectsService.getProjectDashboard(id);
+  }
+
   @Get(':id')
   @Permissions('READ_PROJECT')
   findOne(@Param('id') id: string) {
     return this.projectsService.findOne(id);
+  }
+
+  @Patch(':id/stage')
+  @Permissions('UPDATE_PROJECT')
+  updateStage(
+    @Param('id') id: string,
+    @Body('stage') stage: string,
+    @Body('remarks') remarks?: string,
+  ) {
+    return this.projectsService.updateStage(id, stage, remarks);
   }
 
   @Patch(':id')
