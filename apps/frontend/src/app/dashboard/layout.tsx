@@ -8,6 +8,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { NotificationCenter } from "@/components/notification-center";
+import { toast } from "sonner";
 
 const navigation = [
   // MAIN
@@ -140,13 +141,7 @@ export default function DashboardLayout({
         case "Compliance":
           return userPermissions.has("VIEW_COMPLIANCE") || userPermissions.has("MANAGE_COMPLIANCE");
         case "Digital Vault":
-          return (
-            userPermissions.has("VIEW_STAFF") ||
-            userPermissions.has("VIEW_CLIENTS") ||
-            userPermissions.has("VIEW_PROJECTS") ||
-            userPermissions.has("VIEW_COMPLIANCE") ||
-            effectiveRole === "CLIENT"
-          );
+          return userPermissions.has("READ_DOCUMENT") || effectiveRole === "CLIENT";
         case "Inventory Ledger":
           return userPermissions.has("MANAGE_SYSTEM_SETTINGS") || userPermissions.has("VIEW_INSPECTIONS");
         case "Asset Registry":
@@ -161,28 +156,27 @@ export default function DashboardLayout({
     };
 
     const allowed = allowedModulesForRole[effectiveRole] || [];
+    const isPermissionsLoaded = Array.isArray(user?.roles);
 
     return navigation.filter(item => {
       if (item.module === "ALL") return true;
 
+      if (effectiveRole === "SUPER_ADMIN") {
+        if (item.module === "FIELD_TASKS") return false;
+        return true;
+      }
+
       if (item.module === "FIELD_TASKS") {
-        return effectiveRole !== "CLIENT" && effectiveRole !== "SUPER_ADMIN";
+        return effectiveRole !== "CLIENT";
       }
 
-      // 1. Always show the default sections for this role
-      if (allowed.includes(item.module)) {
-        if (effectiveRole === "SUPER_ADMIN" && item.module === "FIELD_TASKS") {
-          return false; // Hide field tasks from admin view
-        }
-        return true; 
-      }
-
-      // 2. Append any extra sections allowed by dynamic DB permissions
-      if (userPermissions.size > 0) {
+      // Strictly evaluate dynamic permissions if they are loaded in the user object
+      if (isPermissionsLoaded) {
         return hasPermissionForItem(item);
       }
 
-      return false;
+      // Fallback only if roles/permissions structure is not loaded/available yet
+      return allowed.includes(item.module);
     });
   }, [user]);
 
@@ -245,6 +239,28 @@ export default function DashboardLayout({
   useEffect(() => {
     setIsMobileMenuOpen(false);
   }, [pathname]);
+
+  // Global Client-side Route Guard to block manual URL entry for disabled modules
+  useEffect(() => {
+    if (!hydrated || !user || !pathname) return;
+
+    // Skip verification for base overview path
+    if (pathname === "/dashboard") return;
+
+    // Find the defined navigation item that matches the current pathname
+    const matchedNavItem = navigation.find(item => 
+      pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href))
+    );
+
+    if (matchedNavItem) {
+      // Check if this matched item exists in the filtered (allowed) navigation array
+      const isAllowed = filteredNavigation.some(allowedItem => allowedItem.href === matchedNavItem.href);
+      if (!isAllowed) {
+        toast.error("Access Denied: You do not have permission to view this module.");
+        router.push("/dashboard");
+      }
+    }
+  }, [pathname, filteredNavigation, hydrated, user, router]);
 
   if (!hydrated || !token || !user) {
     return <div className="min-h-screen bg-background flex items-center justify-center">
