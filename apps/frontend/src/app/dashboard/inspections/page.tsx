@@ -1225,51 +1225,29 @@ export default function InspectionsPage() {
                     <td className="px-8 py-6 text-right">
                       <div className="flex items-center justify-end gap-2">
                         {isClient ? (
-                          <>
-                            <Button 
-                              variant="ghost" 
-                              className="h-9 px-3 rounded-xl text-xs font-bold text-muted-foreground hover:bg-muted/10 flex items-center gap-1"
-                              onClick={() => {
-                                setSelectedInspection(i);
-                                setUploadedPhotoUrls(parseRemarksPhotos(i.remarks));
-                                setOpenVisit(true);
-                              }}
-                            >
-                              View Details
-                            </Button>
-                            {i.status === 'COMPLETED' && (
-                              <Button 
-                                variant="ghost" 
-                                size="icon"
-                                className="h-9 w-9 rounded-xl text-emerald-600 hover:bg-emerald-500/10"
-                                onClick={() => handleDownloadCertificate(i.id)}
-                              >
-                                <Download className="w-4 h-4" />
-                              </Button>
-                            )}
-                          </>
+                          <Button 
+                            variant="ghost" 
+                            className="h-9 px-3 rounded-xl text-xs font-bold text-muted-foreground hover:bg-muted/10 flex items-center gap-1"
+                            onClick={() => {
+                              setSelectedInspection(i);
+                              setUploadedPhotoUrls(parseRemarksPhotos(i.remarks));
+                              setOpenVisit(true);
+                            }}
+                          >
+                            View Details
+                          </Button>
                         ) : i.status === 'COMPLETED' ? (
-                          <>
-                            <Button 
-                              variant="ghost" 
-                              className="h-9 px-3 rounded-xl text-xs font-bold text-muted-foreground hover:bg-muted/10 flex items-center gap-1"
-                              onClick={() => {
-                                setSelectedInspection(i);
-                                setUploadedPhotoUrls(parseRemarksPhotos(i.remarks));
-                                setOpenVisit(true);
-                              }}
-                            >
-                              Review Checklist
-                            </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="icon"
-                              className="h-9 w-9 rounded-xl text-emerald-600 hover:bg-emerald-500/10"
-                              onClick={() => handleDownloadCertificate(i.id)}
-                            >
-                              <Download className="w-4 h-4" />
-                            </Button>
-                          </>
+                          <Button 
+                            variant="ghost" 
+                            className="h-9 px-3 rounded-xl text-xs font-bold text-muted-foreground hover:bg-muted/10 flex items-center gap-1"
+                            onClick={() => {
+                              setSelectedInspection(i);
+                              setUploadedPhotoUrls(parseRemarksPhotos(i.remarks));
+                              setOpenVisit(true);
+                            }}
+                          >
+                            Review Checklist
+                          </Button>
                         ) : (
                           <Button 
                             variant="ghost" 
