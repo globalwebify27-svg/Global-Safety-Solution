@@ -287,7 +287,7 @@ export class InvoicesService {
   async sendPaymentReminder(id: string, recipientEmail?: string) {
     const invoice = await this.prisma.invoice.findUnique({
       where: { id },
-      include: { client: true },
+      include: { client: true, payments: { orderBy: { created_at: 'asc' } } },
     });
 
     if (!invoice) throw new NotFoundException('Invoice not found.');
@@ -295,14 +295,46 @@ export class InvoicesService {
     const targetEmail = recipientEmail || invoice.client?.email;
     if (!targetEmail) throw new BadRequestException('Client email address is missing.');
 
+    const totalAmount = Number(invoice.total_amount || 0);
+    const paidAmount = (invoice.payments || []).reduce((sum, p) => sum + Number(p.amount || 0), 0);
+    const remainingDue = Math.max(0, totalAmount - paidAmount);
+
+    let installmentBreakdownHtml = '';
+    if (invoice.payments && invoice.payments.length > 0) {
+      const rows = invoice.payments
+        .map((p, idx) => {
+          const payDate = p.created_at ? new Date(p.created_at).toLocaleDateString('en-IN') : 'N/A';
+          const pAmount = `₹${Number(p.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+          const pMethod = p.payment_method || 'Payment';
+          return `<tr style="border-bottom: 1px dashed #cbd5e1;">
+            <td style="padding: 6px 0; color: #475569;">Installment ${idx + 1} (${pMethod}):</td>
+            <td style="padding: 6px 0; text-align: right; font-weight: bold; color: #16a34a;">${pAmount} <span style="font-size: 11px; color: #64748b; font-weight: normal;">(Paid on ${payDate})</span></td>
+          </tr>`;
+        })
+        .join('');
+
+      installmentBreakdownHtml = `
+        <div style="margin: 16px 0; background-color: #f1f5f9; border-radius: 8px; padding: 12px 16px;">
+          <p style="margin: 0 0 8px 0; font-weight: bold; font-size: 13px; color: #334155; text-transform: uppercase; letter-spacing: 0.5px;">Paid Installments History:</p>
+          <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+            ${rows}
+          </table>
+        </div>
+      `;
+    }
+
     const result = await this.templateEngine.sendTemplatedEmail({
       templateCode: 'OVERDUE_PAYMENT_REMINDER',
       to: targetEmail,
       context: {
         client_name: invoice.client?.name || 'Valued Client',
         invoice_number: invoice.invoice_number,
-        amount: `₹${Number(invoice.total_amount).toLocaleString('en-IN')}`,
+        total_amount: `₹${totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+        paid_amount: `₹${paidAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+        remaining_due: `₹${remainingDue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+        amount: `₹${remainingDue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
         due_date: invoice.due_date ? new Date(invoice.due_date).toLocaleDateString('en-IN') : 'Overdue',
+        installment_breakdown_html: installmentBreakdownHtml,
       },
       module: 'FINANCE',
     });

@@ -368,8 +368,28 @@ export class TemplateEngineService {
         body_html: `
           <h2 style="color: #dc2626; margin-top: 0;">Overdue Payment Reminder</h2>
           <p>Dear <strong>{{client_name}}</strong>,</p>
-          <p>Invoice <strong>#{{invoice_number}}</strong> for amount <strong>{{amount}}</strong> was due on <strong>{{due_date}}</strong> and remains unpaid.</p>
-          <p>Please arrange payment at your earliest convenience.</p>
+          <p>This is a formal payment reminder regarding Invoice <strong>#{{invoice_number}}</strong>, which was due on <strong>{{due_date}}</strong>.</p>
+
+          <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin: 16px 0;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+              <tr>
+                <td style="padding: 6px 0; color: #64748b;">Total Invoice Amount:</td>
+                <td style="padding: 6px 0; text-align: right; font-weight: bold; color: #0f172a;">{{total_amount}}</td>
+              </tr>
+              <tr>
+                <td style="padding: 6px 0; color: #16a34a;">Total Paid Amount:</td>
+                <td style="padding: 6px 0; text-align: right; font-weight: bold; color: #16a34a;">- {{paid_amount}}</td>
+              </tr>
+              <tr style="border-top: 2px solid #cbd5e1;">
+                <td style="padding: 10px 0; font-weight: bold; color: #dc2626; font-size: 15px;">Outstanding Balance Due:</td>
+                <td style="padding: 10px 0; text-align: right; font-weight: bold; color: #dc2626; font-size: 15px;">{{remaining_due}}</td>
+              </tr>
+            </table>
+          </div>
+
+          {{installment_breakdown_html}}
+
+          <p>Please arrange payment for the remaining balance of <strong>{{remaining_due}}</strong> at your earliest convenience.</p>
         `,
       },
       CLIENT_WELCOME: {

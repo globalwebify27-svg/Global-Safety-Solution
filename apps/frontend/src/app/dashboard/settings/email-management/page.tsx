@@ -494,7 +494,7 @@ export default function EmailManagementPage() {
       {/* TAB 1: SMTP CONFIGURATION */}
       {activeTab === "smtp" && (
         <div className="bg-card border border-border rounded-3xl p-8 shadow-xs space-y-6">
-          {(!smtpConfig.host || !smtpConfig.username || !smtpConfig.is_active) && (
+          {!loading && (!smtpConfig.host || !smtpConfig.username || !smtpConfig.is_active) && (
             <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center gap-3 text-amber-600 dark:text-amber-400 text-sm font-bold">
               <Lock className="w-5 h-5 shrink-0" />
               <span>SMTP is not configured. Please configure SMTP settings.</span>
@@ -508,18 +508,24 @@ export default function EmailManagementPage() {
                 Configure your outbound mail gateway parameters for system email dispatches.
               </p>
             </div>
-            <span
-              className={cn(
-                "px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider border",
-                smtpConfig.host && smtpConfig.username && smtpConfig.is_active
-                  ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
-                  : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
-              )}
-            >
-              {smtpConfig.host && smtpConfig.username && smtpConfig.is_active
-                ? "Active Transport"
-                : "Unconfigured"}
-            </span>
+            {loading ? (
+              <span className="px-3 py-1 rounded-full text-xs font-bold text-muted-foreground bg-accent animate-pulse">
+                Loading...
+              </span>
+            ) : (
+              <span
+                className={cn(
+                  "px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider border",
+                  smtpConfig.host && smtpConfig.username && smtpConfig.is_active
+                    ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
+                    : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
+                )}
+              >
+                {smtpConfig.host && smtpConfig.username && smtpConfig.is_active
+                  ? "Active Transport"
+                  : "Unconfigured"}
+              </span>
+            )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
