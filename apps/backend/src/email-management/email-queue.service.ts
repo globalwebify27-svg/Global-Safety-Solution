@@ -98,7 +98,25 @@ export class EmailQueueService {
         data: { status: 'SENDING' },
       });
 
-      const attachments = logRecord.attachments ? JSON.parse(logRecord.attachments) : undefined;
+      let attachments: any[] | undefined = undefined;
+      if (logRecord.attachments) {
+        try {
+          const parsed = JSON.parse(logRecord.attachments);
+          if (Array.isArray(parsed)) {
+            attachments = parsed.map((att: any) => {
+              if (att && att.content && typeof att.content === 'object' && att.content.type === 'Buffer' && Array.isArray(att.content.data)) {
+                return {
+                  ...att,
+                  content: Buffer.from(att.content.data),
+                };
+              }
+              return att;
+            });
+          }
+        } catch (e) {
+          this.logger.warn(`Could not parse JSON attachments for email log ${emailId}: ${e.message}`);
+        }
+      }
 
       await this.mailService.sendMail({
         to: logRecord.recipient,

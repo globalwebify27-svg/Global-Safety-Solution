@@ -106,19 +106,20 @@ export class EmailManagementService implements OnModuleInit {
           error_message TEXT,
           metadata TEXT,
           body_html LONGTEXT,
-          attachments TEXT,
+          attachments LONGTEXT,
           created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
       `);
 
-      // Add missing columns if table pre-existed
+      // Add missing columns / alter column types if table pre-existed
       const alterQueries = [
         `ALTER TABLE email_logs ADD COLUMN template_code VARCHAR(100) NULL`,
         `ALTER TABLE email_logs ADD COLUMN retry_count INT NOT NULL DEFAULT 0`,
         `ALTER TABLE email_logs ADD COLUMN max_retries INT NOT NULL DEFAULT 3`,
         `ALTER TABLE email_logs ADD COLUMN scheduled_for DATETIME(6) NULL`,
         `ALTER TABLE email_logs ADD COLUMN body_html LONGTEXT NULL`,
-        `ALTER TABLE email_logs ADD COLUMN attachments TEXT NULL`,
+        `ALTER TABLE email_logs ADD COLUMN attachments LONGTEXT NULL`,
+        `ALTER TABLE email_logs MODIFY COLUMN attachments LONGTEXT NULL`,
         `ALTER TABLE notification_rules ADD COLUMN advanced_config TEXT NULL`,
       ];
 

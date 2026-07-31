@@ -1,8 +1,10 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Inject, forwardRef } from '@nestjs/common';
+import * as path from 'path';
+import * as fs from 'fs';
 import { PrismaService } from '../prisma/prisma.service';
 import { LocalStorageService } from '../common/services/local-storage.service';
-
 import { TemplateEngineService } from '../email-management/template-engine.service';
+import { CertificatesService } from '../certificates/certificates.service';
 
 @Injectable()
 export class DocumentsService {
@@ -10,6 +12,8 @@ export class DocumentsService {
     private readonly prisma: PrismaService,
     private readonly localStorageService: LocalStorageService,
     private readonly templateEngine: TemplateEngineService,
+    @Inject(forwardRef(() => CertificatesService))
+    private readonly certificatesService: CertificatesService,
   ) { }
 
   // Automatically sync any existing DB certificates that are missing from Digital Vault
@@ -552,6 +556,147 @@ export class DocumentsService {
     });
   }
 
+  private async createCertificatePdfBuffer(doc: any): Promise<Buffer> {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const PDFDocument = require('pdfkit');
+    return new Promise((resolve, reject) => {
+      try {
+        const pdfDoc = new PDFDocument({ margin: 40, size: 'A4' });
+        const chunks: Buffer[] = [];
+
+        pdfDoc.on('data', (chunk: Buffer) => chunks.push(chunk));
+        pdfDoc.on('end', () => resolve(Buffer.concat(chunks)));
+        pdfDoc.on('error', (err: any) => reject(err));
+
+        // Header Banner
+        pdfDoc.rect(0, 0, pdfDoc.page.width, 90).fill('#0f172a');
+        pdfDoc.fillColor('#ffffff').fontSize(20).font('Helvetica-Bold').text('GLOBAL SAFETY SOLUTION', 40, 25);
+        pdfDoc.fontSize(10).font('Helvetica').text('Industrial Safety Audit & Compliance Engineering', 40, 52);
+        pdfDoc.fontSize(8).text('Government Recognized Competent Person Authority', 40, 68);
+
+        // Certificate Title Box
+        pdfDoc.moveDown(4);
+        pdfDoc.fillColor('#0f172a').fontSize(18).font('Helvetica-Bold').text('CERTIFICATE OF SAFETY COMPLIANCE', { align: 'center' });
+        pdfDoc.moveDown(0.3);
+        pdfDoc.fillColor('#64748b').fontSize(9).font('Helvetica').text(`Document ID: ${doc.id}`, { align: 'center' });
+
+        // Border Card
+        const startY = 175;
+        pdfDoc.rect(40, startY, pdfDoc.page.width - 80, 360).strokeColor('#cbd5e1').lineWidth(1.5).stroke();
+
+        // Certificate Details
+        let currentY = startY + 20;
+        pdfDoc.fillColor('#334155').fontSize(11).font('Helvetica-Bold').text('CERTIFICATE DETAILS', 60, currentY);
+        currentY += 25;
+
+        const details = [
+          ['Certificate Name:', doc.name || 'Safety Inspection Certificate'],
+          ['Category:', doc.category || 'CERTIFICATE'],
+          ['Client Name:', doc.client?.name || 'Valued Client'],
+          ['Project Name:', doc.project?.name || 'General Operations'],
+          ['Issue / Test Date:', doc.test_date ? new Date(doc.test_date).toLocaleDateString('en-IN') : new Date(doc.created_at || Date.now()).toLocaleDateString('en-IN')],
+          ['Expiry Date:', doc.expiry_date ? new Date(doc.expiry_date).toLocaleDateString('en-IN') : 'Permanent / Valid'],
+          ['Notes / Scope:', doc.notes || 'Full safety inspection carried out as per statutory regulations.'],
+        ];
+
+        details.forEach(([label, value]) => {
+          pdfDoc.fillColor('#64748b').fontSize(10).font('Helvetica-Bold').text(label, 60, currentY);
+          pdfDoc.fillColor('#0f172a').fontSize(10).font('Helvetica').text(value, 190, currentY, { width: 330 });
+          currentY += 28;
+        });
+
+        // Signatory Footer
+        pdfDoc.fillColor('#0f172a').fontSize(10).font('Helvetica-Bold').text('Authorized Signatory:', 60, startY + 295);
+        pdfDoc.fillColor('#10b981').fontSize(11).font('Helvetica-Bold').text('Er. Rahul Sharma (Competent Person)', 60, startY + 312);
+        pdfDoc.fillColor('#64748b').fontSize(8).font('Helvetica').text('Global Safety Solution - Chief Safety Inspector', 60, startY + 328);
+
+        pdfDoc.end();
+      } catch (err) {
+        reject(err);
+      }
+    });
+  }
+
+  private resolveValidAttachment(fileUrl: string | null | undefined, docName: string) {
+    if (!fileUrl) return null;
+    if (fileUrl.startsWith('http://') || fileUrl.startsWith('https://')) {
+      const filename = docName.toLowerCase().endsWith('.pdf') ? docName : `${docName}.pdf`;
+      return { filename, path: fileUrl };
+    }
+
+    const cleanPath = fileUrl.startsWith('/') ? fileUrl.substring(1) : fileUrl;
+    const filenameOnly = path.basename(cleanPath);
+
+    const candidatePaths = [
+      path.join(process.cwd(), cleanPath),
+      path.join(process.cwd(), cleanPath + '.pdf'),
+      path.join(process.cwd(), 'persistent_uploads', cleanPath),
+      path.join(process.cwd(), 'persistent_uploads', filenameOnly),
+      path.join(process.cwd(), '..', 'persistent_uploads', cleanPath),
+      path.join(process.cwd(), '..', 'persistent_uploads', filenameOnly),
+      path.join(process.cwd(), 'uploads', cleanPath),
+      path.join(process.cwd(), 'uploads', filenameOnly),
+      path.join(process.cwd(), 'public', cleanPath),
+      path.join(process.cwd(), 'public', filenameOnly),
+    ];
+
+    for (const p of candidatePaths) {
+      if (fs.existsSync(p) && fs.statSync(p).isFile()) {
+        const filename = docName.toLowerCase().endsWith('.pdf') ? docName : `${docName}.pdf`;
+        return { filename, path: p };
+      }
+    }
+
+    return null;
+  }
+
+  private async findMatchingCertificateRecord(doc: any) {
+    let certRecord: any = null;
+
+    if (doc.compliance_id) {
+      certRecord = await this.prisma.certificate.findUnique({
+        where: { id: doc.compliance_id },
+      });
+    }
+
+    if (!certRecord) {
+      certRecord = await this.prisma.certificate.findUnique({
+        where: { id: doc.id },
+      });
+    }
+
+    if (!certRecord) {
+      const fullText = `${doc.name || ''} ${doc.notes || ''}`;
+      const certNoMatch = fullText.match(/GSS\/[A-Z0-9\/-]+/i);
+      if (certNoMatch && certNoMatch[0]) {
+        const certNo = certNoMatch[0].trim();
+        certRecord = await this.prisma.certificate.findFirst({
+          where: {
+            OR: [
+              { certificate_no: certNo },
+              { certificate_no: { contains: certNo } },
+            ],
+          },
+        });
+      }
+    }
+
+    if (!certRecord && doc.client_id) {
+      certRecord = await this.prisma.certificate.findFirst({
+        where: { inspection: { client_id: doc.client_id } },
+        orderBy: { created_at: 'desc' },
+      });
+    }
+
+    if (!certRecord) {
+      certRecord = await this.prisma.certificate.findFirst({
+        orderBy: { created_at: 'desc' },
+      });
+    }
+
+    return certRecord;
+  }
+
   async deliverCertificateEmail(id: string, recipientEmail?: string) {
     const doc = await this.prisma.document.findUnique({
       where: { id },
@@ -563,8 +708,38 @@ export class DocumentsService {
     const targetEmail = recipientEmail || doc.client?.email;
     if (!targetEmail) throw new BadRequestException('Client email address is missing for this document.');
 
+    const attachments: any[] = [];
+    const validAttachment = this.resolveValidAttachment(doc.file_url, doc.name);
+    const filename = doc.name.toLowerCase().endsWith('.pdf') ? doc.name : `${doc.name}.pdf`;
+
+    if (validAttachment) {
+      attachments.push(validAttachment);
+    } else {
+      // 1. Match Certificate record in DB to generate the EXACT official Factories Act PDF!
+      const certRecord = await this.findMatchingCertificateRecord(doc);
+
+      if (certRecord) {
+        try {
+          const pdfBuffer = await this.certificatesService.generatePdfForCertificate(certRecord.id);
+          attachments.push({ filename, content: pdfBuffer.toString('base64'), encoding: 'base64' });
+        } catch (e) {
+          console.error('Error generating official certificate PDF from CertificatesService:', e);
+        }
+      }
+
+      // 2. Fallback if no matching Certificate record found
+      if (attachments.length === 0) {
+        try {
+          const pdfBuffer = await this.createCertificatePdfBuffer(doc);
+          attachments.push({ filename, content: pdfBuffer.toString('base64'), encoding: 'base64' });
+        } catch (e) {
+          console.error('Error generating fallback certificate PDF:', e);
+        }
+      }
+    }
+
     const result = await this.templateEngine.sendTemplatedEmail({
-      templateCode: 'CERTIFICATE_ISSUED',
+      templateCode: 'CERTIFICATE_DELIVERY',
       to: targetEmail,
       context: {
         client_name: doc.client?.name || 'Valued Client',
@@ -572,7 +747,8 @@ export class DocumentsService {
         expiry_date: doc.expiry_date ? new Date(doc.expiry_date).toLocaleDateString('en-IN') : 'N/A',
         company_name: 'Global Safety Solution ERP',
       },
-      module: 'DIGITAL_VAULT',
+      attachments,
+      module: 'COMPLIANCE',
     });
 
     return { success: true, message: `Certificate email delivered to ${targetEmail}`, result };
@@ -581,13 +757,41 @@ export class DocumentsService {
   async sendRenewalReminder(id: string, recipientEmail?: string) {
     const doc = await this.prisma.document.findUnique({
       where: { id },
-      include: { client: true },
+      include: { client: true, project: true },
     });
 
     if (!doc) throw new NotFoundException('Document not found.');
 
     const targetEmail = recipientEmail || doc.client?.email;
     if (!targetEmail) throw new BadRequestException('Client email address is missing.');
+
+    const attachments: any[] = [];
+    const validAttachment = this.resolveValidAttachment(doc.file_url, doc.name);
+    const filename = doc.name.toLowerCase().endsWith('.pdf') ? doc.name : `${doc.name}.pdf`;
+
+    if (validAttachment) {
+      attachments.push(validAttachment);
+    } else {
+      const certRecord = await this.findMatchingCertificateRecord(doc);
+
+      if (certRecord) {
+        try {
+          const pdfBuffer = await this.certificatesService.generatePdfForCertificate(certRecord.id);
+          attachments.push({ filename, content: pdfBuffer.toString('base64'), encoding: 'base64' });
+        } catch (e) {
+          console.error('Error generating official certificate PDF from CertificatesService:', e);
+        }
+      }
+
+      if (attachments.length === 0) {
+        try {
+          const pdfBuffer = await this.createCertificatePdfBuffer(doc);
+          attachments.push({ filename, content: pdfBuffer.toString('base64'), encoding: 'base64' });
+        } catch (e) {
+          console.error('Error generating fallback certificate PDF:', e);
+        }
+      }
+    }
 
     const result = await this.templateEngine.sendTemplatedEmail({
       templateCode: 'CERTIFICATE_EXPIRING',
@@ -597,6 +801,7 @@ export class DocumentsService {
         certificate_name: doc.name,
         expiry_date: doc.expiry_date ? new Date(doc.expiry_date).toLocaleDateString('en-IN') : 'Overdue',
       },
+      attachments,
       module: 'DIGITAL_VAULT',
     });
 

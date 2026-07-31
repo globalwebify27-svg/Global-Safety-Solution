@@ -5,6 +5,7 @@ import { useAuthStore } from "@/store/auth";
 import { API_BASE_URL } from "@/lib/config";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import {
   FileText,
   FilePlus,
@@ -41,7 +42,8 @@ import {
   X,
   UploadCloud,
   Upload,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Mail
 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -258,6 +260,29 @@ export default function DocumentVaultPage() {
       alert(`Network error: ${e?.message || 'Delete failed'}`);
     } finally {
       setDeletingReceipt(false);
+    }
+  };
+
+  const [emailingCertId, setEmailingCertId] = useState<string | null>(null);
+
+  const handleEmailCertificate = async (docId: string) => {
+    if (!token) return;
+    setEmailingCertId(docId);
+    try {
+      const res = await fetch(`${API_BASE_URL}/documents/${docId}/deliver-email`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success(data.message || "Certificate emailed to client successfully!");
+      } else {
+        toast.error(data.message || "Failed to email certificate.");
+      }
+    } catch {
+      toast.error("Network error emailing certificate.");
+    } finally {
+      setEmailingCertId(null);
     }
   };
 
@@ -953,6 +978,23 @@ export default function DocumentVaultPage() {
                                                   >
                                                     <Download className="w-3.5 h-3.5 mr-1" /> Download
                                                   </Button>
+
+                                                  {!isClient && (
+                                                    <Button
+                                                      size="sm"
+                                                      variant="outline"
+                                                      disabled={emailingCertId === cert.id}
+                                                      onClick={() => handleEmailCertificate(cert.id)}
+                                                      className="h-8 px-3 text-xs font-bold border-blue-500/30 text-blue-600 dark:text-blue-400 hover:bg-blue-500/10"
+                                                    >
+                                                      {emailingCertId === cert.id ? (
+                                                        <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+                                                      ) : (
+                                                        <Mail className="w-3.5 h-3.5 mr-1" />
+                                                      )}
+                                                      Email Cert
+                                                    </Button>
+                                                  )}
                                                 </div>
                                               </td>
                                             </tr>
@@ -1060,6 +1102,22 @@ export default function DocumentVaultPage() {
                           <Button size="sm" onClick={() => handleDownload(doc.file_url, doc.name)} className="h-8 px-3 text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white border-0">
                             <Download className="w-3.5 h-3.5 mr-1" /> Download
                           </Button>
+                          {!isClient && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={emailingCertId === doc.id}
+                              onClick={() => handleEmailCertificate(doc.id)}
+                              className="h-8 px-3 text-xs font-bold border-blue-500/30 text-blue-600 dark:text-blue-400 hover:bg-blue-500/10"
+                            >
+                              {emailingCertId === doc.id ? (
+                                <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+                              ) : (
+                                <Mail className="w-3.5 h-3.5 mr-1" />
+                              )}
+                              Email Cert
+                            </Button>
+                          )}
                           {!isClient && (
                             <Button size="sm" variant="ghost" onClick={() => handleDelete(doc.id)} className="h-8 w-8 p-0 text-rose-500 hover:bg-rose-500/10">
                               <Trash2 className="w-4 h-4" />
@@ -1282,6 +1340,21 @@ export default function DocumentVaultPage() {
                 >
                   <Download className="w-4 h-4 mr-2" /> Download PDF
                 </Button>
+
+                {!isClient && (
+                  <Button
+                    disabled={emailingCertId === selectedPreviewCert.id}
+                    onClick={() => handleEmailCertificate(selectedPreviewCert.id)}
+                    className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-5 h-11 text-xs rounded-xl border-0"
+                  >
+                    {emailingCertId === selectedPreviewCert.id ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Mail className="w-4 h-4 mr-2" />
+                    )}
+                    Email Certificate
+                  </Button>
+                )}
               </div>
             </div>
           )}
