@@ -92,6 +92,16 @@ export class PermissionsGuard implements CanActivate {
       return true;
     }
 
+    const isClientRole =
+      populatedUser.roles?.some(
+        (ur: any) =>
+          ur.role?.name === 'CLIENT' || ur.role?.name === 'CLIENTS',
+      ) || (populatedUser.designation || '').toUpperCase().includes('CLIENT');
+
+    if (isClientRole && (request.method === 'GET' || requiredPermissions.every((p) => p.startsWith('READ_') || p.startsWith('VIEW_')))) {
+      return true;
+    }
+
     const userPermissions = new Set<string>();
     if (populatedUser.roles) {
       populatedUser.roles.forEach((ur: any) => {

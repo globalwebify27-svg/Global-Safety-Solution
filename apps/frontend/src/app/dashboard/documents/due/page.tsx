@@ -46,6 +46,11 @@ interface Stats {
 export default function DueCertificatesPage() {
   const router = useRouter();
   const token = useAuthStore((state) => state.token);
+  const user = useAuthStore((state) => state.user);
+  const roleName = user?.roles?.[0]?.role?.name || "";
+  const designation = (user?.designation || "").toUpperCase();
+  const isClient = roleName === "CLIENT" || designation.includes("CLIENT");
+
   const [loading, setLoading] = useState(true);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [stats, setStats] = useState<Stats>({
@@ -317,15 +322,17 @@ export default function DueCertificatesPage() {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 hover:text-amber-500"
-                          title="Send Renewal Email Notice"
-                          onClick={() => handleSendRenewalReminder(doc.id)}
-                        >
-                          <Mail className="w-4 h-4 text-amber-500" />
-                        </Button>
+                        {!isClient && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 hover:text-amber-500"
+                            title="Send Renewal Email Notice"
+                            onClick={() => handleSendRenewalReminder(doc.id)}
+                          >
+                            <Mail className="w-4 h-4 text-amber-500" />
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="icon"

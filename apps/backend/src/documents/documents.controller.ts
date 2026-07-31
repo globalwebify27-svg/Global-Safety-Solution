@@ -56,14 +56,14 @@ export class DocumentsController {
 
   @Get('due/stats')
   @Permissions('READ_DOCUMENT')
-  getDueStats() {
-    return this.expiryCronService.getDueStats();
+  getDueStats(@Req() req: any) {
+    return this.expiryCronService.getDueStats(req.user);
   }
 
   @Get('due')
   @Permissions('READ_DOCUMENT')
-  getDueCertificates() {
-    return this.expiryCronService.getDueCertificates();
+  getDueCertificates(@Req() req: any) {
+    return this.expiryCronService.getDueCertificates(req.user);
   }
 
   @Get(':id')

@@ -310,6 +310,10 @@ export class DocumentsService {
         })
         .filter((c) => c.total_certificates > 0 || c.projects.length > 0);
 
+      const totalDocumentsCount = await this.prisma.document.count({
+        where: userClientId ? { client_id: userClientId } : {},
+      });
+
       return {
         hierarchy,
         stats: {
@@ -317,13 +321,14 @@ export class DocumentsService {
           active: activeCount,
           due_soon: dueSoonCount,
           expired: expiredCount,
+          available_documents: totalDocumentsCount,
         },
       };
     } catch (error) {
       console.error('Error in getVaultHierarchy:', error);
       return {
         hierarchy: [],
-        stats: { total_certificates: 0, active: 0, due_soon: 0, expired: 0 }
+        stats: { total_certificates: 0, active: 0, due_soon: 0, expired: 0, available_documents: 0 }
       };
     }
   }

@@ -81,13 +81,40 @@ export class ExpiryCronService {
     }
   }
 
-  async getDueCertificates() {
+  private async resolveUserClientId(userPayload?: any): Promise<string | undefined> {
+    const userId = userPayload?.userId || userPayload?.id || userPayload?.sub;
+    if (!userId) return undefined;
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        roles: { include: { role: true } },
+      },
+    });
+
+    const isClient =
+      user?.roles?.some(
+        (ur: any) => ur.role?.name === 'CLIENT' || ur.role?.name === 'CLIENTS',
+      ) || (user?.designation || '').toUpperCase().includes('CLIENT');
+
+    if (isClient && user?.email) {
+      const clientRecord = await this.prisma.client.findFirst({
+        where: { email: user.email },
+      });
+      return clientRecord?.id;
+    }
+    return undefined;
+  }
+
+  async getDueCertificates(userPayload?: any) {
+    const userClientId = await this.resolveUserClientId(userPayload);
     const documents = await this.prisma.document.findMany({
       where: {
         category: 'CERTIFICATE',
         expiry_date: {
           not: null,
         },
+        ...(userClientId ? { client_id: userClientId } : {}),
       },
       include: {
         client: true,
@@ -125,13 +152,15 @@ export class ExpiryCronService {
     });
   }
 
-  async getDueStats() {
+  async getDueStats(userPayload?: any) {
+    const userClientId = await this.resolveUserClientId(userPayload);
     const documents = await this.prisma.document.findMany({
       where: {
         category: 'CERTIFICATE',
         expiry_date: {
           not: null,
         },
+        ...(userClientId ? { client_id: userClientId } : {}),
       },
       select: {
         expiry_date: true,
