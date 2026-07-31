@@ -4,14 +4,15 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-
 import { AccountingService } from '../accounting/accounting.service';
+import { TemplateEngineService } from '../email-management/template-engine.service';
 
 @Injectable()
 export class InvoicesService {
   constructor(
     private prisma: PrismaService,
     private accountingService: AccountingService,
+    private templateEngine: TemplateEngineService,
   ) {}
 
   async findAll() {
@@ -250,5 +251,62 @@ export class InvoicesService {
     } catch (err) {
       console.warn('[Auto-Accounting] Failed to sync invoice vouchers:', err.message);
     }
+  }
+
+  async sendInvoiceEmail(id: string, recipientEmail?: string) {
+    const invoice = await this.prisma.invoice.findUnique({
+      where: { id },
+      include: { client: true },
+    });
+
+    if (!invoice) throw new NotFoundException('Invoice not found.');
+
+    const targetEmail = recipientEmail || invoice.client?.email;
+    if (!targetEmail) throw new BadRequestException('Client email address is missing.');
+
+    const result = await this.templateEngine.sendTemplatedEmail({
+      templateCode: 'INVOICE_GENERATED',
+      to: targetEmail,
+      context: {
+        client_name: invoice.client?.name || 'Valued Client',
+        invoice_number: invoice.invoice_number,
+        amount: `₹${Number(invoice.total_amount).toLocaleString('en-IN')}`,
+        due_date: invoice.due_date ? new Date(invoice.due_date).toLocaleDateString('en-IN') : 'Immediate',
+      },
+      module: 'FINANCE',
+    });
+
+    await this.prisma.invoice.update({
+      where: { id },
+      data: { status: 'SENT' },
+    });
+
+    return { success: true, message: `Tax Invoice emailed to ${targetEmail}`, result };
+  }
+
+  async sendPaymentReminder(id: string, recipientEmail?: string) {
+    const invoice = await this.prisma.invoice.findUnique({
+      where: { id },
+      include: { client: true },
+    });
+
+    if (!invoice) throw new NotFoundException('Invoice not found.');
+
+    const targetEmail = recipientEmail || invoice.client?.email;
+    if (!targetEmail) throw new BadRequestException('Client email address is missing.');
+
+    const result = await this.templateEngine.sendTemplatedEmail({
+      templateCode: 'OVERDUE_PAYMENT_REMINDER',
+      to: targetEmail,
+      context: {
+        client_name: invoice.client?.name || 'Valued Client',
+        invoice_number: invoice.invoice_number,
+        amount: `₹${Number(invoice.total_amount).toLocaleString('en-IN')}`,
+        due_date: invoice.due_date ? new Date(invoice.due_date).toLocaleDateString('en-IN') : 'Overdue',
+      },
+      module: 'FINANCE',
+    });
+
+    return { success: true, message: `Payment reminder emailed to ${targetEmail}`, result };
   }
 }

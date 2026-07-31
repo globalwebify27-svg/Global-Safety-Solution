@@ -128,6 +128,11 @@ export class InspectionsController {
     return this.inspectionsService.reject(id, body.feedback);
   }
 
+  @Post(':id/send-schedule')
+  sendScheduleEmail(@Param('id') id: string, @Body('email') email?: string) {
+    return this.inspectionsService.sendScheduleEmail(id, email);
+  }
+
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.inspectionsService.remove(id);

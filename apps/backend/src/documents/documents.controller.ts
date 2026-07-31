@@ -132,6 +132,18 @@ export class DocumentsController {
     return this.documentsService.deleteDeliveryReceipt(id);
   }
 
+  @Post(':id/deliver-email')
+  @Permissions('UPDATE_DOCUMENT')
+  deliverCertificateEmail(@Param('id') id: string, @Body('email') email?: string) {
+    return this.documentsService.deliverCertificateEmail(id, email);
+  }
+
+  @Post(':id/send-reminder')
+  @Permissions('UPDATE_DOCUMENT')
+  sendRenewalReminder(@Param('id') id: string, @Body('email') email?: string) {
+    return this.documentsService.sendRenewalReminder(id, email);
+  }
+
   @Delete(':id')
   @Permissions('DELETE_DOCUMENT')
   delete(@Param('id') id: string) {

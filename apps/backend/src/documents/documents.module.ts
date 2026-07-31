@@ -4,9 +4,10 @@ import { DocumentsController } from './documents.controller';
 import { PrismaModule } from '../prisma/prisma.module';
 import { LocalStorageService } from '../common/services/local-storage.service';
 import { ExpiryCronService } from './expiry-cron.service';
+import { EmailManagementModule } from '../email-management/email-management.module';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, EmailManagementModule],
   providers: [DocumentsService, LocalStorageService, ExpiryCronService],
   controllers: [DocumentsController],
   exports: [DocumentsService],

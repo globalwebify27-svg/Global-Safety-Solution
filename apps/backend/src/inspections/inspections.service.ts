@@ -11,12 +11,15 @@ import { NotificationsService } from '../notifications/notifications.service';
 import * as path from 'path';
 import * as fs from 'fs';
 
+import { TemplateEngineService } from '../email-management/template-engine.service';
+
 @Injectable()
 export class InspectionsService {
   constructor(
     private prisma: PrismaService,
     private mailService: MailService,
     private notificationsService: NotificationsService,
+    private templateEngine: TemplateEngineService,
   ) {}
 
   async create(data: CreateInspectionDto) {
@@ -79,6 +82,44 @@ export class InspectionsService {
         });
       } catch (err) {
         console.warn('[InspectionsService] Failed to notify engineer on schedule:', err?.message);
+      }
+    }
+
+    // Trigger Email 1: Site Visit Notice to Client
+    if (inspection.client?.email) {
+      try {
+        await this.templateEngine.sendTemplatedEmail({
+          templateCode: 'SITE_VISIT_SCHEDULE',
+          to: inspection.client.email,
+          context: {
+            client_name: inspection.client.name,
+            scheduled_date: new Date(inspection.scheduled_date).toLocaleDateString('en-IN'),
+            engineer_name: inspection.engineer?.name || 'Assigned Field Engineer',
+            site_location: (inspection.client as any)?.address || 'Client Operations Site',
+          },
+          module: 'OPERATIONS',
+        });
+      } catch (err) {
+        console.warn('[InspectionsService] Failed to dispatch client site visit schedule email:', err?.message);
+      }
+    }
+
+    // Trigger Email 2: Task Assignment Email to Engineer
+    if (inspection.engineer?.email) {
+      try {
+        await this.templateEngine.sendTemplatedEmail({
+          templateCode: 'ENGINEER_TASK_ASSIGNMENT',
+          to: inspection.engineer.email,
+          context: {
+            engineer_name: inspection.engineer.name,
+            task_title: `Site Safety Inspection Audit - ${inspection.client?.name || 'Client'}`,
+            due_date: new Date(inspection.scheduled_date).toLocaleDateString('en-IN'),
+            priority: 'HIGH',
+          },
+          module: 'OPERATIONS',
+        });
+      } catch (err) {
+        console.warn('[InspectionsService] Failed to dispatch engineer task assignment email:', err?.message);
       }
     }
 
@@ -1585,5 +1626,32 @@ export class InspectionsService {
         reject(err);
       }
     });
+  }
+
+  async sendScheduleEmail(id: string, recipientEmail?: string) {
+    const inspection: any = await this.prisma.inspection.findUnique({
+      where: { id },
+      include: { client: true, engineer: true, work_order: true },
+    });
+
+    if (!inspection) throw new NotFoundException('Inspection not found.');
+
+    const clientObj = inspection.client;
+    const targetEmail = recipientEmail || inspection.engineer?.email || clientObj?.email;
+    if (!targetEmail) throw new NotFoundException('Recipient email is missing for this inspection.');
+
+    const result = await this.templateEngine.sendTemplatedEmail({
+      templateCode: 'INSPECTION_SCHEDULED',
+      to: targetEmail,
+      context: {
+        engineer_name: inspection.engineer?.name || 'Assigned Inspector',
+        client_name: clientObj?.name || 'Valued Client',
+        scheduled_date: inspection.scheduled_date ? new Date(inspection.scheduled_date).toLocaleDateString('en-IN') : 'TBD',
+        site_location: inspection.location || clientObj?.city || 'Client Premises',
+      },
+      module: 'INSPECTIONS',
+    });
+
+    return { success: true, message: `Inspection schedule email sent to ${targetEmail}`, result };
   }
 }

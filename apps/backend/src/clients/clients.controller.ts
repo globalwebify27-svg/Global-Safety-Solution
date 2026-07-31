@@ -48,6 +48,27 @@ export class ClientsController {
     return this.clientsService.update(id, updateClientDto);
   }
 
+  @Post(':id/send-welcome')
+  @Permissions('UPDATE_CLIENT')
+  sendWelcomeEmail(@Param('id') id: string, @Body('email') email?: string) {
+    return this.clientsService.sendWelcomeEmail(id, email);
+  }
+
+  @Post(':id/send-credentials')
+  @Permissions('UPDATE_CLIENT')
+  sendPortalCredentials(@Param('id') id: string, @Body('email') email?: string) {
+    return this.clientsService.sendPortalCredentials(id, email);
+  }
+
+  @Post(':id/send-custom-email')
+  @Permissions('UPDATE_CLIENT')
+  sendCustomEmail(
+    @Param('id') id: string,
+    @Body() body: { email: string; subject: string; message: string }
+  ) {
+    return this.clientsService.sendCustomEmail(id, body.email, body.subject, body.message);
+  }
+
   @Delete(':id')
   @Permissions('DELETE_CLIENT')
   remove(@Param('id') id: string) {

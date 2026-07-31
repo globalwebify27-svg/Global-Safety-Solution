@@ -21,4 +21,9 @@ export class PaymentsController {
   findByInvoice(@Param('invoiceId') invoiceId: string) {
     return this.paymentsService.findByInvoice(invoiceId);
   }
+
+  @Post(':id/send-receipt')
+  sendReceipt(@Param('id') id: string, @Body('email') email?: string) {
+    return this.paymentsService.sendPaymentReceipt(id, email);
+  }
 }

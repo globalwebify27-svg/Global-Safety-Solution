@@ -5,8 +5,9 @@ import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/auth";
 import { API_BASE_URL } from "@/lib/config";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Building2, Mail, Phone, MapPin, FileText, ShieldAlert, CheckCircle2, User, Briefcase, CheckSquare, Calendar, Activity, AlertCircle, Clock, ChevronDown, ChevronUp, BarChart2, Users, Layers, ExternalLink } from "lucide-react";
+import { ArrowLeft, Building2, Mail, Phone, MapPin, FileText, ShieldAlert, CheckCircle2, User, Briefcase, CheckSquare, Calendar, Activity, AlertCircle, Clock, ChevronDown, ChevronUp, BarChart2, Users, Layers, ExternalLink, KeyRound, Send } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 interface Compliance {
   id: string;
@@ -253,6 +254,42 @@ export default function ClientProfilePage({ params }: { params: Promise<{ id: st
     }
   };
 
+  const handleSendWelcome = async () => {
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/clients/${id}/send-welcome`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success(data.message || "Welcome email sent!");
+      } else {
+        toast.error(data.message || "Failed to send welcome email");
+      }
+    } catch {
+      toast.error("Error connecting to email service");
+    }
+  };
+
+  const handleSendCredentials = async () => {
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/clients/${id}/send-credentials`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success(data.message || "Portal credentials sent!");
+      } else {
+        toast.error(data.message || "Failed to send portal credentials");
+      }
+    } catch {
+      toast.error("Error connecting to email service");
+    }
+  };
+
   if (loading) return <div className="p-8 text-muted-foreground animate-pulse text-center font-bold uppercase tracking-widest text-xs">Loading client profile...</div>;
   if (!client) return <div className="p-8 text-destructive font-bold">Client not found.</div>;
 
@@ -270,7 +307,23 @@ export default function ClientProfilePage({ params }: { params: Promise<{ id: st
           </div>
         </div>
 
-        <div className="flex flex-col items-end gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            onClick={handleSendWelcome}
+            variant="outline"
+            className="font-bold text-xs rounded-xl h-10 px-4 bg-card border-border hover:bg-accent"
+          >
+            <Mail className="w-4 h-4 mr-1.5 text-blue-500" /> Welcome Email
+          </Button>
+
+          <Button
+            onClick={handleSendCredentials}
+            variant="outline"
+            className="font-bold text-xs rounded-xl h-10 px-4 bg-card border-border hover:bg-accent"
+          >
+            <KeyRound className="w-4 h-4 mr-1.5 text-emerald-500" /> Credentials
+          </Button>
+
           <Button
             disabled={toggling}
             onClick={toggleStatus}

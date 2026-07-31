@@ -18,7 +18,9 @@ import {
   Download,
   Filter,
   Eye,
+  Mail,
 } from "lucide-react";
+import { toast } from "sonner";
 
 interface Document {
   id: string;
@@ -86,6 +88,24 @@ export default function DueCertificatesPage() {
       console.error("Error fetching due certificates:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSendRenewalReminder = async (docId: string) => {
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/documents/${docId}/send-reminder`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success(data.message || "Renewal reminder emailed successfully!");
+      } else {
+        toast.error(data.message || "Failed to send renewal reminder.");
+      }
+    } catch {
+      toast.error("Error connecting to email service");
     }
   };
 
@@ -297,6 +317,15 @@ export default function DueCertificatesPage() {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 hover:text-amber-500"
+                          title="Send Renewal Email Notice"
+                          onClick={() => handleSendRenewalReminder(doc.id)}
+                        >
+                          <Mail className="w-4 h-4 text-amber-500" />
+                        </Button>
                         <Button
                           variant="ghost"
                           size="icon"

@@ -2,11 +2,14 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { PrismaService } from '../prisma/prisma.service';
 import { LocalStorageService } from '../common/services/local-storage.service';
 
+import { TemplateEngineService } from '../email-management/template-engine.service';
+
 @Injectable()
 export class DocumentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly localStorageService: LocalStorageService,
+    private readonly templateEngine: TemplateEngineService,
   ) { }
 
   // Automatically sync any existing DB certificates that are missing from Digital Vault
@@ -547,5 +550,56 @@ export class DocumentsService {
         delivery_receipt_uploaded_by: null,
       },
     });
+  }
+
+  async deliverCertificateEmail(id: string, recipientEmail?: string) {
+    const doc = await this.prisma.document.findUnique({
+      where: { id },
+      include: { client: true, project: true },
+    });
+
+    if (!doc) throw new NotFoundException('Document / Certificate not found in Vault.');
+
+    const targetEmail = recipientEmail || doc.client?.email;
+    if (!targetEmail) throw new BadRequestException('Client email address is missing for this document.');
+
+    const result = await this.templateEngine.sendTemplatedEmail({
+      templateCode: 'CERTIFICATE_ISSUED',
+      to: targetEmail,
+      context: {
+        client_name: doc.client?.name || 'Valued Client',
+        certificate_name: doc.name,
+        expiry_date: doc.expiry_date ? new Date(doc.expiry_date).toLocaleDateString('en-IN') : 'N/A',
+        company_name: 'Global Safety Solution ERP',
+      },
+      module: 'DIGITAL_VAULT',
+    });
+
+    return { success: true, message: `Certificate email delivered to ${targetEmail}`, result };
+  }
+
+  async sendRenewalReminder(id: string, recipientEmail?: string) {
+    const doc = await this.prisma.document.findUnique({
+      where: { id },
+      include: { client: true },
+    });
+
+    if (!doc) throw new NotFoundException('Document not found.');
+
+    const targetEmail = recipientEmail || doc.client?.email;
+    if (!targetEmail) throw new BadRequestException('Client email address is missing.');
+
+    const result = await this.templateEngine.sendTemplatedEmail({
+      templateCode: 'CERTIFICATE_EXPIRING',
+      to: targetEmail,
+      context: {
+        client_name: doc.client?.name || 'Valued Client',
+        certificate_name: doc.name,
+        expiry_date: doc.expiry_date ? new Date(doc.expiry_date).toLocaleDateString('en-IN') : 'Overdue',
+      },
+      module: 'DIGITAL_VAULT',
+    });
+
+    return { success: true, message: `Certificate renewal reminder emailed to ${targetEmail}`, result };
   }
 }

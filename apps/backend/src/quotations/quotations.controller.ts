@@ -52,6 +52,11 @@ export class QuotationsController {
     return this.quotationsService.convertToProjectAndInvoice(id);
   }
 
+  @Post(':id/send-proposal')
+  sendProposal(@Param('id') id: string, @Body('email') email?: string) {
+    return this.quotationsService.sendQuotationProposal(id, email);
+  }
+
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.quotationsService.remove(id);

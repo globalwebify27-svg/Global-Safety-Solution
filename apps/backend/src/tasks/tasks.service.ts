@@ -2,11 +2,15 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 
+import { TemplateEngineService } from '../email-management/template-engine.service';
+import { NotFoundException, BadRequestException } from '@nestjs/common';
+
 @Injectable()
 export class TasksService {
   constructor(
     private prisma: PrismaService,
     private notificationsService: NotificationsService,
+    private templateEngine: TemplateEngineService,
   ) {}
 
   async findAll() {
@@ -123,5 +127,32 @@ export class TasksService {
     return this.prisma.task.delete({
       where: { id },
     });
+  }
+
+  async sendTaskAssignmentEmail(id: string, recipientEmail?: string) {
+    const task = await this.prisma.task.findUnique({
+      where: { id },
+      include: { assignee: true, project: true },
+    });
+
+    if (!task) throw new NotFoundException('Task not found.');
+
+    const targetEmail = recipientEmail || task.assignee?.email;
+    if (!targetEmail) throw new BadRequestException('Assigned engineer email is missing.');
+
+    const result = await this.templateEngine.sendTemplatedEmail({
+      templateCode: 'TASK_ASSIGNED',
+      to: targetEmail,
+      context: {
+        engineer_name: task.assignee?.name || 'Assigned Technician',
+        task_title: task.title,
+        project_name: task.project?.name || 'Field Operations',
+        due_date: task.due_date ? new Date(task.due_date).toLocaleDateString('en-IN') : 'Immediate',
+        priority: task.priority || 'MEDIUM',
+      },
+      module: 'OPERATIONS',
+    });
+
+    return { success: true, message: `Task assignment email sent to ${targetEmail}`, result };
   }
 }

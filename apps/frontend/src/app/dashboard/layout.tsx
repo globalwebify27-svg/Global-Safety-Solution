@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { useAuthStore } from "@/store/auth";
 import { API_BASE_URL } from "@/lib/config";
-import { LogOut, Home, Users, FolderKanban, ShieldCheck, Settings, BadgeCheck, UserCircle, Target, FileSpreadsheet, Package, Monitor, FolderLock, Menu, X, Banknote, ClipboardCheck, ChevronDown, ChevronRight, Calculator } from "lucide-react";
+import { LogOut, Home, Users, FolderKanban, ShieldCheck, Settings, BadgeCheck, UserCircle, Target, FileSpreadsheet, Package, Monitor, FolderLock, Menu, X, Banknote, ClipboardCheck, ChevronDown, ChevronRight, Calculator, Mail } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -41,6 +41,7 @@ const navigation = [
 
   // SYSTEM
   { name: "Settings",          category: "SYSTEM",               href: "/dashboard/settings",    icon: Settings,        module: "SYSTEM" },
+  { name: "Email Management",  category: "SYSTEM",               href: "/dashboard/settings/email-management", icon: Mail, module: "SYSTEM" },
   { name: "Field Task Board",  category: "SYSTEM",               href: "/dashboard/field-tasks", icon: ClipboardCheck,  module: "FIELD_TASKS" },
 ];
 

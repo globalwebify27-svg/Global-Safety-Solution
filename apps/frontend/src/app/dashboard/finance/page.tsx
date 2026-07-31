@@ -25,8 +25,11 @@ import {
   Building2,
   Calendar,
   Trash2,
-  Calculator
+  Calculator,
+  Mail,
+  Send
 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { 
@@ -275,6 +278,61 @@ export default function FinancePage() {
       if (res.ok) fetchInvoices();
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const handleSendInvoiceEmail = async (id: string) => {
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/invoices/${id}/send-email`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success(data.message || "Tax invoice emailed successfully!");
+        fetchInvoices();
+      } else {
+        toast.error(data.message || "Failed to send invoice email.");
+      }
+    } catch {
+      toast.error("Error connecting to email service");
+    }
+  };
+
+  const handleSendReminderEmail = async (id: string) => {
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/invoices/${id}/send-reminder`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success(data.message || "Payment reminder emailed successfully!");
+      } else {
+        toast.error(data.message || "Failed to send payment reminder.");
+      }
+    } catch {
+      toast.error("Error connecting to email service");
+    }
+  };
+
+  const handleSendReceiptEmail = async (paymentId: string) => {
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/payments/${paymentId}/send-receipt`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success(data.message || "Payment receipt emailed successfully!");
+      } else {
+        toast.error(data.message || "Failed to send payment receipt.");
+      }
+    } catch {
+      toast.error("Error connecting to email service");
     }
   };
 
@@ -815,6 +873,18 @@ export default function FinancePage() {
                             </Button>
                           } />
                           <DropdownMenuContent align="end" className="w-48 bg-card border-border rounded-xl shadow-2xl p-2 z-[100]">
+                             <DropdownMenuItem 
+                                onClick={() => handleSendInvoiceEmail(invoice.id)}
+                                className="flex items-center gap-3 p-2.5 rounded-lg cursor-pointer focus:bg-blue-500/10 focus:text-blue-500 font-bold text-xs"
+                              >
+                                <Mail className="w-4 h-4 text-blue-500" /> Email Invoice
+                              </DropdownMenuItem>
+                              <DropdownMenuItem 
+                                onClick={() => handleSendReminderEmail(invoice.id)}
+                                className="flex items-center gap-3 p-2.5 rounded-lg cursor-pointer focus:bg-amber-500/10 focus:text-amber-500 font-bold text-xs"
+                              >
+                                <Send className="w-4 h-4 text-amber-500" /> Send Reminder
+                              </DropdownMenuItem>
                              <DropdownMenuItem 
                                onClick={async () => {
                                  setSelectedInvoice(invoice);

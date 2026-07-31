@@ -46,6 +46,12 @@ export class TasksController {
     return this.tasksService.update(id, updateTaskDto);
   }
 
+  @Post(':id/send-assignment')
+  @Permissions('UPDATE_TASK')
+  sendTaskAssignmentEmail(@Param('id') id: string, @Body('email') email?: string) {
+    return this.tasksService.sendTaskAssignmentEmail(id, email);
+  }
+
   @Delete(':id')
   @Permissions('DELETE_TASK')
   remove(@Param('id') id: string) {

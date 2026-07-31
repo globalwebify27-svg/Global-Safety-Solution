@@ -5,12 +5,14 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { TemplateEngineService } from '../email-management/template-engine.service';
 
 @Injectable()
 export class QuotationsService {
   constructor(
     private prisma: PrismaService,
     private notificationsService: NotificationsService,
+    private templateEngine: TemplateEngineService,
   ) { }
 
   async findAll(userPayload?: any) {
@@ -251,7 +253,7 @@ export class QuotationsService {
     const taxAmount = cgst + sgst + igst;
     const totalAmount = taxableValue + taxAmount;
 
-    return this.prisma.$transaction(async (tx) => {
+    return this.prisma.$transaction(async (tx: any) => {
       // Delete existing line items
       await tx.quoteItem.deleteMany({
         where: { quotation_id: id }
@@ -293,7 +295,7 @@ export class QuotationsService {
   async convertToProjectAndInvoice(id: string) {
     try {
       return await this.prisma.$transaction(
-        async (tx) => {
+        async (tx: any) => {
           const year = new Date().getFullYear();
           const quotation = await tx.quotation.findUnique({
             where: { id },
@@ -430,7 +432,7 @@ export class QuotationsService {
               stage: 'PROJECT_CREATED',
               status: 'PENDING',
               tasks: {
-                create: quotation.items.map((item) => ({
+                create: quotation.items.map((item: any) => ({
                   title: item.description,
                   description: `Task for ${item.description}`,
                   priority: 'MEDIUM',
@@ -541,7 +543,7 @@ export class QuotationsService {
               due_date: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000), // Default 15 days
               notes: `Invoice generated for Quotation ${quotation.quote_number}`,
               items: {
-                create: quotation.items.map((item) => ({
+                create: quotation.items.map((item: any) => ({
                   description: item.description,
                   quantity: item.quantity,
                   unit_price: item.unit_price,
@@ -608,5 +610,52 @@ export class QuotationsService {
       }
       throw new BadRequestException(error.message || 'Conversion failed.');
     }
+  }
+
+  async sendQuotationProposal(id: string, recipientEmail?: string) {
+    const quotation = await this.prisma.quotation.findUnique({
+      where: { id },
+      include: { client: true, lead: true, items: true },
+    });
+
+    if (!quotation) {
+      throw new NotFoundException('Quotation not found.');
+    }
+
+    const emailTo = recipientEmail || quotation.client?.email || quotation.lead?.email;
+    if (!emailTo) {
+      throw new BadRequestException('Client email address is missing for this quotation.');
+    }
+
+    const context = {
+      client_name: quotation.client?.name || quotation.lead?.company_name || 'Valued Client',
+      quotation_number: quotation.quote_number,
+      total_amount: quotation.total_amount ? Number(quotation.total_amount).toLocaleString('en-IN') : '0.00',
+      amount: quotation.total_amount ? `₹${Number(quotation.total_amount).toLocaleString('en-IN')}` : '₹0.00',
+      acceptance_link: `http://localhost:3000/verify/proposal/${quotation.id}`,
+    };
+
+    const result = await this.templateEngine.sendTemplatedEmail({
+      templateCode: 'QUOTATION_PROPOSAL',
+      to: emailTo,
+      context,
+      module: 'QUOTATIONS',
+    });
+
+    // Update status to SENT
+    await this.prisma.quotation.update({
+      where: { id },
+      data: { status: 'SENT' },
+    });
+
+    const isSkipped = (result as any)?.status === 'SKIPPED_DISABLED';
+
+    return {
+      success: true,
+      message: isSkipped
+        ? `Quotation marked as SENT. Email dispatch skipped (Notification rule is disabled).`
+        : `Quotation proposal email sent successfully to ${emailTo}`,
+      result,
+    };
   }
 }

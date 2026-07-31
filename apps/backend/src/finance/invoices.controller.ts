@@ -41,6 +41,16 @@ export class InvoicesController {
     return this.invoicesService.updateStatus(id, status);
   }
 
+  @Post(':id/send-email')
+  sendInvoiceEmail(@Param('id') id: string, @Body('email') email?: string) {
+    return this.invoicesService.sendInvoiceEmail(id, email);
+  }
+
+  @Post(':id/send-reminder')
+  sendPaymentReminder(@Param('id') id: string, @Body('email') email?: string) {
+    return this.invoicesService.sendPaymentReminder(id, email);
+  }
+
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.invoicesService.remove(id);

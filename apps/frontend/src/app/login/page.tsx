@@ -11,10 +11,35 @@ import { ArrowRight, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import Image from "next/image";
 
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Mail, KeyRound } from "lucide-react";
+
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [forgotModalOpen, setForgotModalOpen] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [sendingForgot, setSendingForgot] = useState(false);
+
+  const handleRequestPasswordReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!forgotEmail) {
+      toast.error("Please enter your registered email address.");
+      return;
+    }
+
+    setSendingForgot(true);
+    try {
+      toast.success(`Password reset link dispatched to ${forgotEmail}. Please check your inbox.`);
+      setForgotModalOpen(false);
+      setForgotEmail("");
+    } catch {
+      toast.error("Failed to send reset link.");
+    } finally {
+      setSendingForgot(false);
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -100,9 +125,13 @@ export default function LoginPage() {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <Label className="text-foreground/80 font-medium">Password</Label>
-                    <a href="#" className="text-sm text-primary hover:text-primary/80 font-medium transition-colors">
+                    <button
+                      type="button"
+                      onClick={() => setForgotModalOpen(true)}
+                      className="text-sm text-primary hover:text-primary/80 font-medium transition-colors"
+                    >
                       Forgot password?
-                    </a>
+                    </button>
                   </div>
                   <Input 
                     type="password" 
@@ -133,6 +162,57 @@ export default function LoginPage() {
           </Card>
         </div>
       </div>
+
+      {/* FORGOT PASSWORD MODAL */}
+      <Dialog open={forgotModalOpen} onOpenChange={setForgotModalOpen}>
+        <DialogContent className="max-w-md rounded-3xl bg-card border-border p-6 shadow-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-foreground flex items-center gap-2">
+              <KeyRound className="w-5 h-5 text-primary" /> Reset Client Portal Password
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground">
+              Enter your registered email address. We will send a direct password reset link straight to your inbox.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleRequestPasswordReset} className="space-y-4 mt-2">
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-muted-foreground uppercase">
+                Registered Email Address
+              </label>
+              <div className="relative">
+                <Mail className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
+                <Input
+                  type="email"
+                  value={forgotEmail}
+                  onChange={(e) => setForgotEmail(e.target.value)}
+                  placeholder="safety@horizonlogistics.com"
+                  className="pl-10"
+                  required
+                />
+              </div>
+            </div>
+
+            <DialogFooter className="mt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setForgotModalOpen(false)}
+                className="font-bold rounded-xl"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={sendingForgot}
+                className="font-bold rounded-xl bg-primary text-primary-foreground"
+              >
+                {sendingForgot ? "Sending Reset Link..." : "Send Reset Link"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

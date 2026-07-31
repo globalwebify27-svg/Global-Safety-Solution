@@ -19,7 +19,8 @@ import {
   Calculator,
   User,
   Hash,
-  Banknote
+  Banknote,
+  Mail
 } from "lucide-react";
 
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
@@ -234,6 +235,28 @@ function QuotationsContent() {
       }
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  const handleSendProposal = async (id: string) => {
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/quotations/${id}/send-proposal`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        toast.success(data.message || "Proposal email sent successfully!");
+        fetchData();
+      } else {
+        toast.error(data.message || "Failed to send proposal email.");
+      }
+    } catch {
+      toast.error("Error connecting to email service");
     }
   };
 
@@ -703,6 +726,9 @@ function QuotationsContent() {
                           </DropdownMenuItem>
                           {!isClient && (
                             <>
+                              <DropdownMenuItem onClick={() => handleSendProposal(q.id)} className="hover:bg-blue-500/10 text-blue-600 dark:text-blue-400 cursor-pointer flex items-center gap-3 py-3 rounded-xl font-bold text-sm transition-colors">
+                                <Mail className="w-4 h-4 text-blue-500" /> Send Proposal Email
+                              </DropdownMenuItem>
                               {q.status === 'DRAFT' && (
                                 <>
                                   <DropdownMenuItem onClick={() => handleEditQuotation(q)} className="hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 cursor-pointer flex items-center gap-3 py-3 rounded-xl font-bold text-sm">
