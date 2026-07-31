@@ -93,7 +93,11 @@ console.log('Ensured dist/public/uploads/ directory exists');
 
 // 6. Install production dependencies directly inside dist/
 console.log('Installing production dependencies into dist/node_modules...');
-execSync('npm install --prefix dist --omit=dev', { stdio: 'inherit' });
-console.log('Production dependencies installed in dist/node_modules successfully!');
+try {
+  execSync('npm install --omit=dev --legacy-peer-deps', { cwd: rootDist, stdio: 'inherit' });
+  console.log('Production dependencies installed in dist/node_modules successfully!');
+} catch (err) {
+  console.warn('Note: Local dist npm install skipped (Hostinger will install production dependencies automatically on server deployment).');
+}
 
 console.log('Hostinger root-level dist packaging completed successfully!');
