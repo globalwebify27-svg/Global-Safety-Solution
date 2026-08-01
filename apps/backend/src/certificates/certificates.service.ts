@@ -9,27 +9,16 @@ import {
   UpdateCertificateTemplateDto,
 } from './dto/create-template.dto';
 
+import { computeExpiryDate } from '../common/utils/date-utils';
+
 @Injectable()
 export class CertificatesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async create(createCertificateDto: CreateCertificateDto) {
     const { issue_date, validity_period, metadata, ...rest } = createCertificateDto;
     const issueDate = new Date(issue_date);
-    const expiryDate = new Date(issue_date);
-
-    if (validity_period === '1y' || validity_period === '1 year') {
-      expiryDate.setFullYear(expiryDate.getFullYear() + 1);
-    } else if (validity_period === '2y' || validity_period === '2 year') {
-      expiryDate.setFullYear(expiryDate.getFullYear() + 2);
-    } else if (validity_period === '3y' || validity_period === '3 year') {
-      expiryDate.setFullYear(expiryDate.getFullYear() + 3);
-    } else if (validity_period === '1/2y' || validity_period === '1/2 year') {
-      expiryDate.setMonth(expiryDate.getMonth() + 6);
-    } else {
-      // One-time or other: valid for 1 day
-      expiryDate.setDate(expiryDate.getDate() + 1);
-    }
+    const expiryDate = computeExpiryDate(issueDate, validity_period);
 
     const metadataStr = metadata && typeof metadata === 'object'
       ? JSON.stringify(metadata)

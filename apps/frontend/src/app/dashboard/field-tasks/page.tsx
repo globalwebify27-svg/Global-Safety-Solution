@@ -294,6 +294,7 @@ export default function FieldTasksPage() {
     } else if (validity === "1/2y") {
       expiry.setMonth(expiry.getMonth() + 6);
     }
+    expiry.setDate(expiry.getDate() - 1);
     
     const expiryDateStr = expiry.toISOString();
     setItemValidityPeriods(prev => ({ ...prev, [itemId]: validity }));
@@ -1161,7 +1162,7 @@ export default function FieldTasksPage() {
             {(selectedTask?.items || []).map((item, index) => (
               <div key={item.id} className="p-5 bg-card border border-border rounded-2xl space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="font-bold text-foreground">Observation {index + 1}</span>
+                  <span className="font-bold text-foreground">Equipment {index + 1}</span>
                   <div className="flex items-center gap-2">
                     <Button 
                       size="sm" 

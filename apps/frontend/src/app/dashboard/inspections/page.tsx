@@ -679,6 +679,7 @@ export default function InspectionsPage() {
     } else if (validity === "1/2y") {
       expiry.setMonth(expiry.getMonth() + 6);
     }
+    expiry.setDate(expiry.getDate() - 1);
     
     const expiryDateStr = expiry.toISOString();
     setItemValidityPeriods(prev => ({ ...prev, [itemId]: validity }));
@@ -1826,7 +1827,7 @@ export default function InspectionsPage() {
                       {(selectedInspection?.items || []).map((item, index) => (
                         <div key={item.id} className="p-5 bg-muted/20 border border-border rounded-2xl space-y-3">
                           <div className="flex items-center justify-between">
-                            <span className="font-bold text-foreground">Observation {index + 1}</span>
+                            <span className="font-bold text-foreground">Equipment {index + 1}</span>
                             <div className="flex items-center gap-2">
                               <Button 
                                 size="sm" 
@@ -1957,11 +1958,11 @@ export default function InspectionsPage() {
                               })()}
                             </div>
 
-                            {/* Inspections Name Input (Below Certificate Details) */}
+                            {/* Equipment Name Input (Below Certificate Details) */}
                             <div className="space-y-1 pt-3 border-t border-border/40">
-                              <Label className="text-[10px] font-bold text-muted-foreground uppercase">Inspections Name</Label>
+                              <Label className="text-[10px] font-bold text-muted-foreground uppercase">Equipment Name</Label>
                               <Input 
-                                placeholder="Inspections Name..." 
+                                placeholder="Equipment Name..." 
                                 className="bg-background h-10 text-sm flex-1"
                                 defaultValue={item.scope || ""}
                                 onBlur={(e) => {

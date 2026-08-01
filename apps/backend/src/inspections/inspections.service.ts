@@ -12,6 +12,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 
 import { TemplateEngineService } from '../email-management/template-engine.service';
+import { computeExpiryDate } from '../common/utils/date-utils';
 
 @Injectable()
 export class InspectionsService {
@@ -304,7 +305,7 @@ export class InspectionsService {
       if (!existingCert) {
         // Parse draft certificate data if available in remarks JSON
         let validityPeriod = '1y';
-        let expiryDate = new Date(new Date().setFullYear(new Date().getFullYear() + 1));
+        let expiryDate = computeExpiryDate(new Date(), '1y');
         let cycleDays = 365;
 
         if (inspection.remarks) {
@@ -880,7 +881,7 @@ export class InspectionsService {
 
         const refNo28 = `GSS/RRL-K/TEST/CPB/${inspection.id.substring(0, 4).toUpperCase()}/${new Date().getFullYear()}`;
         const testDate28 = new Date(inspection.completed_date || new Date()).toLocaleDateString('en-IN');
-        const expiryDate28 = draftData.expiry_date ? new Date(draftData.expiry_date).toLocaleDateString('en-IN') : new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toLocaleDateString('en-IN');
+        const expiryDate28 = draftData.expiry_date ? new Date(draftData.expiry_date).toLocaleDateString('en-IN') : computeExpiryDate(inspection.completed_date || new Date(), draftData.validity_period || '1y').toLocaleDateString('en-IN');
 
         doc.fontSize(8).fillColor(primaryColor);
         doc.font('Helvetica-Bold').text(`REF NO: ${refNo28}`, 40, 160);
@@ -1012,7 +1013,7 @@ export class InspectionsService {
 
         const certNoPV = inspection.certificates?.[0]?.certificate_no || `GSS/OIL-D/PV/H-TEST/${inspection.id.substring(0, 4).toUpperCase()}/${new Date().getFullYear()}`;
         const issueDatePV = new Date(inspection.completed_date || new Date()).toLocaleDateString('en-IN');
-        const expiryDatePV = draftData.expiry_date ? new Date(draftData.expiry_date).toLocaleDateString('en-IN') : new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toLocaleDateString('en-IN');
+        const expiryDatePV = draftData.expiry_date ? new Date(draftData.expiry_date).toLocaleDateString('en-IN') : computeExpiryDate(inspection.completed_date || new Date(), draftData.validity_period || '1y').toLocaleDateString('en-IN');
 
         doc.fontSize(8).fillColor(primaryColor);
         doc.font('Helvetica-Bold').text(`Certificate No. : ${certNoPV}`, 40, 145);
@@ -1110,7 +1111,7 @@ export class InspectionsService {
 
         const certNoSV = inspection.certificates?.[0]?.certificate_no || `GSS/OIL-D/PSV/H-TEST/${inspection.id.substring(0, 4).toUpperCase()}/${new Date().getFullYear()}`;
         const issueDateSV = new Date(inspection.completed_date || new Date()).toLocaleDateString('en-IN');
-        const expiryDateSV = draftData.expiry_date ? new Date(draftData.expiry_date).toLocaleDateString('en-IN') : new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toLocaleDateString('en-IN');
+        const expiryDateSV = draftData.expiry_date ? new Date(draftData.expiry_date).toLocaleDateString('en-IN') : computeExpiryDate(inspection.completed_date || new Date(), draftData.validity_period || '1y').toLocaleDateString('en-IN');
 
         doc.fontSize(8).fillColor(primaryColor);
         doc.font('Helvetica-Bold').text(`Certificate No. : ${certNoSV}`, 40, 145);
@@ -1319,7 +1320,7 @@ export class InspectionsService {
                 inspection_item_id: item.id,
                 certificate_no: item.cert_ref_no,
                 issue_date: item.cert_test_date || new Date(),
-                expiry_date: item.cert_expiry_date || new Date(new Date().setFullYear(new Date().getFullYear() + 1)),
+                expiry_date: item.cert_expiry_date || computeExpiryDate(item.cert_test_date || new Date(), '1y'),
                 validity_period: "1 Year",
                 metadata: JSON.stringify({
                   template_id: item.cert_template_id,
@@ -1329,7 +1330,7 @@ export class InspectionsService {
             });
 
             // Also auto-sync to Digital Vault (Documents table)
-            const certExpDate = item.cert_expiry_date || new Date(new Date().setFullYear(new Date().getFullYear() + 1));
+            const certExpDate = item.cert_expiry_date || computeExpiryDate(item.cert_test_date || new Date(), '1y');
             const certTestDate = item.cert_test_date || new Date();
             await this.prisma.document.create({
               data: {
