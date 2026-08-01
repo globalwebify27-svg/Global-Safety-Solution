@@ -53,6 +53,7 @@ model User {
   user_feature_overrides  UserFeatureOverride[]
   roles                   UserRole[]
   co_assigned_inspections InspectionEngineer[]
+  certificate_audit_logs  CertificateAuditLog[]
 
   @@map("users")
 }
@@ -1196,5 +1197,25 @@ model EmailLog {
   created_at    DateTime  @default(now()) @db.DateTime(6)
 
   @@map("email_logs")
+}
+
+model CertificateAuditLog {
+  id              String   @id @default(uuid()) @db.VarChar(36)
+  certificate_id  String?  @db.VarChar(36)
+  document_id     String?  @db.VarChar(36)
+  edited_by_id    String   @db.VarChar(36)
+  edited_by_name  String   @db.VarChar(255)
+  user_role       String   @db.VarChar(100)
+  changed_fields  String   @db.Text
+  previous_values String   @db.Text
+  new_values      String   @db.Text
+  reason          String?  @db.Text
+  created_at      DateTime @default(now()) @db.DateTime(6)
+  edited_by       User     @relation(fields: [edited_by_id], references: [id], onDelete: Cascade)
+
+  @@index([certificate_id])
+  @@index([document_id])
+  @@index([edited_by_id])
+  @@map("certificate_audit_logs")
 }
 

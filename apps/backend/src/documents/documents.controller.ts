@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
   Delete,
   Param,
   Body,
@@ -20,6 +21,7 @@ import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { LocalStorageService } from '../common/services/local-storage.service';
 import { ExpiryCronService } from './expiry-cron.service';
+import { EditCertificateDto } from './dto/edit-certificate.dto';
 
 @Controller('documents')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
@@ -64,6 +66,22 @@ export class DocumentsController {
   @Permissions('READ_DOCUMENT')
   getDueCertificates(@Req() req: any) {
     return this.expiryCronService.getDueCertificates(req.user);
+  }
+
+  @Patch(':id/edit-certificate')
+  @Permissions('UPDATE_DOCUMENT')
+  editCertificate(
+    @Param('id') id: string,
+    @Body() dto: EditCertificateDto,
+    @Req() req: any,
+  ) {
+    return this.documentsService.editCertificate(id, dto, req.user);
+  }
+
+  @Get(':id/audit-history')
+  @Permissions('READ_DOCUMENT')
+  getAuditHistory(@Param('id') id: string) {
+    return this.documentsService.getAuditHistory(id);
   }
 
   @Get(':id')

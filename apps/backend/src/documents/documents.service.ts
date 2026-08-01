@@ -5,6 +5,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { LocalStorageService } from '../common/services/local-storage.service';
 import { TemplateEngineService } from '../email-management/template-engine.service';
 import { CertificatesService } from '../certificates/certificates.service';
+import { EditCertificateDto } from './dto/edit-certificate.dto';
+import { computeExpiryDate } from '../common/utils/date-utils';
 
 @Injectable()
 export class DocumentsService {
@@ -137,7 +139,18 @@ export class DocumentsService {
         orderBy: { created_at: 'desc' },
       });
 
-      // 4. Query all clients to preserve client metadata
+      // 4. Query all certificates for reference number lookup
+      const allCertificates = await this.prisma.certificate.findMany({
+        select: { id: true, certificate_no: true, inspection_item_id: true, inspection_id: true }
+      });
+      const certLookupMap = new Map<string, string>();
+      for (const c of allCertificates) {
+        if (c.id && c.certificate_no) certLookupMap.set(c.id, c.certificate_no);
+        if (c.inspection_item_id && c.certificate_no) certLookupMap.set(c.inspection_item_id, c.certificate_no);
+        if (c.inspection_id && c.certificate_no) certLookupMap.set(c.inspection_id, c.certificate_no);
+      }
+
+      // 5. Query all clients to preserve client metadata
       const allClients = await this.prisma.client.findMany({
         where: userClientId ? { id: userClientId } : {},
         include: {
@@ -240,11 +253,23 @@ export class DocumentsService {
           dueDateStr = dueDateObj.toISOString().split('T')[0];
         }
 
-        // Extract cert number from notes/name
-        let certNumber = null;
-        if (doc.notes) {
+        // Extract cert number from matching Certificate record, notes, or name
+        const certRec = await this.findMatchingCertificateRecord(doc);
+        let certNumber: string | null = certRec?.certificate_no || null;
+
+        if (!certNumber && doc.notes) {
           const match = doc.notes.match(/Certificate No\.\s*([A-Za-z0-9\/-]+)/i);
           if (match) certNumber = match[1];
+        }
+
+        if (!certNumber && doc.notes) {
+          const match = doc.notes.match(/GSS\/[A-Za-z0-9\/-]+/i);
+          if (match) certNumber = match[0];
+        }
+
+        if (!certNumber && doc.name) {
+          const match = doc.name.match(/GSS\/[A-Za-z0-9\/-]+/i);
+          if (match) certNumber = match[0];
         }
 
         const clientName = doc.client?.name || 'General Safety Client';
@@ -817,5 +842,212 @@ export class DocumentsService {
     });
 
     return { success: true, message: `Certificate renewal reminder emailed to ${targetEmail}`, result };
+  }
+
+  async editCertificate(id: string, dto: EditCertificateDto, userPayload: any) {
+    try {
+      const doc = await this.prisma.document.findUnique({
+        where: { id },
+        include: { client: true, project: true }
+      });
+
+      if (!doc) {
+        throw new NotFoundException('Certificate document not found');
+      }
+
+      const rawEditorId = userPayload?.userId || userPayload?.id || userPayload?.sub;
+      let validUser: any = null;
+
+      if (rawEditorId) {
+        validUser = await this.prisma.user.findUnique({
+          where: { id: rawEditorId },
+          include: { roles: { include: { role: true } } }
+        });
+      }
+
+      if (!validUser) {
+        validUser = await this.prisma.user.findFirst({
+          where: { is_active: true }
+        });
+      }
+
+      const editorId = validUser?.id || null;
+      const editorName = validUser?.name || validUser?.email || userPayload?.email || 'Authorized User';
+      const userRole = validUser?.roles?.[0]?.role?.name || userPayload?.role || 'ADMIN';
+
+      // Find matching certificate record if present
+      const certRecord = await this.findMatchingCertificateRecord(doc);
+
+      // Track changed fields
+      const changes: Record<string, { old: any; new: any }> = {};
+
+      let newTestDate = doc.test_date;
+      let newExpiryDate = doc.expiry_date;
+
+      if (dto.issue_date) {
+        const parsedIssue = new Date(dto.issue_date);
+        if (!isNaN(parsedIssue.getTime())) {
+          if (!doc.test_date || doc.test_date.toISOString().split('T')[0] !== parsedIssue.toISOString().split('T')[0]) {
+            changes['issue_date'] = {
+              old: doc.test_date ? doc.test_date.toISOString().split('T')[0] : null,
+              new: dto.issue_date
+            };
+            newTestDate = parsedIssue;
+          }
+        }
+      }
+
+      if (dto.validity_period || dto.issue_date) {
+        const effectiveIssue = newTestDate || new Date();
+        const period = dto.validity_period || (certRecord?.validity_period || '1 Year');
+        const calculatedExpiry = computeExpiryDate(effectiveIssue, period);
+        if (calculatedExpiry) {
+          newExpiryDate = calculatedExpiry;
+        }
+      }
+
+      if (dto.expiry_date) {
+        const parsedExpiry = new Date(dto.expiry_date);
+        if (!isNaN(parsedExpiry.getTime())) {
+          newExpiryDate = parsedExpiry;
+        }
+      }
+
+      if (newExpiryDate && (!doc.expiry_date || doc.expiry_date.toISOString().split('T')[0] !== newExpiryDate.toISOString().split('T')[0])) {
+        changes['expiry_date'] = {
+          old: doc.expiry_date ? doc.expiry_date.toISOString().split('T')[0] : null,
+          new: newExpiryDate.toISOString().split('T')[0]
+        };
+      }
+
+      if (dto.name && dto.name !== doc.name) {
+        changes['name'] = { old: doc.name, new: dto.name };
+      }
+
+      if (dto.notes !== undefined && dto.notes !== doc.notes) {
+        changes['notes'] = { old: doc.notes || '', new: dto.notes };
+      }
+
+      if (dto.certificate_number && certRecord && dto.certificate_number !== certRecord.certificate_no) {
+        changes['certificate_number'] = { old: certRecord.certificate_no, new: dto.certificate_number };
+      }
+
+      if (dto.validity_period && certRecord && dto.validity_period !== certRecord.validity_period) {
+        changes['validity_period'] = { old: certRecord.validity_period, new: dto.validity_period };
+      }
+
+      // Execute atomic update across all linked records
+      await this.prisma.$transaction(async (tx) => {
+        // 1. Update Document
+        let updatedNotes = dto.notes !== undefined ? dto.notes : (doc.notes || '');
+        const newCertNo = dto.certificate_number || certRecord?.certificate_no;
+
+        if (newCertNo) {
+          if (updatedNotes.includes('Certificate No.')) {
+            updatedNotes = updatedNotes.replace(/Certificate No\.\s*([A-Za-z0-9\/-]+)/i, `Certificate No. ${newCertNo}`);
+          } else if (updatedNotes.includes('GSS/')) {
+            updatedNotes = updatedNotes.replace(/GSS\/[A-Za-z0-9\/-]+/i, `${newCertNo}`);
+          }
+        }
+
+        await tx.document.update({
+          where: { id: doc.id },
+          data: {
+            name: dto.name || doc.name,
+            test_date: newTestDate,
+            expiry_date: newExpiryDate,
+            notes: updatedNotes,
+          }
+        });
+
+        // 2. Update Certificate if exists
+        if (certRecord) {
+          await tx.certificate.update({
+            where: { id: certRecord.id },
+            data: {
+              certificate_no: dto.certificate_number || certRecord.certificate_no,
+              issue_date: newTestDate || certRecord.issue_date,
+              expiry_date: newExpiryDate || certRecord.expiry_date,
+              validity_period: dto.validity_period || certRecord.validity_period,
+            }
+          });
+
+          // 3. Update linked InspectionItem if exists
+          if (certRecord.inspection_item_id) {
+            const itemData: any = {};
+            if (dto.name) itemData.description = dto.name;
+            if (dto.certificate_number) itemData.cert_ref_no = dto.certificate_number;
+            if (newTestDate) itemData.cert_test_date = newTestDate;
+            if (newExpiryDate) itemData.cert_expiry_date = newExpiryDate;
+            if (dto.cert_competency_no) itemData.cert_competency_no = dto.cert_competency_no;
+
+            if (Object.keys(itemData).length > 0) {
+              await tx.inspectionItem.update({
+                where: { id: certRecord.inspection_item_id },
+                data: itemData
+              });
+            }
+          }
+        }
+
+        // 4. Record Audit Log if editorId exists
+        if (editorId) {
+          try {
+            await tx.certificateAuditLog.create({
+              data: {
+                document_id: doc.id,
+                certificate_id: certRecord?.id || null,
+                edited_by_id: editorId,
+                edited_by_name: editorName,
+                user_role: userRole,
+                changed_fields: JSON.stringify(Object.keys(changes)),
+                previous_values: JSON.stringify(Object.fromEntries(Object.entries(changes).map(([k, v]) => [k, v.old]))),
+                new_values: JSON.stringify(Object.fromEntries(Object.entries(changes).map(([k, v]) => [k, v.new]))),
+                reason: dto.reason || 'Manual certificate details update via Digital Vault',
+              }
+            });
+          } catch (auditErr) {
+            console.error('Non-blocking Audit log creation warning:', auditErr);
+          }
+        }
+      });
+
+      const updatedDoc = await this.prisma.document.findUnique({
+        where: { id: doc.id },
+        include: { client: true, project: true }
+      });
+
+      return {
+        message: 'Certificate updated and synchronized successfully across ERP!',
+        document: updatedDoc,
+      };
+    } catch (error: any) {
+      console.error('Error in editCertificate:', error);
+      throw new BadRequestException(error?.message || 'Failed to update certificate');
+    }
+  }
+
+  async getAuditHistory(documentId: string) {
+    const doc = await this.prisma.document.findUnique({ where: { id: documentId } });
+    const certRecord = doc ? await this.findMatchingCertificateRecord(doc) : null;
+
+    const idsToSearch = [documentId];
+    if (certRecord) idsToSearch.push(certRecord.id);
+
+    const logs = await this.prisma.certificateAuditLog.findMany({
+      where: {
+        OR: [
+          { document_id: { in: idsToSearch } },
+          { certificate_id: { in: idsToSearch } }
+        ]
+      },
+      include: {
+        edited_by: {
+          select: { id: true, name: true, email: true, designation: true }
+        }
+      },
+      orderBy: { created_at: 'desc' }
+    });
+    return logs;
   }
 }

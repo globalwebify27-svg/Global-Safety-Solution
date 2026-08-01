@@ -43,7 +43,8 @@ import {
   UploadCloud,
   Upload,
   Image as ImageIcon,
-  Mail
+  Mail,
+  Pencil
 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -162,6 +163,25 @@ export default function DocumentVaultPage() {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [selectedPreviewCert, setSelectedPreviewCert] = useState<VaultCertificateItem | null>(null);
 
+  // Edit Certificate & Audit Trail states
+  const [editCertOpen, setEditCertOpen] = useState(false);
+  const [editingCertDoc, setEditingCertDoc] = useState<any | null>(null);
+  const [editForm, setEditForm] = useState({
+    name: "",
+    certificate_number: "",
+    cert_competency_no: "",
+    issue_date: "",
+    expiry_date: "",
+    validity_period: "1 Year",
+    notes: "",
+    reason: ""
+  });
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  const [auditHistoryOpen, setAuditHistoryOpen] = useState(false);
+  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [loadingAuditLogs, setLoadingAuditLogs] = useState(false);
+
   // Delivery Receipt Upload / Delete State
   const [uploadingReceipt, setUploadingReceipt] = useState(false);
   const [deletingReceipt, setDeletingReceipt] = useState(false);
@@ -260,6 +280,71 @@ export default function DocumentVaultPage() {
       alert(`Network error: ${e?.message || 'Delete failed'}`);
     } finally {
       setDeletingReceipt(false);
+    }
+  };
+
+  const handleOpenEditCert = (certItem: any) => {
+    setEditingCertDoc(certItem);
+    setEditForm({
+      name: certItem.name || "",
+      certificate_number: certItem.certificate_number || certItem.certificate_no || "",
+      cert_competency_no: certItem.cert_competency_no || "",
+      issue_date: certItem.issue_date || (certItem.test_date ? certItem.test_date.split('T')[0] : (certItem.created_at ? certItem.created_at.split('T')[0] : "")),
+      expiry_date: certItem.expiry_date || "",
+      validity_period: certItem.validity_period || "1 Year",
+      notes: certItem.notes || "",
+      reason: ""
+    });
+    setEditCertOpen(true);
+  };
+
+  const handleSaveEditCert = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingCertDoc || !token) return;
+    try {
+      setSavingEdit(true);
+      const res = await fetch(`${API_BASE_URL}/documents/${editingCertDoc.id}/edit-certificate`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(editForm)
+      });
+      if (res.ok) {
+        const data = await res.json();
+        toast.success(data.message || "Certificate updated successfully!");
+        setEditCertOpen(false);
+        fetchData();
+      } else {
+        const err = await res.json();
+        toast.error(err.message || "Failed to update certificate");
+      }
+    } catch (err) {
+      toast.error("Failed to update certificate");
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const handleOpenAuditHistory = async (docId: string) => {
+    if (!token) return;
+    try {
+      setLoadingAuditLogs(true);
+      setAuditHistoryOpen(true);
+      const res = await fetch(`${API_BASE_URL}/documents/${docId}/audit-history`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAuditLogs(data);
+      } else {
+        toast.error("Failed to fetch audit history");
+      }
+    } catch (err) {
+      toast.error("Failed to fetch audit history");
+    } finally {
+      setLoadingAuditLogs(false);
     }
   };
 
@@ -991,6 +1076,18 @@ export default function DocumentVaultPage() {
                                               </td>
                                               <td className="px-5 py-4 text-right">
                                                 <div className="flex items-center justify-end gap-2">
+                                                  {!isClient && (
+                                                    <Button
+                                                      size="sm"
+                                                      variant="outline"
+                                                      onClick={() => handleOpenEditCert(cert)}
+                                                      className="h-8 px-2.5 text-xs font-bold border-amber-500/30 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10"
+                                                      title="Edit Certificate Details"
+                                                    >
+                                                      <Pencil className="w-3.5 h-3.5 mr-1" /> Edit
+                                                    </Button>
+                                                  )}
+
                                                   <Button
                                                     size="sm"
                                                     variant="outline"
@@ -1027,6 +1124,16 @@ export default function DocumentVaultPage() {
                                                       Email Cert
                                                     </Button>
                                                   )}
+
+                                                  <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    onClick={() => handleOpenAuditHistory(cert.id)}
+                                                    className="h-8 px-2 text-xs font-bold text-muted-foreground hover:text-foreground"
+                                                    title="View Audit Trail"
+                                                  >
+                                                    <History className="w-3.5 h-3.5 mr-1" /> History
+                                                  </Button>
                                                 </div>
                                               </td>
                                             </tr>
@@ -1388,6 +1495,212 @@ export default function DocumentVaultPage() {
                   </Button>
                 )}
               </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Certificate Modal */}
+      <Dialog open={editCertOpen} onOpenChange={setEditCertOpen}>
+        <DialogContent className="sm:max-w-[600px] bg-card border-border text-foreground shadow-2xl rounded-3xl p-6 relative max-h-[85vh] overflow-y-auto">
+          <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-amber-500 via-orange-500 to-red-500" />
+          
+          <DialogHeader>
+            <DialogTitle className="text-xl font-black flex items-center gap-2">
+              <Pencil className="w-5 h-5 text-amber-500" /> Edit Certificate Information
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              Update certificate details. Changes will automatically synchronize across all ERP views, PDF exports, and client portal.
+            </DialogDescription>
+          </DialogHeader>
+
+          {editingCertDoc && (
+            <form onSubmit={handleSaveEditCert} className="space-y-4 mt-2">
+              {/* Read Only Badges */}
+              <div className="p-3 bg-muted/40 border border-border/80 rounded-2xl grid grid-cols-2 gap-3 text-xs">
+                <div>
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase">Client Name (Locked)</span>
+                  <p className="font-bold text-foreground truncate">{editingCertDoc.client_name || editingCertDoc.client?.name || "N/A"}</p>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase">Project (Locked)</span>
+                  <p className="font-bold text-foreground truncate">{editingCertDoc.project_name || editingCertDoc.project?.name || "General / Direct Client"}</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs font-bold">Inspection Name / Scope</Label>
+                  <Input
+                    required
+                    value={editForm.name}
+                    onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                    className="h-10 text-xs bg-background border-border"
+                    placeholder="e.g. Forklift Inspection Certificate"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs font-bold">Certificate Ref No</Label>
+                  <Input
+                    value={editForm.certificate_number}
+                    onChange={(e) => setEditForm({ ...editForm, certificate_number: e.target.value })}
+                    className="h-10 text-xs bg-background border-border font-mono font-bold text-blue-600 dark:text-blue-400"
+                    placeholder="e.g. GSS-CERT-2026-001"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs font-bold">Issue / Test Date</Label>
+                  <Input
+                    type="date"
+                    value={editForm.issue_date}
+                    onChange={(e) => setEditForm({ ...editForm, issue_date: e.target.value })}
+                    className="h-10 text-xs bg-background border-border"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs font-bold">Validity Period</Label>
+                  <select
+                    value={editForm.validity_period}
+                    onChange={(e) => setEditForm({ ...editForm, validity_period: e.target.value })}
+                    className="w-full h-10 px-3 bg-background border border-border rounded-xl text-xs font-semibold"
+                  >
+                    <option value="1 Year">1 Year</option>
+                    <option value="2 Years">2 Years</option>
+                    <option value="3 Years">3 Years</option>
+                    <option value="6 Months">6 Months</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1 md:col-span-2">
+                  <Label className="text-xs font-bold">Expiry Date</Label>
+                  <Input
+                    type="date"
+                    value={editForm.expiry_date}
+                    onChange={(e) => setEditForm({ ...editForm, expiry_date: e.target.value })}
+                    className="h-10 text-xs bg-background border-border font-bold text-rose-600 dark:text-rose-400"
+                  />
+                </div>
+
+                <div className="space-y-1 md:col-span-2">
+                  <Label className="text-xs font-bold">Certificate Remarks / Notes</Label>
+                  <Input
+                    value={editForm.notes}
+                    onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+                    className="h-10 text-xs bg-background border-border"
+                    placeholder="Optional remarks or inspector observations"
+                  />
+                </div>
+
+                <div className="space-y-1 md:col-span-2">
+                  <Label className="text-xs font-bold">Reason for Edit (Required for Audit Log)</Label>
+                  <Input
+                    required
+                    value={editForm.reason}
+                    onChange={(e) => setEditForm({ ...editForm, reason: e.target.value })}
+                    className="h-10 text-xs bg-background border-border"
+                    placeholder="e.g. Corrected typo in serial number / Updated validity date per client request"
+                  />
+                </div>
+              </div>
+
+              <DialogFooter className="pt-3 border-t border-border flex items-center justify-between">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setEditCertOpen(false)}
+                  className="h-9 text-xs"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={savingEdit}
+                  className="h-9 px-5 text-xs font-bold bg-amber-600 hover:bg-amber-500 text-white"
+                >
+                  {savingEdit ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-1" />}
+                  Save & Synchronize ERP
+                </Button>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Audit Log History Modal */}
+      <Dialog open={auditHistoryOpen} onOpenChange={setAuditHistoryOpen}>
+        <DialogContent className="sm:max-w-[650px] bg-card border-border text-foreground shadow-2xl rounded-3xl p-6 relative max-h-[85vh] overflow-y-auto">
+          <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-blue-600 via-indigo-500 to-purple-600" />
+          
+          <DialogHeader>
+            <DialogTitle className="text-xl font-black flex items-center gap-2">
+              <History className="w-5 h-5 text-blue-600" /> Certificate Audit Trail
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              Complete chronological audit history of all edits made to this certificate.
+            </DialogDescription>
+          </DialogHeader>
+
+          {loadingAuditLogs ? (
+            <div className="p-8 text-center text-sm text-muted-foreground flex flex-col items-center gap-2">
+              <Loader2 className="w-6 h-6 animate-spin text-blue-600" /> Loading audit history...
+            </div>
+          ) : auditLogs.length === 0 ? (
+            <div className="p-8 text-center text-sm text-muted-foreground bg-muted/20 border border-dashed border-border rounded-2xl">
+              No edit history found for this certificate. It is in its original state.
+            </div>
+          ) : (
+            <div className="space-y-3 mt-2">
+              {auditLogs.map((log) => {
+                let changedFieldsList: string[] = [];
+                let oldVals: any = {};
+                let newVals: any = {};
+                try {
+                  changedFieldsList = JSON.parse(log.changed_fields || "[]");
+                  oldVals = JSON.parse(log.previous_values || "{}");
+                  newVals = JSON.parse(log.new_values || "{}");
+                } catch (e) {}
+
+                return (
+                  <div key={log.id} className="p-4 bg-muted/30 border border-border/80 rounded-2xl space-y-2 text-xs">
+                    <div className="flex items-center justify-between border-b border-border/50 pb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-foreground text-sm">{log.edited_by_name}</span>
+                        <span className="px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-blue-500/10 text-blue-600 border border-blue-500/20">
+                          {log.user_role}
+                        </span>
+                      </div>
+                      <span className="text-[11px] text-muted-foreground font-semibold">
+                        {new Date(log.created_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
+                      </span>
+                    </div>
+
+                    {log.reason && (
+                      <p className="text-xs font-semibold text-foreground/80 italic bg-background/60 p-2 rounded-xl border border-border/40">
+                        "{log.reason}"
+                      </p>
+                    )}
+
+                    <div className="space-y-1 pt-1">
+                      <span className="text-[10px] font-bold text-muted-foreground uppercase">Changed Fields:</span>
+                      <div className="space-y-1">
+                        {changedFieldsList.map((f) => (
+                          <div key={f} className="flex items-center justify-between bg-background p-2 rounded-lg border border-border/60 text-[11px]">
+                            <span className="font-bold capitalize text-blue-600 dark:text-blue-400">{f.replace('_', ' ')}:</span>
+                            <div className="flex items-center gap-2">
+                              <span className="line-through text-rose-500">{String(oldVals[f] || 'Empty')}</span>
+                              <span>➔</span>
+                              <span className="font-bold text-emerald-600 dark:text-emerald-400">{String(newVals[f] || 'Empty')}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </DialogContent>

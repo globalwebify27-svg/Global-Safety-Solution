@@ -110,7 +110,7 @@ export default function LoginPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <form onSubmit={handleLogin} className="space-y-5">
+              <form onSubmit={handleLogin} className="space-y-5" suppressHydrationWarning>
                 <div className="space-y-2">
                   <Label className="text-foreground/80 font-medium">Email address</Label>
                   <Input 
@@ -120,6 +120,7 @@ export default function LoginPage() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className="bg-background/50 border-border text-foreground placeholder:text-muted-foreground focus-visible:ring-primary focus-visible:ring-offset-0 focus-visible:border-primary transition-all py-6"
+                    suppressHydrationWarning
                   />
                 </div>
                 <div className="space-y-2">
@@ -129,6 +130,7 @@ export default function LoginPage() {
                       type="button"
                       onClick={() => setForgotModalOpen(true)}
                       className="text-sm text-primary hover:text-primary/80 font-medium transition-colors"
+                      suppressHydrationWarning
                     >
                       Forgot password?
                     </button>
@@ -140,6 +142,7 @@ export default function LoginPage() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     className="bg-background/50 border-border text-foreground placeholder:text-muted-foreground focus-visible:ring-primary focus-visible:ring-offset-0 focus-visible:border-primary transition-all py-6"
+                    suppressHydrationWarning
                   />
                 </div>
                 
@@ -147,6 +150,7 @@ export default function LoginPage() {
                   type="submit" 
                   disabled={loading}
                   className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-base py-6 shadow-lg transition-all group"
+                  suppressHydrationWarning
                 >
                   {loading ? (
                     <Loader2 className="w-5 h-5 animate-spin mx-auto opacity-50" />
