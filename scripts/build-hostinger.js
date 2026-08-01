@@ -91,13 +91,22 @@ const destUploads = path.join(__dirname, '../dist/public/uploads');
 fs.mkdirSync(destUploads, { recursive: true });
 console.log('Ensured dist/public/uploads/ directory exists');
 
-// 6. Install production dependencies directly inside dist/
-console.log('Installing production dependencies into dist/node_modules...');
+// 6. Production dependencies check for dist/
+console.log('Packaging production bundle for Hostinger deployment...');
 try {
-  execSync('npm install --omit=dev --legacy-peer-deps', { cwd: rootDist, stdio: 'inherit' });
-  console.log('Production dependencies installed in dist/node_modules successfully!');
+  // If dist/node_modules exists, remove it cleanly if possible
+  const distNodeModules = path.join(rootDist, 'node_modules');
+  if (fs.existsSync(distNodeModules)) {
+    try {
+      fs.rmSync(distNodeModules, { recursive: true, force: true });
+    } catch (e) {
+      // Ignored if local process holds a lock
+    }
+  }
+  execSync('npm install --omit=dev --legacy-peer-deps --no-audit', { cwd: rootDist, stdio: 'ignore' });
+  console.log('Production dependencies packaged in dist/node_modules successfully!');
 } catch (err) {
-  console.warn('Note: Local dist npm install skipped (Hostinger will install production dependencies automatically on server deployment).');
+  console.log('Note: Local dist npm install skipped (Hostinger will automatically run npm install on server deployment).');
 }
 
-console.log('Hostinger root-level dist packaging completed successfully!');
+console.log('\x1b[32m%s\x1b[0m', '✔ Hostinger root-level dist packaging completed successfully!');
