@@ -84,6 +84,25 @@ export class InspectionsController {
     return this.inspectionsService.deleteItem(itemId);
   }
 
+  @Get('item/:itemId/certificate-pdf')
+  async downloadItemCertificate(
+    @Param('itemId') itemId: string,
+    @Res() res: any,
+  ) {
+    try {
+      const buffer = await this.inspectionsService.generateCertificatePdfForItem(itemId);
+      res.set({
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename=certificate-item-${itemId.substring(0, 8)}.pdf`,
+        'Content-Length': buffer.length,
+      });
+      res.end(buffer);
+    } catch (err) {
+      console.error('[PDF Error] inspections/item/:itemId/certificate-pdf failed:', err?.message);
+      res.status(err?.status || 500).json({ error: err?.message || 'PDF generation failed' });
+    }
+  }
+
   @Get(':id/certificate')
   async downloadCertificate(
     @Param('id') id: string,

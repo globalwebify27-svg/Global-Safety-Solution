@@ -335,8 +335,9 @@ export class CertificatesService {
     const PDFDocument = _PDFDocument.default || _PDFDocument;
 
     return new Promise((resolve, reject) => {
-      const docOptions: any = { margin: 40, size: 'A4' };
+      const docOptions: any = { margin: 20, size: 'A4' };
       const doc = new PDFDocument(docOptions);
+      doc.page.margins.bottom = 15;
       const buffers: Buffer[] = [];
 
       doc.on('data', buffers.push.bind(buffers));
@@ -422,27 +423,27 @@ export class CertificatesService {
       };
 
       // Draw Key-Value dynamic fields
-      let yRef = { val: 165 };
+      let yRef = { val: 160 };
       const drawRow = (num: string, label: string, val: string, labelWidth = 220) => {
         const y = yRef.val;
         
         // Calculate dynamic heights based on text content and widths
-        doc.font('Helvetica-Bold').fontSize(8);
+        doc.font('Helvetica-Bold').fontSize(7.5);
         const labelHeight = doc.heightOfString(label, { width: labelWidth });
         
-        doc.font('Helvetica').fontSize(8);
+        doc.font('Helvetica').fontSize(7.5);
         const valHeight = doc.heightOfString(`:  ${val || 'N/A'}`, { width: 560 - 56 - labelWidth - 4 });
         
         const rowHeight = Math.max(labelHeight, valHeight);
-        const rowPadding = 8; // Padding between content and bottom border line
+        const rowPadding = 3; // Compact padding between content and bottom border line
         
         // Render texts using calculated layouts
-        doc.font('Helvetica-Bold').fontSize(8).fillColor(primaryColor).text(`${num}.`, 38, y, { width: 16 });
+        doc.font('Helvetica-Bold').fontSize(7.5).fillColor(primaryColor).text(`${num}.`, 38, y, { width: 16 });
         doc.font('Helvetica-Bold').text(label, 56, y, { width: labelWidth });
         doc.font('Helvetica').text(`:  ${val || 'N/A'}`, 56 + labelWidth + 4, y, { width: 560 - 56 - labelWidth - 4 });
         
         yRef.val += rowHeight + rowPadding;
-        doc.moveTo(35, yRef.val - 3).lineTo(560, yRef.val - 3).lineWidth(0.3).stroke('#e2e8f0');
+        doc.moveTo(35, yRef.val - 1).lineTo(560, yRef.val - 1).lineWidth(0.3).stroke('#e2e8f0');
       };
 
 
@@ -481,42 +482,42 @@ export class CertificatesService {
       const finalStatementRaw = template?.html_content || `I / We certify that on {{cert_test_date}} the safety checklist section described above was thoroughly examined and found satisfactory, subject to notes and recommendations.`;
       const finalStatement = replacePlaceholders(finalStatementRaw);
 
-      const statementY = yRef.val + 10;
-      doc.fontSize(8).font('Helvetica-Oblique').fillColor(primaryColor);
-      doc.text(finalStatement, 38, statementY, { width: 516, align: 'justify', lineGap: 1.5 });
+      const statementY = Math.min(yRef.val + 6, 620);
+      doc.fontSize(7.5).font('Helvetica-Oblique').fillColor(primaryColor);
+      doc.text(finalStatement, 38, statementY, { width: 516, align: 'justify', lineGap: 1 });
 
       // Signatures & Footer
-      const sigY = Math.min(statementY + 90, 710);
+      const sigY = Math.min(statementY + 45, 680);
       
       // Divider
-      doc.moveTo(28, sigY - 10).lineTo(567, sigY - 10).lineWidth(0.5).stroke('#94a3b8');
+      doc.moveTo(28, sigY - 6).lineTo(567, sigY - 6).lineWidth(0.5).stroke('#94a3b8');
 
-      doc.font('Helvetica-Bold').fontSize(8).fillColor(primaryColor);
+      doc.font('Helvetica-Bold').fontSize(7.5).fillColor(primaryColor);
       doc.text(`Test Date: ${issueDateStr}`, 38, sigY);
       doc.text(`Due Date: ${expiryDateStr}`, 38, sigY + 12);
       doc.font('Helvetica').text(`Competency No – ${certificate.inspection_item?.cert_competency_no || '663'}`, 38, sigY + 24);
 
       // QR Code
       if (qrCodeBuffer) {
-        doc.image(qrCodeBuffer, 460, sigY, { width: 55, height: 55 });
-        doc.fontSize(6).fillColor('#475569').text('SCAN TO VERIFY', 460, sigY + 57, { align: 'center', width: 55 });
+        doc.image(qrCodeBuffer, 460, sigY, { width: 50, height: 50 });
+        doc.fontSize(5.5).fillColor('#475569').text('SCAN TO VERIFY', 460, sigY + 52, { align: 'center', width: 50 });
       }
 
       // Signature line
-      doc.moveTo(220, sigY + 35).lineTo(420, sigY + 35).lineWidth(0.5).stroke(primaryColor);
-      doc.font('Helvetica-Bold').fontSize(8.5).fillColor(primaryColor).text('Competent Person', 220, sigY + 39, { align: 'center', width: 200 });
-      doc.fontSize(7.5).text('Global Safety Solution', 220, sigY + 49, { align: 'center', width: 200 });
+      doc.moveTo(220, sigY + 30).lineTo(420, sigY + 30).lineWidth(0.5).stroke(primaryColor);
+      doc.font('Helvetica-Bold').fontSize(8).fillColor(primaryColor).text('Competent Person', 220, sigY + 34, { align: 'center', width: 200 });
+      doc.fontSize(7).text('Global Safety Solution', 220, sigY + 44, { align: 'center', width: 200 });
 
       // Competency footer
       const drawCompetencyFooter = (startY: number, competencyNo: string) => {
         doc.moveTo(28, startY).lineTo(567, startY).lineWidth(0.5).stroke('#94a3b8');
-        startY += 6;
-        doc.fontSize(7.5).font('Helvetica-Bold').fillColor(primaryColor);
+        startY += 4;
+        doc.fontSize(7).font('Helvetica-Bold').fillColor(primaryColor);
         doc.text('Global Safety Solution', 160, startY, { align: 'center', width: 280 });
-        doc.text('Competent Person under the Factories Act. 1948', 160, startY + 10, { align: 'center', width: 280 });
-        doc.text(`Competency No. from Govt. – Memo. No.: ${competencyNo}`, 160, startY + 20, { align: 'center', width: 280 });
+        doc.text('Competent Person under the Factories Act. 1948', 160, startY + 9, { align: 'center', width: 280 });
+        doc.text(`Competency No. from Govt. – Memo. No.: ${competencyNo}`, 160, startY + 18, { align: 'center', width: 280 });
       };
-      drawCompetencyFooter(sigY + 74, certificate.inspection_item?.cert_competency_no || '663');
+      drawCompetencyFooter(sigY + 60, certificate.inspection_item?.cert_competency_no || '663');
 
       doc.end();
     });

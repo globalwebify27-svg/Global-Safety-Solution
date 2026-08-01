@@ -13,6 +13,7 @@ import * as fs from 'fs';
 
 import { TemplateEngineService } from '../email-management/template-engine.service';
 import { computeExpiryDate } from '../common/utils/date-utils';
+import { CertificatesService } from '../certificates/certificates.service';
 
 @Injectable()
 export class InspectionsService {
@@ -21,6 +22,7 @@ export class InspectionsService {
     private mailService: MailService,
     private notificationsService: NotificationsService,
     private templateEngine: TemplateEngineService,
+    private certificatesService: CertificatesService,
   ) {}
 
   async create(data: CreateInspectionDto) {
@@ -810,19 +812,66 @@ export class InspectionsService {
     return this.prisma.inspection.delete({ where: { id } });
   }
 
+  async generateCertificatePdfForItem(itemId: string): Promise<Buffer> {
+    const item = await this.prisma.inspectionItem.findUnique({
+      where: { id: itemId },
+      include: { inspection: true }
+    });
+
+    if (!item) {
+      throw new NotFoundException(`Inspection item ${itemId} not found`);
+    }
+
+    let cert = await this.prisma.certificate.findFirst({
+      where: { inspection_item_id: itemId },
+    });
+
+    if (!cert) {
+      const refNo = item.cert_ref_no || `GSS-CERT-${item.id.substring(0, 6).toUpperCase()}`;
+      const issueDate = item.cert_test_date || new Date();
+      const expiryDate = item.cert_expiry_date || computeExpiryDate(issueDate, '1y');
+
+      cert = await this.prisma.certificate.create({
+        data: {
+          inspection_id: item.inspection_id,
+          inspection_item_id: item.id,
+          certificate_no: refNo,
+          issue_date: issueDate,
+          expiry_date: expiryDate,
+          validity_period: '1 Year',
+          metadata: JSON.stringify({
+            template_id: item.cert_template_id || null,
+            field_values: item.cert_template_fields ? JSON.parse(item.cert_template_fields) : {}
+          })
+        }
+      });
+    }
+
+    return this.certificatesService.generatePdfForCertificate(cert.id);
+  }
+
   async generateCertificate(id: string): Promise<Buffer> {
     const inspection = await this.prisma.inspection.findUnique({
       where: { id },
       include: {
         client: true,
         engineer: true,
-        certificates: true,
+        certificates: { orderBy: { created_at: 'asc' } },
         items: true,
         work_order: { include: { service_product: true } },
       },
     });
 
     if (!inspection) return Buffer.alloc(0);
+
+    if (inspection.certificates && inspection.certificates.length > 0) {
+      return this.certificatesService.generatePdfForCertificate(inspection.certificates[0].id);
+    }
+
+    const itemWithCert = inspection.items.find(i => i.cert_template_id || i.cert_ref_no);
+    if (itemWithCert) {
+      return this.generateCertificatePdfForItem(itemWithCert.id);
+    }
 
     // 1. Download/Generate QR Code image linking to public verification page
     let qrCodeBuffer: Buffer | null = null;
