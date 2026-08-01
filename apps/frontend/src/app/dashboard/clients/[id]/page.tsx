@@ -5,6 +5,9 @@ import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/auth";
 import { API_BASE_URL } from "@/lib/config";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { ArrowLeft, Building2, Mail, Phone, MapPin, FileText, ShieldAlert, CheckCircle2, User, Briefcase, CheckSquare, Calendar, Activity, AlertCircle, Clock, ChevronDown, ChevronUp, BarChart2, Users, Layers, ExternalLink, KeyRound, Send } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -130,6 +133,43 @@ export default function ClientProfilePage({ params }: { params: Promise<{ id: st
   const [actionError, setActionError] = useState<string | null>(null);
   const [expandedProject, setExpandedProject] = useState<string | null>(null);
   const [isWorkloadAnalyzed, setIsWorkloadAnalyzed] = useState(false);
+
+  // Custom Email States
+  const [openCustomEmailModal, setOpenCustomEmailModal] = useState(false);
+  const [customRecipientEmail, setCustomRecipientEmail] = useState("");
+  const [customSubject, setCustomSubject] = useState("");
+  const [customMessage, setCustomMessage] = useState("");
+  const [sendingCustomEmail, setSendingCustomEmail] = useState(false);
+
+  const handleSendCustomEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!token || !client) return;
+    try {
+      setSendingCustomEmail(true);
+      const res = await fetch(`${API_BASE_URL}/clients/${id}/send-custom-email`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          email: customRecipientEmail || client.email,
+          subject: customSubject,
+          message: customMessage,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success(data.message || "Custom email sent successfully!");
+        setOpenCustomEmailModal(false);
+        setCustomSubject("");
+        setCustomMessage("");
+      } else {
+        toast.error(data.message || "Failed to send custom email.");
+      }
+    } catch {
+      toast.error("Error connecting to email service.");
+    } finally {
+      setSendingCustomEmail(false);
+    }
+  };
 
   // Reallocation States
   const [usersList, setUsersList] = useState<any[]>([]);
@@ -314,6 +354,19 @@ export default function ClientProfilePage({ params }: { params: Promise<{ id: st
             className="font-bold text-xs rounded-xl h-10 px-4 bg-card border-border hover:bg-accent"
           >
             <Mail className="w-4 h-4 mr-1.5 text-blue-500" /> Welcome Email
+          </Button>
+
+          <Button
+            onClick={() => {
+              setCustomRecipientEmail(client.email || "");
+              setCustomSubject(`Direct Update for ${client.name}`);
+              setCustomMessage(`Dear ${client.name},\n\nWe wanted to share an update regarding your ongoing projects and safety compliance records with Global Safety Solution.\n\nPlease feel free to contact us if you have any questions.\n\nBest regards,\nGlobal Safety Solution`);
+              setOpenCustomEmailModal(true);
+            }}
+            variant="outline"
+            className="font-bold text-xs rounded-xl h-10 px-4 bg-card border-border hover:bg-accent"
+          >
+            <Send className="w-4 h-4 mr-1.5 text-indigo-500" /> Custom Email
           </Button>
 
           <Button
@@ -1472,6 +1525,58 @@ export default function ClientProfilePage({ params }: { params: Promise<{ id: st
           </div>
         );
       })()}
+
+      {/* Compose Custom Email Dialog */}
+      <Dialog open={openCustomEmailModal} onOpenChange={setOpenCustomEmailModal}>
+        <DialogContent className="sm:max-w-[550px] bg-card border-border text-foreground rounded-[2rem]">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold flex items-center gap-3">
+              <Send className="w-6 h-6 text-indigo-500" /> Compose Custom Email
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground">
+              Send a direct manual message to {client.name}.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSendCustomEmail} className="space-y-5 mt-4">
+            <div className="space-y-2">
+              <Label>Recipient Email</Label>
+              <Input
+                type="email"
+                value={customRecipientEmail}
+                onChange={(e) => setCustomRecipientEmail(e.target.value)}
+                placeholder="client@company.com"
+                className="bg-background border-border h-11 rounded-xl"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Subject</Label>
+              <Input
+                value={customSubject}
+                onChange={(e) => setCustomSubject(e.target.value)}
+                placeholder="Email Subject"
+                className="bg-background border-border h-11 rounded-xl"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Message</Label>
+              <textarea
+                className="w-full bg-background border border-border rounded-xl p-3 text-sm min-h-[160px] focus:ring-2 focus:ring-indigo-500 text-foreground"
+                value={customMessage}
+                onChange={(e) => setCustomMessage(e.target.value)}
+                placeholder="Type your email body here..."
+                required
+              />
+            </div>
+            <DialogFooter>
+              <Button type="submit" disabled={sendingCustomEmail} className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold w-full h-12 shadow-xl shadow-indigo-500/20 rounded-xl mt-2 border-0">
+                {sendingCustomEmail ? "Sending Email..." : "Send Custom Email"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

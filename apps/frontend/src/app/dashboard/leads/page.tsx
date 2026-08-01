@@ -597,17 +597,6 @@ export default function LeadsPage() {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent className="bg-card border-border text-foreground min-w-[180px] rounded-2xl shadow-2xl p-2">
                             <DropdownMenuItem 
-                              onClick={() => {
-                                setSelectedLeadForEmail(lead);
-                                setEmailSubject(`Regarding safety compliance at ${lead.company_name}`);
-                                setEmailMessage(`Dear ${lead.contact_person},\n\nWe wanted to follow up on your recent request for safety compliance solutions...\n\nBest regards,\nGlobal Safety Solution`);
-                                setOpenEmailModal(true);
-                              }}
-                              className="hover:bg-accent/10 cursor-pointer flex items-center gap-3 py-3 rounded-xl font-bold text-sm"
-                            >
-                              <Mail className="w-4 h-4 text-muted-foreground" /> Send Email
-                            </DropdownMenuItem>
-                            <DropdownMenuItem 
                               onClick={() => router.push(`/dashboard/quotations?leadId=${lead.id}`)}
                               className="hover:bg-primary/10 hover:text-primary cursor-pointer flex items-center gap-3 py-3 rounded-xl font-bold text-sm"
                             >
