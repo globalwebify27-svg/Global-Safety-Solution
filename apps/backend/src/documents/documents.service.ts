@@ -298,12 +298,18 @@ export class DocumentsService {
       // Convert clientMap and projectMaps to clean response hierarchy
       const hierarchy = Array.from(clientMap.values())
         .map((clientNode) => {
-          const projectsList = Array.from(clientNode.projectMap.values()).filter((p: any) => p.certificates.length > 0);
+          const projectsList = Array.from(clientNode.projectMap.values())
+            .filter((p: any) => p.certificates.length > 0)
+            .map((p: any) => ({
+              ...p,
+              is_general: p.project_id === 'general',
+            }));
           return {
             client_id: clientNode.client_id,
             client_name: clientNode.client_name,
             industry: clientNode.industry,
             city: clientNode.city,
+            total_projects: projectsList.length,
             projects: projectsList,
             total_certificates: clientNode.total_certificates,
           };

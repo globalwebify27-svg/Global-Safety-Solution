@@ -841,19 +841,19 @@ export default function DocumentVaultPage() {
                         </div>
                         <div>
                           <div className="flex items-center gap-3">
-                            <h2 className="text-lg font-bold text-foreground">{clientNode.client_name}</h2>
-                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
-                              {clientNode.total_certificates} {clientNode.total_certificates === 1 ? 'Certificate' : 'Certificates'}
+                            <h2 className="text-lg font-black tracking-tight text-foreground">{clientNode.client_name}</h2>
+                            <span className="px-3 py-1 rounded-full text-[11px] font-extrabold tracking-wide bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                              {(clientNode as any).total_projects || clientNode.projects.length} {(clientNode as any).total_projects === 1 ? 'Project' : 'Projects'} • {clientNode.total_certificates} {clientNode.total_certificates === 1 ? 'Certificate' : 'Certificates'}
                             </span>
                           </div>
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            {clientNode.projects.length} {clientNode.projects.length === 1 ? 'Project Folder' : 'Project Folders'} • {clientNode.city || clientNode.industry || 'Client Organization'}
+                          <p className="text-xs text-muted-foreground mt-1 flex items-center gap-2">
+                            <span>📍 Location: {clientNode.city || clientNode.industry || 'Headquarters'}</span>
                           </p>
                         </div>
                       </div>
 
                       <div className="flex items-center gap-2 text-muted-foreground">
-                        {isClientExpanded ? <ChevronDown className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
+                        {isClientExpanded ? <ChevronDown className="w-5 h-5 text-blue-500" /> : <ChevronRight className="w-5 h-5" />}
                       </div>
                     </div>
 
@@ -877,22 +877,54 @@ export default function DocumentVaultPage() {
                                 {/* Project Folder Header */}
                                 <div
                                   onClick={() => toggleProjectExpand(projKey)}
-                                  className="p-4 bg-muted/20 hover:bg-accent/10 cursor-pointer flex items-center justify-between transition-colors select-none"
+                                  className={cn(
+                                    "p-4 cursor-pointer flex items-center justify-between transition-colors select-none",
+                                    (projectNode as any).is_general || projectNode.project_id === 'general'
+                                      ? "bg-amber-500/5 hover:bg-amber-500/10 border-b border-amber-500/20"
+                                      : "bg-muted/20 hover:bg-accent/10"
+                                  )}
                                 >
                                   <div className="flex items-center gap-3">
-                                    <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
-                                      <Briefcase className="w-4 h-4" />
+                                    <div className={cn(
+                                      "w-9 h-9 rounded-xl flex items-center justify-center font-bold border",
+                                      (projectNode as any).is_general || projectNode.project_id === 'general'
+                                        ? "bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400"
+                                        : "bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400"
+                                    )}>
+                                      {(projectNode as any).is_general || projectNode.project_id === 'general' ? (
+                                        <FolderOpen className="w-4 h-4" />
+                                      ) : (
+                                        <Briefcase className="w-4 h-4" />
+                                      )}
                                     </div>
                                     <div>
-                                      <div className="flex items-center gap-2">
-                                        <h3 className="text-sm font-bold text-foreground">{projectNode.project_name}</h3>
-                                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest bg-muted px-2 py-0.5 rounded-md">
-                                          {projectNode.certificates.length} {projectNode.certificates.length === 1 ? 'File' : 'Files'}
+                                      <div className="flex flex-wrap items-center gap-2">
+                                        {((projectNode as any).is_general || projectNode.project_id === 'general') ? (
+                                          <h3 className="text-sm font-black text-amber-600 dark:text-amber-400">
+                                            General / Direct Client Certificates
+                                          </h3>
+                                        ) : (
+                                          <>
+                                            <span className="text-[10px] font-mono font-bold text-blue-600 dark:text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20">
+                                              Project ID: {projectNode.project_id.length > 20 ? `GSS-PROJ-${projectNode.project_id.substring(0, 8).toUpperCase()}` : projectNode.project_id}
+                                            </span>
+                                            <h3 className="text-sm font-bold text-foreground">{projectNode.project_name}</h3>
+                                          </>
+                                        )}
+                                        <span className="text-[10px] font-extrabold text-muted-foreground uppercase tracking-widest bg-muted px-2 py-0.5 rounded-md border border-border">
+                                          {projectNode.certificates.length} {projectNode.certificates.length === 1 ? 'Certificate' : 'Certificates'}
                                         </span>
+                                        {projectNode.status && (projectNode as any).project_id !== 'general' && (
+                                          <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                                            {projectNode.status}
+                                          </span>
+                                        )}
                                       </div>
-                                      {projectNode.description && (
-                                        <p className="text-[11px] text-muted-foreground line-clamp-1">{projectNode.description}</p>
-                                      )}
+                                      <p className="text-[11px] text-muted-foreground mt-0.5">
+                                        {(projectNode as any).is_general || projectNode.project_id === 'general'
+                                          ? 'Certificates stored directly under client without specific project assignment'
+                                          : (projectNode.description || 'Institutional safety inspection project')}
+                                      </p>
                                     </div>
                                   </div>
 
