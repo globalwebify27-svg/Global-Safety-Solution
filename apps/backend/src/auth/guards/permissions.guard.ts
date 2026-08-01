@@ -45,9 +45,9 @@ const PERMISSION_MAP: Record<string, string[]> = {
   'DELETE_ASSET': ['MANAGE_SYSTEM_SETTINGS'],
 
   // Documents
-  'READ_DOCUMENT': ['READ_DOCUMENT'],
-  'CREATE_DOCUMENT': ['CREATE_DOCUMENT'],
-  'DELETE_DOCUMENT': ['DELETE_DOCUMENT'],
+  'READ_DOCUMENT': ['READ_DOCUMENT', 'VIEW_FIELD_TASKS', 'VIEW_INSPECTIONS', 'MANAGE_INSPECTIONS'],
+  'CREATE_DOCUMENT': ['CREATE_DOCUMENT', 'VIEW_FIELD_TASKS', 'MANAGE_INSPECTIONS', 'VIEW_INSPECTIONS'],
+  'DELETE_DOCUMENT': ['DELETE_DOCUMENT', 'MANAGE_INSPECTIONS'],
 
   // Settings
   'READ_SETTING': ['MANAGE_SYSTEM_SETTINGS'],
@@ -88,7 +88,16 @@ export class PermissionsGuard implements CanActivate {
     if (!populatedUser) return false;
 
     const admins = ['admin@globalsafety.com', 'amrvbloggers@gmail.com'];
-    if (admins.includes(populatedUser.email)) {
+    const isAdmin =
+      admins.includes(populatedUser.email) ||
+      populatedUser.roles?.some(
+        (ur: any) =>
+          ur.role?.name === 'SUPER_ADMIN' ||
+          ur.role?.name === 'ADMIN' ||
+          ur.role?.name === 'ORGANIZATION_ADMIN',
+      );
+
+    if (isAdmin) {
       return true;
     }
 
@@ -97,6 +106,20 @@ export class PermissionsGuard implements CanActivate {
         (ur: any) =>
           ur.role?.name === 'CLIENT' || ur.role?.name === 'CLIENTS',
       ) || (populatedUser.designation || '').toUpperCase().includes('CLIENT');
+
+    // For ALL internal active staff/employees (non-client users), grant access to document uploads, inspections, and field task operations
+    if (!isClientRole) {
+      const internalStaffPermissions = [
+        'CREATE_DOCUMENT', 'READ_DOCUMENT', 
+        'VIEW_FIELD_TASKS', 'UPDATE_TASK', 'CREATE_TASK', 'READ_TASK',
+        'VIEW_INSPECTIONS', 'MANAGE_INSPECTIONS',
+        'VIEW_PROJECTS', 'MANAGE_PROJECTS',
+        'VIEW_COMPLIANCE', 'MANAGE_COMPLIANCE'
+      ];
+      if (requiredPermissions.some((p) => internalStaffPermissions.includes(p))) {
+        return true;
+      }
+    }
 
     if (isClientRole && (request.method === 'GET' || requiredPermissions.every((p) => p.startsWith('READ_') || p.startsWith('VIEW_')))) {
       return true;

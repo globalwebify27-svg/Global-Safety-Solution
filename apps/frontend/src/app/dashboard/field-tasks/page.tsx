@@ -263,7 +263,8 @@ export default function FieldTasksPage() {
     }
     
     const baseUrl = API_BASE_URL.endsWith("/") ? API_BASE_URL.slice(0, -1) : API_BASE_URL;
-    return `${baseUrl}${cleanPath}`;
+    const origin = baseUrl.replace(/\/api$/, "");
+    return `${origin}${cleanPath}`;
   };
 
   const calculateInitialValidity = (testDateStr?: string | null, expiryDateStr?: string | null) => {
