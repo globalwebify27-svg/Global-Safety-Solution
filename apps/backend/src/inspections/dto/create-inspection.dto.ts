@@ -53,6 +53,11 @@ export class CreateInspectionDto {
   engineer_id?: string;
 
   @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  engineer_ids?: string[];
+
+  @IsOptional()
   @IsUUID()
   work_order_id?: string;
 
@@ -86,6 +91,11 @@ export class UpdateInspectionDto {
   @IsOptional()
   @IsUUID()
   engineer_id?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  engineer_ids?: string[];
 
   @IsOptional()
   @IsUUID()

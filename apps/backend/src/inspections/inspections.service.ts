@@ -24,16 +24,35 @@ export class InspectionsService {
   ) {}
 
   async create(data: CreateInspectionDto) {
-    const { items, ...inspectionData } = data;
+    const { items, engineer_ids, ...inspectionData } = data;
+
+    const assignedEngIds: string[] = Array.isArray(engineer_ids) && engineer_ids.length > 0
+      ? Array.from(new Set(engineer_ids.filter(Boolean)))
+      : (inspectionData.engineer_id ? [inspectionData.engineer_id] : []);
+
+    const primaryEngId = assignedEngIds[0] || inspectionData.engineer_id || null;
+
     const inspection = await this.prisma.inspection.create({
       data: {
         ...inspectionData,
+        engineer_id: primaryEngId,
         scheduled_date: new Date(inspectionData.scheduled_date),
         items: {
           create: items || [],
         },
+        engineers: {
+          create: assignedEngIds.map((engId) => ({
+            engineer_id: engId,
+          })),
+        },
       },
-      include: { items: true, client: true, engineer: true, work_order: true },
+      include: {
+        items: true,
+        client: true,
+        engineer: true,
+        engineers: { include: { engineer: true } },
+        work_order: true,
+      },
     });
 
     let targetProjectId = inspection.project_id;
@@ -70,12 +89,13 @@ export class InspectionsService {
       }
     }
 
-    if (inspection.engineer_id) {
+    // Notify ALL assigned engineers
+    for (const engId of assignedEngIds) {
       try {
         const clientName = inspection.client?.name || 'Client';
         const formattedDate = new Date(inspection.scheduled_date).toLocaleDateString();
         await this.notificationsService.create({
-          user_id: inspection.engineer_id,
+          user_id: engId,
           title: '📅 Site Inspection Scheduled',
           message: `You have been scheduled for a Safety Audit inspection for ${clientName} on ${formattedDate}.`,
           type: 'INFO',
@@ -156,43 +176,110 @@ export class InspectionsService {
       }
     }
 
-    return this.prisma.inspection.findMany({
-      where: clientId ? { client_id: clientId } : undefined,
-      include: {
-        client: true,
-        engineer: true,
-        project: true,
-        work_order: true,
-        items: true,
-        expenditures: true,
-      },
-      orderBy: { scheduled_date: 'desc' },
-    });
+    try {
+      return await this.prisma.inspection.findMany({
+        where: clientId ? { client_id: clientId } : undefined,
+        include: {
+          client: true,
+          engineer: true,
+          engineers: { include: { engineer: true } },
+          project: true,
+          work_order: true,
+          items: true,
+          expenditures: true,
+        },
+        orderBy: { scheduled_date: 'desc' },
+      });
+    } catch (e: any) {
+      if (e?.code === 'P2021') {
+        return await this.prisma.inspection.findMany({
+          where: clientId ? { client_id: clientId } : undefined,
+          include: {
+            client: true,
+            engineer: true,
+            project: true,
+            work_order: true,
+            items: true,
+            expenditures: true,
+          },
+          orderBy: { scheduled_date: 'desc' },
+        });
+      }
+      throw e;
+    }
   }
 
   async findOne(id: string) {
-    const inspection = await this.prisma.inspection.findUnique({
-      where: { id },
-      include: {
-        client: true,
-        engineer: true,
-        project: true,
-        work_order: {
-          include: {
-            service_product: true,
+    let inspection: any = null;
+    try {
+      inspection = await this.prisma.inspection.findUnique({
+        where: { id },
+        include: {
+          client: true,
+          engineer: true,
+          engineers: { include: { engineer: true } },
+          project: true,
+          work_order: {
+            include: {
+              service_product: true,
+            },
           },
+          items: true,
+          expenditures: true,
+          certificates: true,
         },
-        items: true,
-        expenditures: true,
-        certificates: true,
-      },
-    });
+      });
+    } catch (e: any) {
+      if (e?.code === 'P2021') {
+        inspection = await this.prisma.inspection.findUnique({
+          where: { id },
+          include: {
+            client: true,
+            engineer: true,
+            project: true,
+            work_order: {
+              include: {
+                service_product: true,
+              },
+            },
+            items: true,
+            expenditures: true,
+            certificates: true,
+          },
+        });
+      } else {
+        throw e;
+      }
+    }
     if (!inspection) throw new NotFoundException('Inspection not found');
     return inspection;
   }
 
   async update(id: string, data: UpdateInspectionDto) {
-    const { admin_feedback, draft_cert_type, draft_cert_data, expenditures, ...rest } = data;
+    const { admin_feedback, draft_cert_type, draft_cert_data, expenditures, engineer_ids, ...rest } = data;
+
+    if (engineer_ids !== undefined) {
+      const assignedEngIds = Array.isArray(engineer_ids)
+        ? Array.from(new Set(engineer_ids.filter(Boolean)))
+        : (rest.engineer_id ? [rest.engineer_id] : []);
+
+      const primaryEngId = assignedEngIds[0] || rest.engineer_id;
+      if (primaryEngId) rest.engineer_id = primaryEngId;
+
+      await this.prisma.inspectionEngineer.deleteMany({
+        where: { inspection_id: id },
+      });
+
+      if (assignedEngIds.length > 0) {
+        await this.prisma.inspectionEngineer.createMany({
+          data: assignedEngIds.map((engId) => ({
+            inspection_id: id,
+            engineer_id: engId,
+          })),
+        });
+      }
+    }
+
     const completed_date = rest.completed_date
       ? new Date(rest.completed_date)
       : undefined;
@@ -200,43 +287,15 @@ export class InspectionsService {
       ? new Date(rest.scheduled_date)
       : undefined;
 
-    if (expenditures !== undefined) {
-      await this.prisma.inspectionExpenditure.deleteMany({ where: { inspection_id: id } });
-      if (expenditures && expenditures.length > 0) {
-        await this.prisma.inspectionExpenditure.createMany({
-          data: expenditures.map(exp => ({
-            inspection_id: id,
-            date: new Date(exp.date),
-            amount: exp.amount,
-            note: exp.note,
-          }))
-        });
-      }
-      const totalExpenditure = (expenditures || []).reduce((sum, item) => sum + Number(item.amount), 0);
-      rest.expenditure = totalExpenditure;
-    }
-
-    // Handle JSON remarks updates safely
-    let updatedRemarks = rest.remarks;
-    if (admin_feedback !== undefined || draft_cert_type !== undefined || draft_cert_data !== undefined) {
-      const current = await this.prisma.inspection.findUnique({ where: { id } });
+    let updatedRemarks: string | undefined = undefined;
+    if (admin_feedback !== undefined || draft_cert_type !== undefined || draft_cert_data !== undefined || rest.remarks !== undefined) {
+      const existingInspection = await this.prisma.inspection.findUnique({ where: { id } });
       let currentRemarksJson: any = {};
-      if (current?.remarks) {
-        if (current.remarks.startsWith('{') && current.remarks.endsWith('}')) {
-          try {
-            currentRemarksJson = JSON.parse(current.remarks);
-          } catch (e) {
-            currentRemarksJson = { legacy_text: current.remarks };
-          }
-        } else if (current.remarks.startsWith('Verification Photos: ')) {
-          try {
-            const urls = JSON.parse(current.remarks.replace('Verification Photos: ', ''));
-            currentRemarksJson = { verification_photos: urls };
-          } catch (e) {
-            currentRemarksJson = { legacy_text: current.remarks };
-          }
-        } else {
-          currentRemarksJson = { legacy_text: current.remarks };
+      if (existingInspection?.remarks) {
+        try {
+          currentRemarksJson = JSON.parse(existingInspection.remarks);
+        } catch (e) {
+          currentRemarksJson = { legacy_text: existingInspection.remarks };
         }
       }
 
@@ -257,6 +316,22 @@ export class InspectionsService {
       }
 
       updatedRemarks = JSON.stringify(currentRemarksJson);
+    }
+
+    if (expenditures !== undefined) {
+      await this.prisma.inspectionExpenditure.deleteMany({ where: { inspection_id: id } });
+      if (expenditures && expenditures.length > 0) {
+        await this.prisma.inspectionExpenditure.createMany({
+          data: expenditures.map(exp => ({
+            inspection_id: id,
+            date: new Date(exp.date),
+            amount: exp.amount,
+            note: exp.note,
+          }))
+        });
+      }
+      const totalExpenditure = (expenditures || []).reduce((sum, item) => sum + Number(item.amount), 0);
+      rest.expenditure = totalExpenditure;
     }
 
     // If status is changed away from COMPLETED, clean up existing certificate & compliance
@@ -286,6 +361,7 @@ export class InspectionsService {
         items: true,
         client: true,
         engineer: true,
+        engineers: { include: { engineer: true } },
         work_order: {
           include: {
             service_product: true,
@@ -593,10 +669,13 @@ export class InspectionsService {
         OR: [
           { engineer_id: engineerId },
           { assigned_staff_id: engineerId },
+          { engineers: { some: { engineer_id: engineerId } } },
         ],
       },
       include: {
         client: true,
+        engineer: true,
+        engineers: { include: { engineer: true } },
         project: true,
         work_order: {
           include: {

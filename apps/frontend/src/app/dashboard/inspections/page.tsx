@@ -63,6 +63,7 @@ interface Inspection {
   id: string;
   client: { name: string };
   engineer?: { name: string };
+  engineers?: Array<{ id: string; engineer: { id: string; name: string } }>;
   engineer_id?: string;
   scheduled_date: string;
   status: string;
@@ -335,6 +336,9 @@ export default function InspectionsPage() {
   });
   const [schedulePdf, setSchedulePdf] = useState<File | null>(null);
   const [itemValidityPeriods, setItemValidityPeriods] = useState<Record<string, string>>({});
+  const [selectedEngineerIds, setSelectedEngineerIds] = useState<string[]>([]);
+  const [engineerSearchQuery, setEngineerSearchQuery] = useState("");
+  const [isEngineerDropdownOpen, setIsEngineerDropdownOpen] = useState(false);
 
   const { token, user } = useAuthStore();
   const roleName = user?.roles?.[0]?.role?.name || "";
@@ -537,7 +541,8 @@ export default function InspectionsPage() {
 
       const payload: any = {
         client_id: scheduleForm.client_id,
-        engineer_id: scheduleForm.engineer_id,
+        engineer_id: selectedEngineerIds[0] || scheduleForm.engineer_id || null,
+        engineer_ids: selectedEngineerIds,
         assigned_staff_id: scheduleForm.assigned_staff_id || null,
         scheduled_date: scheduleForm.scheduled_date,
         items: [{ description: "General Safety Check" }]
@@ -1067,16 +1072,116 @@ export default function InspectionsPage() {
                     </select>
                   </div>
                   <div className="space-y-2">
-                    <Label>Assign Engineer</Label>
-                    <select 
-                      required
-                      value={scheduleForm.engineer_id}
-                      onChange={(e) => setScheduleForm({...scheduleForm, engineer_id: e.target.value})}
-                      className="w-full h-11 px-4 bg-background border border-border rounded-xl text-sm"
-                    >
-                      <option value="">Select engineer...</option>
-                      {engineers.map(e => <option key={e.id} value={e.id}>{e.name} ({e.employee_id || e.designation || 'Field Engineer'})</option>)}
-                    </select>
+                    <Label className="flex items-center justify-between">
+                      <span>Assign Engineers (Single or Multiple)</span>
+                      {selectedEngineerIds.length > 0 && (
+                        <span className="text-xs font-bold text-blue-600 dark:text-blue-400">
+                          {selectedEngineerIds.length} Selected
+                        </span>
+                      )}
+                    </Label>
+
+                    {/* Selected Engineer Chips */}
+                    {selectedEngineerIds.length > 0 && (
+                      <div className="flex flex-wrap gap-2 p-2 bg-muted/30 border border-border rounded-xl mb-2">
+                        {selectedEngineerIds.map((id) => {
+                          const eng = engineers.find((e) => e.id === id);
+                          return (
+                            <span
+                              key={id}
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20"
+                            >
+                              <User className="w-3.5 h-3.5" />
+                              {eng?.name || 'Engineer'}
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setSelectedEngineerIds((prev) =>
+                                    prev.filter((item) => item !== id)
+                                  )
+                                }
+                                className="ml-1 text-blue-500 hover:text-rose-500 focus:outline-none"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </span>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* Multi-select Dropdown / Search Box */}
+                    <div className="relative">
+                      <Input
+                        placeholder="Search & select engineers..."
+                        value={engineerSearchQuery}
+                        onChange={(e) => {
+                          setEngineerSearchQuery(e.target.value);
+                          setIsEngineerDropdownOpen(true);
+                        }}
+                        onFocus={() => setIsEngineerDropdownOpen(true)}
+                        className="h-11 bg-background border-border pr-8 text-sm"
+                      />
+                      <Search className="w-4 h-4 text-muted-foreground absolute right-3 top-3.5 pointer-events-none" />
+
+                      {isEngineerDropdownOpen && (
+                        <div className="absolute z-50 left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-background border border-border rounded-xl shadow-xl p-1.5 space-y-1">
+                          {engineers
+                            .filter((e) =>
+                              e.name.toLowerCase().includes(engineerSearchQuery.toLowerCase()) ||
+                              (e.employee_id || '').toLowerCase().includes(engineerSearchQuery.toLowerCase())
+                            )
+                            .map((e) => {
+                              const isSelected = selectedEngineerIds.includes(e.id);
+                              return (
+                                <div
+                                  key={e.id}
+                                  onClick={() => {
+                                    if (isSelected) {
+                                      setSelectedEngineerIds((prev) => prev.filter((id) => id !== e.id));
+                                    } else {
+                                      setSelectedEngineerIds((prev) => [...prev, e.id]);
+                                    }
+                                  }}
+                                  className={cn(
+                                    "px-3 py-2 rounded-lg text-xs font-medium cursor-pointer flex items-center justify-between transition-colors",
+                                    isSelected
+                                      ? "bg-blue-500/10 text-blue-600 dark:text-blue-400 font-bold"
+                                      : "hover:bg-muted text-foreground"
+                                  )}
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <div className={cn(
+                                      "w-4 h-4 rounded border flex items-center justify-center text-[10px]",
+                                      isSelected ? "bg-blue-600 text-white border-blue-600" : "border-muted-foreground/40"
+                                    )}>
+                                      {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
+                                    </div>
+                                    <span>{e.name}</span>
+                                    <span className="text-[10px] text-muted-foreground">({e.employee_id || e.designation || 'Field Engineer'})</span>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          {engineers.length === 0 && (
+                            <div className="p-3 text-center text-xs text-muted-foreground italic">
+                              No engineers found.
+                            </div>
+                          )}
+                          <div className="pt-1 text-right">
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setIsEngineerDropdownOpen(false)}
+                              className="h-6 text-[10px] text-muted-foreground hover:text-foreground"
+                            >
+                              Close Dropdown
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <Label>Data Entry Staff (Optional)</Label>
@@ -1208,10 +1313,30 @@ export default function InspectionsPage() {
                       </div>
                     </td>
                     <td className="px-8 py-6">
-                      <div className="flex items-center gap-2">
-                        <User className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-sm font-medium">{i.engineer?.name || "Unassigned"}</span>
-                      </div>
+                      {(() => {
+                        const engList = (i.engineers || []).map((ie: any) => ie.engineer).filter(Boolean);
+                        if (engList.length > 0) {
+                          return (
+                            <div className="flex flex-wrap items-center gap-1.5 max-w-[220px]">
+                              {engList.map((eng: any) => (
+                                <span
+                                  key={eng.id}
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20"
+                                >
+                                  <User className="w-3 h-3" />
+                                  {eng.name}
+                                </span>
+                              ))}
+                            </div>
+                          );
+                        }
+                        return (
+                          <div className="flex items-center gap-2">
+                            <User className="w-4 h-4 text-muted-foreground" />
+                            <span className="text-sm font-medium">{i.engineer?.name || "Unassigned"}</span>
+                          </div>
+                        );
+                      })()}
                     </td>
                     <td className="px-8 py-6">
                       <div className="flex items-center gap-2 text-sm">
@@ -1319,8 +1444,28 @@ export default function InspectionsPage() {
                     </p>
                   </div>
                   <div className="col-span-2">
-                    <span className="text-[10px] font-bold text-muted-foreground uppercase">Assigned Field Engineer</span>
-                    <p className="font-bold mt-0.5">{selectedInspection.engineer?.name || "Unassigned"}</p>
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase">Assigned Field Engineers</span>
+                    <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                      {(() => {
+                        const engList = (selectedInspection.engineers || []).map((ie: any) => ie.engineer).filter(Boolean);
+                        if (engList.length > 0) {
+                          return engList.map((eng: any) => (
+                            <span
+                              key={eng.id}
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20"
+                            >
+                              <User className="w-3.5 h-3.5" />
+                              {eng.name}
+                            </span>
+                          ));
+                        }
+                        return (
+                          <p className="font-bold text-sm text-foreground">
+                            {selectedInspection.engineer?.name || "Unassigned"}
+                          </p>
+                        );
+                      })()}
+                    </div>
                   </div>
                   {selectedInspection.pdf_url && (
                     <div className="col-span-2">
@@ -1445,34 +1590,107 @@ export default function InspectionsPage() {
                     </div>
     
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-muted-foreground uppercase">Assign Engineer</label>
-                        <select
-                          value={selectedInspection.engineer_id || ""}
-                          onChange={async (e) => {
-                            const newEngineerId = e.target.value;
-                            if (!token) return;
-                            try {
-                              const res = await fetch(`${API_BASE_URL}/inspections/${selectedInspection.id}`, {
-                                method: 'PATCH',
-                                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                                body: JSON.stringify({ engineer_id: newEngineerId || null })
-                              });
-                              if (res.ok) {
-                                toast.success("Engineer reassigned successfully!");
-                                await fetchSingleInspection(selectedInspection.id);
-                              }
-                            } catch (err) {
-                              toast.error("Failed to reassign engineer");
+                      {/* Multi-Engineer Assignment Control */}
+                      <div className="space-y-1 md:col-span-2">
+                        <div className="flex items-center justify-between">
+                          <label className="text-[10px] font-bold text-muted-foreground uppercase">
+                            Assigned Engineers ({((selectedInspection.engineers && selectedInspection.engineers.length > 0)
+                              ? selectedInspection.engineers.length
+                              : (selectedInspection.engineer_id ? 1 : 0))} Assigned)
+                          </label>
+                        </div>
+
+                        {/* Engineer Chips List */}
+                        <div className="flex flex-wrap items-center gap-1.5 p-2 bg-background border border-border rounded-xl min-h-[40px]">
+                          {(() => {
+                            const assignedList = (selectedInspection.engineers && selectedInspection.engineers.length > 0)
+                              ? selectedInspection.engineers.map((ie: any) => ie.engineer).filter(Boolean)
+                              : (selectedInspection.engineer ? [selectedInspection.engineer] : []);
+
+                            if (assignedList.length === 0) {
+                              return <span className="text-xs text-muted-foreground italic px-1">No engineers assigned</span>;
                             }
-                          }}
-                          className="w-full h-10 px-3 bg-background border border-border rounded-xl text-xs font-semibold focus:outline-none"
-                        >
-                          <option value="">Unassigned</option>
-                          {engineers.map(eng => (
-                            <option key={eng.id} value={eng.id}>{eng.name} ({eng.employee_id || eng.designation || 'Field Engineer'})</option>
-                          ))}
-                        </select>
+
+                            return assignedList.map((eng: any) => (
+                              <span
+                                key={eng.id}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 shadow-sm"
+                              >
+                                <User className="w-3.5 h-3.5" />
+                                {eng.name}
+                                <button
+                                  type="button"
+                                  title="Remove engineer"
+                                  onClick={async () => {
+                                    const currentIds = (selectedInspection.engineers && selectedInspection.engineers.length > 0)
+                                      ? selectedInspection.engineers.map((ie: any) => ie.engineer_id || ie.engineer?.id).filter(Boolean)
+                                      : (selectedInspection.engineer_id ? [selectedInspection.engineer_id] : []);
+                                    const updatedIds = currentIds.filter((id: string) => id !== eng.id);
+                                    
+                                    try {
+                                      const res = await fetch(`${API_BASE_URL}/inspections/${selectedInspection.id}`, {
+                                        method: 'PATCH',
+                                        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                                        body: JSON.stringify({ engineer_ids: updatedIds })
+                                      });
+                                      if (res.ok) {
+                                        toast.success(`Removed ${eng.name}`);
+                                        await fetchSingleInspection(selectedInspection.id);
+                                      }
+                                    } catch (err) {
+                                      toast.error("Failed to update assigned engineers");
+                                    }
+                                  }}
+                                  className="ml-1 text-blue-500 hover:text-rose-500 focus:outline-none"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </span>
+                            ));
+                          })()}
+                        </div>
+
+                        {/* Add Co-Engineer Dropdown */}
+                        <div className="pt-1">
+                          <select
+                            value=""
+                            onChange={async (e) => {
+                              const newEngId = e.target.value;
+                              if (!newEngId || !token) return;
+                              const currentIds = (selectedInspection.engineers && selectedInspection.engineers.length > 0)
+                                ? selectedInspection.engineers.map((ie: any) => ie.engineer_id || ie.engineer?.id).filter(Boolean)
+                                : (selectedInspection.engineer_id ? [selectedInspection.engineer_id] : []);
+                              
+                              if (currentIds.includes(newEngId)) {
+                                toast.info("Engineer is already assigned.");
+                                return;
+                              }
+
+                              const updatedIds = [...currentIds, newEngId];
+                              try {
+                                const res = await fetch(`${API_BASE_URL}/inspections/${selectedInspection.id}`, {
+                                  method: 'PATCH',
+                                  headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                                  body: JSON.stringify({ engineer_ids: updatedIds })
+                                });
+                                if (res.ok) {
+                                  toast.success("Engineer added successfully!");
+                                  await fetchSingleInspection(selectedInspection.id);
+                                }
+                              } catch (err) {
+                                toast.error("Failed to add engineer");
+                              }
+                            }}
+                            className="w-full h-9 px-3 bg-background border border-border rounded-xl text-xs font-medium text-muted-foreground focus:outline-none"
+                          >
+                            <option value="">+ Add engineer to this audit...</option>
+                            {engineers.map((eng) => (
+                              <option key={eng.id} value={eng.id}>
+                                {eng.name} ({eng.employee_id || eng.designation || 'Field Engineer'})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
                       </div>
                       
                       <div className="space-y-1">

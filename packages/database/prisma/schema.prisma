@@ -50,6 +50,7 @@ model User {
   tasks                   Task[]
   user_feature_overrides  UserFeatureOverride[]
   roles                   UserRole[]
+  co_assigned_inspections InspectionEngineer[]
 
   @@map("users")
 }
@@ -669,6 +670,7 @@ model Inspection {
   items          InspectionItem[]
   report         InspectionReport?
   expenditures   InspectionExpenditure[]
+  engineers      InspectionEngineer[]
   client         Client            @relation(fields: [client_id], references: [id], onDelete: Cascade)
   engineer       User?             @relation(fields: [engineer_id], references: [id])
   project        Project?          @relation(fields: [project_id], references: [id])
@@ -679,6 +681,20 @@ model Inspection {
   @@index([project_id], map: "inspections_project_id_fkey")
   @@index([work_order_id], map: "inspections_work_order_id_fkey")
   @@map("inspections")
+}
+
+model InspectionEngineer {
+  id            String     @id @default(uuid()) @db.VarChar(36)
+  inspection_id String     @db.VarChar(36)
+  engineer_id   String     @db.VarChar(36)
+  created_at    DateTime   @default(now()) @db.DateTime(6)
+  inspection    Inspection @relation(fields: [inspection_id], references: [id], onDelete: Cascade)
+  engineer      User       @relation(fields: [engineer_id], references: [id], onDelete: Cascade)
+
+  @@unique([inspection_id, engineer_id])
+  @@index([inspection_id])
+  @@index([engineer_id])
+  @@map("inspection_engineers")
 }
 
 model InspectionExpenditure {
