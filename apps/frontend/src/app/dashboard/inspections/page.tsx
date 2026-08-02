@@ -81,6 +81,7 @@ interface Inspection {
   expenditures?: any[];
   certificates?: any[];
   assigned_staff_id?: string | null;
+  work_order?: any;
 }
 
 function PdfPreviewer({ url }: { url: string }) {
@@ -1555,12 +1556,23 @@ export default function InspectionsPage() {
             ) : (
               <div className="space-y-6">
                 <DialogHeader>
-                  <DialogTitle className="text-2xl font-black flex items-center gap-3">
-                    <ClipboardCheck className="w-6 h-6 text-blue-600" /> {selectedInspection.status === 'PENDING_REVIEW' || selectedInspection.status === 'IN_PROGRESS' ? 'Office Review & Issuance' : 'Inspection Checklist'}
-                  </DialogTitle>
-                  <DialogDescription>
-                    Site Visit for <span className="font-bold text-foreground">{selectedInspection.client?.name}</span>
-                  </DialogDescription>
+                  <div className="space-y-1">
+                    <DialogTitle className="text-2xl font-black text-foreground tracking-tight break-words">
+                      {selectedInspection.client?.name || "Client Site Visit"}
+                    </DialogTitle>
+                    <DialogDescription className="text-sm font-semibold text-muted-foreground flex flex-wrap items-center gap-2">
+                      <ClipboardCheck className="w-4 h-4 text-blue-600 inline-block shrink-0" />
+                      <span>{selectedInspection.status === 'PENDING_REVIEW' || selectedInspection.status === 'IN_PROGRESS' ? 'Office Review & Issuance' : 'Inspection Details'}</span>
+                      {selectedInspection.work_order?.work_order_no && (
+                        <>
+                          <span className="text-xs text-muted-foreground/40">•</span>
+                          <span className="text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-500/10 px-2.5 py-0.5 rounded-full border border-blue-500/20">
+                            WO: {selectedInspection.work_order.work_order_no}
+                          </span>
+                        </>
+                      )}
+                    </DialogDescription>
+                  </div>
                 </DialogHeader>
   
                 {/* Rejection Banner */}

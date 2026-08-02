@@ -988,13 +988,27 @@ export default function FieldTasksPage() {
   if (view === 'details' && selectedTask) {
     return (
       <div className="flex flex-col h-[calc(100vh-120px)] md:h-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
-        <div className="flex items-center gap-4 mb-6">
-          <Button variant="ghost" size="icon" className="rounded-full" onClick={() => setView('list')}>
+        <div className="flex items-start md:items-center gap-4 mb-6">
+          <Button variant="ghost" size="icon" className="rounded-full mt-1 md:mt-0 hover:bg-accent/10 transition-colors shrink-0" onClick={() => setView('list')}>
             <ArrowLeft className="w-6 h-6" />
           </Button>
-          <div>
-            <h1 className="text-2xl font-black text-foreground">Inspection Details</h1>
-            <p className="text-sm text-muted-foreground">{selectedTask.client.name}</p>
+          <div className="space-y-0.5 min-w-0">
+            <h1 className="text-2xl lg:text-3xl font-black tracking-tight text-foreground leading-tight break-words">
+              {selectedTask.client.name}
+            </h1>
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-sm font-semibold text-muted-foreground">
+                Inspection Details
+              </h2>
+              {selectedTask.work_order?.work_order_no && (
+                <>
+                  <span className="text-xs text-muted-foreground/40">•</span>
+                  <span className="text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-500/10 px-2.5 py-0.5 rounded-full border border-blue-500/20">
+                    WO: {selectedTask.work_order.work_order_no}
+                  </span>
+                </>
+              )}
+            </div>
           </div>
         </div>
 

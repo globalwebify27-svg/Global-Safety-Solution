@@ -45,6 +45,66 @@ const navigation = [
   { name: "Field Task Board",  category: "SYSTEM",               href: "/dashboard/field-tasks", icon: ClipboardCheck,  module: "FIELD_TASKS" },
 ];
 
+// Helper to format any role dynamically into Title Case (e.g. SUPER_ADMIN -> Super Admin, CLIENT -> Client, SALES_EXECUTIVE -> Sales Executive)
+const getDisplayRole = (u: any) => {
+  if (!u) return "User";
+  let rawRole = u?.role || u?.roles?.[0]?.role?.name || u?.roles?.[0]?.name || u?.designation;
+  if (!rawRole) return "Staff";
+
+  return rawRole
+    .replace(/_/g, ' ')
+    .toLowerCase()
+    .replace(/\b\w/g, (char: string) => char.toUpperCase());
+};
+
+// Helper for dynamic badge color themes based on role type (with generic elegant fallback for custom roles)
+const getRoleBadgeStyle = (u: any) => {
+  const roleStr = (u?.role || u?.roles?.[0]?.role?.name || u?.designation || "").toUpperCase();
+  
+  if (roleStr.includes("SUPER") || roleStr.includes("ADMIN")) {
+    return {
+      dotColor: "bg-blue-500",
+      badgeBg: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20",
+    };
+  }
+  if (roleStr.includes("CA") || roleStr.includes("ACCOUNT") || roleStr.includes("FINANCE")) {
+    return {
+      dotColor: "bg-emerald-500",
+      badgeBg: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
+    };
+  }
+  if (roleStr.includes("SALES") || roleStr.includes("LEAD")) {
+    return {
+      dotColor: "bg-amber-500",
+      badgeBg: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20",
+    };
+  }
+  if (roleStr.includes("HR")) {
+    return {
+      dotColor: "bg-purple-500",
+      badgeBg: "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20",
+    };
+  }
+  if (roleStr.includes("FIELD") || roleStr.includes("ENGINEER") || roleStr.includes("TECH") || roleStr.includes("INSPECT")) {
+    return {
+      dotColor: "bg-cyan-500",
+      badgeBg: "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/20",
+    };
+  }
+  if (roleStr.includes("CLIENT")) {
+    return {
+      dotColor: "bg-indigo-500",
+      badgeBg: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20",
+    };
+  }
+  
+  // Sleek default theme for future custom roles created by admin
+  return {
+    dotColor: "bg-slate-400",
+    badgeBg: "bg-slate-500/10 text-slate-600 dark:text-slate-300 border-slate-500/20",
+  };
+};
+
 export default function DashboardLayout({
   children,
 }: {
@@ -476,14 +536,24 @@ export default function DashboardLayout({
           <div className="flex items-center gap-4">
             <NotificationCenter />
             <ThemeToggle />
-            <div className="hidden md:flex flex-col items-end mr-2">
-              <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                {user?.roles?.[0]?.role?.name?.replace(/_/g, ' ') || user?.designation || "STAFF"}
+            <div className="hidden md:flex flex-col items-end mr-1">
+              <div className="flex items-center gap-1.5">
+                {(() => {
+                  const style = getRoleBadgeStyle(user);
+                  return (
+                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border shadow-sm ${style.badgeBg}`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${style.dotColor} animate-pulse`} />
+                      {getDisplayRole(user)}
+                    </span>
+                  );
+                })()}
+              </div>
+              <span className="text-xs font-bold text-foreground/90 mt-0.5">
+                {user?.name || user?.email || "User"}
               </span>
-              <span className="text-xs font-bold text-foreground/80">{orgName || "Global Webify"}</span>
             </div>
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-500 cursor-pointer shadow-xl shadow-blue-500/20 border border-border flex items-center justify-center text-white font-bold">
-              {user?.name?.charAt(0) || "U"}
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-500 cursor-pointer shadow-lg shadow-blue-500/20 border border-border/60 flex items-center justify-center text-white font-bold text-sm hover:scale-105 transition-all">
+              {user?.name ? user.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() : "U"}
             </div>
           </div>
         </header>

@@ -26,13 +26,14 @@ export const useAuthStore = create<AuthState>()(
       token: null,
       user: null,
       setAuth: (token, user) => {
-        let roleName = user?.roles?.[0]?.role?.name;
+        let roleName = user?.role || user?.roles?.[0]?.role?.name || user?.roles?.[0]?.name;
         if (!roleName) {
           const designation = (user?.designation || "").toUpperCase();
           if (designation.includes("HR")) roleName = "HR_MANAGER";
-          else if (designation.includes("FIELD") || designation.includes("ENGINEER")) roleName = "FIELD_ENGINEER";
+          else if (designation.includes("FIELD") || designation.includes("ENGINEER") || designation.includes("TECHNICIAN")) roleName = "FIELD_ENGINEER";
           else if (designation.includes("SALES")) roleName = "SALES_EXECUTIVE";
           else if (designation.includes("CLIENT")) roleName = "CLIENT";
+          else if (user?.designation) roleName = user.designation;
           else roleName = "STAFF";
         }
         const isLegacyAdmin = user?.email === "admin@globalsafety.com";
