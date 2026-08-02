@@ -1325,7 +1325,7 @@ export default function FieldTasksPage() {
                               type="button"
                               onClick={async () => {
                                 const remaining = parseItemPhotos(item.photo_url).filter((_, idx) => idx !== index);
-                                await handleUpdateItem(item.id, item.status, item.notes, undefined, remaining.length > 0 ? JSON.stringify(remaining) : "");
+                                await handleUpdateItem(item.id, item.status, item.notes, remaining.length > 0 ? JSON.stringify(remaining) : "");
                               }}
                               className="absolute top-1.5 right-1.5 bg-rose-500 hover:bg-rose-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow duration-200 cursor-pointer"
                             >
