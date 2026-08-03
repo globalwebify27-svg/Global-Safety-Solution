@@ -31,23 +31,25 @@ const MIME_SIGNATURES: Array<{ ext: string[]; bytes: number[]; offset?: number }
 
 @Injectable()
 export class LocalStorageService {
-    private readonly primaryDir: string;
-    private readonly backupDir: string;
+    private readonly targetDirs: string[];
 
     constructor() {
-        // Direct public uploads folder inside application root (100% visible in Hostinger File Manager)
-        this.primaryDir = path.join(process.cwd(), 'public', 'uploads');
-        // External persistent backup directory outside web root
-        this.backupDir = path.join(process.cwd(), '..', 'persistent_uploads');
+        this.targetDirs = [
+            path.join(process.cwd(), 'public', 'uploads'),
+            path.join(process.cwd(), '..', 'persistent_uploads'),
+            '/home/u745630191/persistent_uploads',
+            '/home/u745630191/nodejs/public/uploads',
+            '/home/u745630191/public_html/public/uploads',
+            path.join(process.cwd(), '..', 'nodejs', 'public', 'uploads'),
+        ];
 
-        // Ensure both directories exist
-        [this.primaryDir, this.backupDir].forEach((dir) => {
+        this.targetDirs.forEach((dir) => {
             try {
                 if (!fs.existsSync(dir)) {
                     fs.mkdirSync(dir, { recursive: true });
                 }
             } catch (e) {
-                console.warn(`Directory creation warning for ${dir}:`, e);
+                // Ignore directory creation error for non-existent path
             }
         });
     }
@@ -150,30 +152,20 @@ export class LocalStorageService {
             const fileExtension = path.extname(sanitizedName).toLowerCase() || '.pdf';
             const uniqueFileName = `${uuidv4()}${fileExtension}`;
 
-            const primaryPath = path.join(this.primaryDir, uniqueFileName);
-            const backupPath = path.join(this.backupDir, uniqueFileName);
-
-            let primaryOk = false;
-            let backupOk = false;
-
-            // 1. Save to primary public/uploads directory (Hostinger File Manager visible)
-            try {
-                await fs.promises.writeFile(primaryPath, fileBuffer);
-                primaryOk = true;
-            } catch (err) {
-                console.warn('Failed to write to primaryDir:', err);
+            let wroteAny = false;
+            for (const dir of this.targetDirs) {
+                try {
+                    if (!fs.existsSync(dir)) {
+                        fs.mkdirSync(dir, { recursive: true });
+                    }
+                    await fs.promises.writeFile(path.join(dir, uniqueFileName), fileBuffer);
+                    wroteAny = true;
+                } catch (err) {
+                    // Ignore write error for non-existent system paths
+                }
             }
 
-            // 2. Dual-sync write to backup persistent_uploads directory
-            try {
-                await fs.promises.writeFile(backupPath, fileBuffer);
-                backupOk = true;
-            } catch (err) {
-                console.warn('Failed to write to backupDir:', err);
-            }
-
-            // If both writes failed, throw error
-            if (!primaryOk && !backupOk) {
+            if (!wroteAny) {
                 throw new InternalServerErrorException(
                     'File upload failed: unable to write to any storage directory.',
                 );
@@ -212,80 +204,63 @@ export class LocalStorageService {
     // =====================================================================
 
     /**
-     * Saves a raw file buffer directly to both primary and backup directories.
+     * Saves a raw file buffer directly to all target directories.
      * Used by sync endpoint to receive files from local testing.
      */
     async saveRawFile(fileBuffer: Buffer, fileName: string): Promise<void> {
         const sanitized = this.sanitizeFilename(fileName);
-        const primaryPath = path.join(this.primaryDir, sanitized);
-        const backupPath = path.join(this.backupDir, sanitized);
-
-        try {
-            await fs.promises.writeFile(primaryPath, fileBuffer);
-        } catch (e) {
-            console.warn('saveRawFile primary write error:', e);
-        }
-
-        try {
-            await fs.promises.writeFile(backupPath, fileBuffer);
-        } catch (e) {
-            console.warn('saveRawFile backup write error:', e);
+        for (const dir of this.targetDirs) {
+            try {
+                if (!fs.existsSync(dir)) {
+                    fs.mkdirSync(dir, { recursive: true });
+                }
+                await fs.promises.writeFile(path.join(dir, sanitized), fileBuffer);
+            } catch (e) {
+                // Ignore write errors for non-existent system paths
+            }
         }
     }
 
     // =====================================================================
-    // FILE DELETE (physical cleanup from both directories)
+    // FILE DELETE (physical cleanup from all target directories)
     // =====================================================================
 
     /**
      * Extracts the filename from a full URL and deletes the physical file
-     * from both primary (public/uploads) and backup (persistent_uploads) directories.
-     * Returns true if at least one file was deleted, false if neither existed.
+     * from all target directories.
+     * Returns true if at least one file was deleted, false if none existed.
      * Never throws — logs warnings on failure.
      */
     async deleteFile(fileUrl: string): Promise<boolean> {
         if (!fileUrl) return false;
 
         try {
-            // Extract filename from URL (e.g., "https://domain.com/public/uploads/abc-123.jpg" → "abc-123.jpg")
             const fileName = this.extractFilenameFromUrl(fileUrl);
             if (!fileName) {
                 console.warn('Could not extract filename from URL for deletion:', fileUrl);
                 return false;
             }
 
-            // Security: Ensure filename has no path traversal
             if (fileName.includes('..') || fileName.includes('/') || fileName.includes('\\')) {
                 console.warn('Suspicious filename rejected for deletion:', fileName);
                 return false;
             }
 
             let deleted = false;
-
-            // Delete from primary directory
-            const primaryPath = path.join(this.primaryDir, fileName);
-            try {
-                if (fs.existsSync(primaryPath)) {
-                    await fs.promises.unlink(primaryPath);
-                    deleted = true;
+            for (const dir of this.targetDirs) {
+                try {
+                    const targetPath = path.join(dir, fileName);
+                    if (fs.existsSync(targetPath)) {
+                        await fs.promises.unlink(targetPath);
+                        deleted = true;
+                    }
+                } catch (err) {
+                    // Ignore non-existent path delete errors
                 }
-            } catch (err) {
-                console.warn(`Failed to delete from primaryDir: ${primaryPath}`, err);
-            }
-
-            // Delete from backup directory
-            const backupPath = path.join(this.backupDir, fileName);
-            try {
-                if (fs.existsSync(backupPath)) {
-                    await fs.promises.unlink(backupPath);
-                    deleted = true;
-                }
-            } catch (err) {
-                console.warn(`Failed to delete from backupDir: ${backupPath}`, err);
             }
 
             if (deleted) {
-                console.log(`Physical file deleted: ${fileName}`);
+                console.log(`Physical file deleted across all storage paths: ${fileName}`);
             }
 
             return deleted;
