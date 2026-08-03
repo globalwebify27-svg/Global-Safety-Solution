@@ -43,7 +43,11 @@ async function bootstrap() {
 
   // Serve static assets from external persistent_uploads folder (outside git root)
   const fs = require('fs');
-  const persistentUploadsDir = join(process.cwd(), '..', 'persistent_uploads');
+  const mainCwd = process.cwd();
+  const persistentUploadsDir = (mainCwd.endsWith('apps/backend') || mainCwd.endsWith('apps\\backend'))
+    ? join(mainCwd, '..', '..', 'persistent_uploads')
+    : join(mainCwd, 'persistent_uploads');
+
   if (!fs.existsSync(persistentUploadsDir)) {
     try {
       fs.mkdirSync(persistentUploadsDir, { recursive: true });

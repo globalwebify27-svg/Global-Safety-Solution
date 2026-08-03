@@ -31,27 +31,24 @@ const MIME_SIGNATURES: Array<{ ext: string[]; bytes: number[]; offset?: number }
 
 @Injectable()
 export class LocalStorageService {
-    private readonly targetDirs: string[];
+    private readonly persistentDir: string;
 
     constructor() {
-        this.targetDirs = [
-            path.join(process.cwd(), 'public', 'uploads'),
-            path.join(process.cwd(), '..', 'persistent_uploads'),
-            '/home/u745630191/persistent_uploads',
-            '/home/u745630191/nodejs/public/uploads',
-            '/home/u745630191/public_html/public/uploads',
-            path.join(process.cwd(), '..', 'nodejs', 'public', 'uploads'),
-        ];
+        // Locate monorepo root folder cleanly regardless of where backend is executed
+        const cwd = process.cwd();
+        if (cwd.endsWith('apps/backend') || cwd.endsWith('apps\\backend')) {
+            this.persistentDir = path.join(cwd, '..', '..', 'persistent_uploads');
+        } else {
+            this.persistentDir = path.join(cwd, 'persistent_uploads');
+        }
 
-        this.targetDirs.forEach((dir) => {
-            try {
-                if (!fs.existsSync(dir)) {
-                    fs.mkdirSync(dir, { recursive: true });
-                }
-            } catch (e) {
-                // Ignore directory creation error for non-existent path
+        try {
+            if (!fs.existsSync(this.persistentDir)) {
+                fs.mkdirSync(this.persistentDir, { recursive: true });
             }
-        });
+        } catch (e) {
+            console.warn('Persistent directory creation warning:', e);
+        }
     }
 
     // =====================================================================
@@ -112,11 +109,10 @@ export class LocalStorageService {
 
     /**
      * Validates file content magic bytes against the declared extension.
-     * Only warns on mismatch for common types (non-blocking for .txt, .csv).
      */
     private validateMimeBytes(buffer: Buffer, ext: string): void {
         const sig = MIME_SIGNATURES.find((s) => s.ext.includes(ext));
-        if (!sig) return; // No signature to check for this extension
+        if (!sig) return;
 
         const offset = sig.offset || 0;
         const matches = sig.bytes.every(
@@ -124,7 +120,6 @@ export class LocalStorageService {
         );
 
         if (!matches) {
-            // For image and PDF files, strictly reject mismatched magic bytes
             const strictExts = new Set(['.jpg', '.jpeg', '.png', '.gif', '.pdf', '.webp']);
             if (strictExts.has(ext)) {
                 throw new BadRequestException(
@@ -135,13 +130,12 @@ export class LocalStorageService {
     }
 
     // =====================================================================
-    // FILE SAVE (with validation and dual-write)
+    // FILE SAVE
     // =====================================================================
 
     /**
-     * Validates, saves file to both primary and backup directories,
+     * Validates, saves file strictly to single permanent persistent_uploads directory,
      * and returns the public access URL.
-     * Throws on validation failure or if both writes fail.
      */
     async saveFile(fileBuffer: Buffer, originalName: string, fileMimeType?: string): Promise<string> {
         try {
@@ -152,45 +146,21 @@ export class LocalStorageService {
             const fileExtension = path.extname(sanitizedName).toLowerCase() || '.pdf';
             const uniqueFileName = `${uuidv4()}${fileExtension}`;
 
-            let wroteAny = false;
-            for (const dir of this.targetDirs) {
-                try {
-                    if (!fs.existsSync(dir)) {
-                        fs.mkdirSync(dir, { recursive: true });
-                    }
-                    await fs.promises.writeFile(path.join(dir, uniqueFileName), fileBuffer);
-                    wroteAny = true;
-                } catch (err) {
-                    // Ignore write error for non-existent system paths
-                }
+            const filePath = path.join(this.persistentDir, uniqueFileName);
+
+            if (!fs.existsSync(this.persistentDir)) {
+                fs.mkdirSync(this.persistentDir, { recursive: true });
             }
 
-            if (!wroteAny) {
-                throw new InternalServerErrorException(
-                    'File upload failed: unable to write to any storage directory.',
-                );
-            }
+            await fs.promises.writeFile(filePath, fileBuffer);
 
-            // Determine domain URL
-            const localDomain = (process.env.BACKEND_URL || 'http://localhost:3001').replace(/\/$/, '');
-            const isLocalhost = localDomain.includes('localhost') || localDomain.includes('127.0.0.1');
-
-            const hostingerUrl = (process.env.REMOTE_HOSTINGER_URL || 'https://papayawhip-dolphin-790455.hostingersite.com').replace(/\/$/, '');
-
-            // 3. Remote Sync: If testing on localhost connected to main database, sync file to Hostinger server
-            if (isLocalhost && hostingerUrl && !hostingerUrl.includes('localhost')) {
-                this.syncToRemoteHostinger(fileBuffer, uniqueFileName, hostingerUrl).catch((err) => {
-                    console.warn('Background sync to Hostinger server notice:', err?.message || err);
-                });
-            }
-
-            // If connected to remote database or testing on localhost, use Hostinger URL for database persistence so links work anywhere
-            const isRemoteDb = process.env.DATABASE_URL?.includes('hstgr.io') || process.env.DATABASE_URL?.includes('prisma-data.net') || isLocalhost;
-            const targetDomain = (isLocalhost && isRemoteDb) ? hostingerUrl : localDomain;
-            const cleanDomain = targetDomain.replace(/\/api$/, '');
+            // Determine domain URL dynamically:
+            // Localhost environment -> http://localhost:3001/public/uploads/... (served from local persistent_uploads)
+            // Hostinger environment -> https://papayawhip-dolphin.../public/uploads/... (served from Hostinger persistent_uploads)
+            const envBackendUrl = (process.env.BACKEND_URL || 'http://localhost:3001').replace(/\/$/, '');
+            const cleanDomain = envBackendUrl.replace(/\/api$/, '');
             return `${cleanDomain}/public/uploads/${uniqueFileName}`;
         } catch (error) {
-            // Re-throw BadRequestException as-is (validation errors)
             if (error instanceof BadRequestException) {
                 throw error;
             }
@@ -204,31 +174,25 @@ export class LocalStorageService {
     // =====================================================================
 
     /**
-     * Saves a raw file buffer directly to all target directories.
+     * Saves a raw file buffer directly to permanent storage.
      * Used by sync endpoint to receive files from local testing.
      */
     async saveRawFile(fileBuffer: Buffer, fileName: string): Promise<void> {
         const sanitized = this.sanitizeFilename(fileName);
-        for (const dir of this.targetDirs) {
-            try {
-                if (!fs.existsSync(dir)) {
-                    fs.mkdirSync(dir, { recursive: true });
-                }
-                await fs.promises.writeFile(path.join(dir, sanitized), fileBuffer);
-            } catch (e) {
-                // Ignore write errors for non-existent system paths
-            }
+        if (!fs.existsSync(this.persistentDir)) {
+            fs.mkdirSync(this.persistentDir, { recursive: true });
         }
+        await fs.promises.writeFile(path.join(this.persistentDir, sanitized), fileBuffer);
     }
 
     // =====================================================================
-    // FILE DELETE (physical cleanup from all target directories)
+    // FILE DELETE (physical cleanup from persistent_uploads)
     // =====================================================================
 
     /**
      * Extracts the filename from a full URL and deletes the physical file
-     * from all target directories.
-     * Returns true if at least one file was deleted, false if none existed.
+     * strictly from persistent_uploads storage.
+     * Returns true if file was deleted, false if file did not exist.
      * Never throws — logs warnings on failure.
      */
     async deleteFile(fileUrl: string): Promise<boolean> {
@@ -246,24 +210,13 @@ export class LocalStorageService {
                 return false;
             }
 
-            let deleted = false;
-            for (const dir of this.targetDirs) {
-                try {
-                    const targetPath = path.join(dir, fileName);
-                    if (fs.existsSync(targetPath)) {
-                        await fs.promises.unlink(targetPath);
-                        deleted = true;
-                    }
-                } catch (err) {
-                    // Ignore non-existent path delete errors
-                }
+            const targetPath = path.join(this.persistentDir, fileName);
+            if (fs.existsSync(targetPath)) {
+                await fs.promises.unlink(targetPath);
+                console.log(`Physical file unlinked cleanly from persistent_uploads: ${fileName}`);
+                return true;
             }
-
-            if (deleted) {
-                console.log(`Physical file deleted across all storage paths: ${fileName}`);
-            }
-
-            return deleted;
+            return false;
         } catch (error) {
             console.warn('deleteFile unexpected error:', error);
             return false;
@@ -278,10 +231,8 @@ export class LocalStorageService {
     private extractFilenameFromUrl(fileUrl: string): string | null {
         if (!fileUrl || fileUrl === '#') return null;
         try {
-            // Handle data: URIs (base64) — nothing to delete
             if (fileUrl.startsWith('data:')) return null;
 
-            // Try to parse as full URL first
             let urlPath = fileUrl;
             try {
                 const parsed = new URL(fileUrl);
@@ -290,11 +241,9 @@ export class LocalStorageService {
                 // Not a full URL, treat as a path
             }
 
-            // Extract filename from path
             const parts = urlPath.split('/').filter(Boolean);
             const filename = parts[parts.length - 1];
 
-            // Basic validation: must have an extension
             if (filename && filename.includes('.')) {
                 return filename;
             }
@@ -347,7 +296,7 @@ export class LocalStorageService {
             if (!response.ok) {
                 console.warn('Sync to Hostinger returned status:', response.status, await response.text());
             } else {
-                console.log('Successfully synced file to Hostinger File Manager:', uniqueFileName);
+                console.log('Successfully synced file to Hostinger persistent storage:', uniqueFileName);
             }
         } catch (e: any) {
             console.warn('Background sync to Hostinger server notice:', e?.message || e);
