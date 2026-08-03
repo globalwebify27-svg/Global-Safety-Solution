@@ -499,9 +499,24 @@ export class DocumentsService {
   }
 
   async delete(id: string) {
-    return this.prisma.document.delete({
+    // 1. Fetch document to get file URLs before deletion
+    const doc = await this.prisma.document.findUnique({ where: { id } });
+    if (!doc) throw new NotFoundException('Document not found');
+
+    // 2. Delete DB record first
+    const result = await this.prisma.document.delete({
       where: { id },
     });
+
+    // 3. Delete physical files from disk (non-blocking, best-effort)
+    if (doc.file_url) {
+      await this.localStorageService.deleteFile(doc.file_url);
+    }
+    if (doc.delivery_receipt_url) {
+      await this.localStorageService.deleteFile(doc.delivery_receipt_url);
+    }
+
+    return result;
   }
 
   async uploadDeliveryReceipt(id: string, file: any, uploaderId?: string) {
@@ -579,7 +594,11 @@ export class DocumentsService {
     const doc = await this.prisma.document.findUnique({ where: { id } });
     if (!doc) throw new NotFoundException('Document not found');
 
-    return this.prisma.document.update({
+    // Store the receipt URL before clearing it
+    const receiptUrl = doc.delivery_receipt_url;
+
+    // 1. Clear delivery receipt metadata in DB
+    const result = await this.prisma.document.update({
       where: { id },
       data: {
         delivery_receipt_url: null,
@@ -590,6 +609,13 @@ export class DocumentsService {
         delivery_receipt_uploaded_by: null,
       },
     });
+
+    // 2. Delete the physical receipt file from disk (non-blocking, best-effort)
+    if (receiptUrl) {
+      await this.localStorageService.deleteFile(receiptUrl);
+    }
+
+    return result;
   }
 
   private async createCertificatePdfBuffer(doc: any): Promise<Buffer> {

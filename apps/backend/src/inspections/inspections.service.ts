@@ -14,6 +14,7 @@ import * as fs from 'fs';
 import { TemplateEngineService } from '../email-management/template-engine.service';
 import { computeExpiryDate } from '../common/utils/date-utils';
 import { CertificatesService } from '../certificates/certificates.service';
+import { LocalStorageService } from '../common/services/local-storage.service';
 
 @Injectable()
 export class InspectionsService {
@@ -23,6 +24,7 @@ export class InspectionsService {
     private notificationsService: NotificationsService,
     private templateEngine: TemplateEngineService,
     private certificatesService: CertificatesService,
+    private localStorageService: LocalStorageService,
   ) {}
 
   async create(data: CreateInspectionDto) {
@@ -587,11 +589,14 @@ export class InspectionsService {
 
       for (const url of removedUrls) {
         try {
+          // Delete DB document record
           await this.prisma.document.deleteMany({
             where: { file_url: url },
           });
+          // Delete physical file from disk (both directories)
+          await this.localStorageService.deleteFile(url);
         } catch (e) {
-          console.error('Failed to clean up deleted document from DB:', e);
+          console.error('Failed to clean up deleted document:', e);
         }
       }
     }
@@ -616,11 +621,14 @@ export class InspectionsService {
       const urls = this.parsePhotos(currentItem.photo_url);
       for (const url of urls) {
         try {
+          // Delete DB document record
           await this.prisma.document.deleteMany({
             where: { file_url: url },
           });
+          // Delete physical file from disk (both directories)
+          await this.localStorageService.deleteFile(url);
         } catch (e) {
-          console.error('Failed to clean up deleted document from DB:', e);
+          console.error('Failed to clean up deleted document:', e);
         }
       }
     }

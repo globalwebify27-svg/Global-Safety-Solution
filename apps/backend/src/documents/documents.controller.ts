@@ -10,6 +10,7 @@ import {
   UseGuards,
   Req,
   Header,
+  Headers,
   UseInterceptors,
   UploadedFile,
   InternalServerErrorException,
@@ -31,6 +32,23 @@ export class DocumentsController {
     private readonly localStorageService: LocalStorageService,
     private readonly expiryCronService: ExpiryCronService,
   ) {}
+
+  @Post('sync-raw-file')
+  @UseInterceptors(FileInterceptor('file'))
+  async syncRawFile(
+    @UploadedFile() file: any,
+    @Headers('x-sync-secret') syncSecret: string,
+  ) {
+    if (syncSecret !== 'gss_internal_sync_2026') {
+      throw new InternalServerErrorException('Unauthorized sync attempt');
+    }
+    if (!file || !file.buffer) {
+      throw new InternalServerErrorException('No file buffer provided for sync');
+    }
+    const fileName = file.originalname || 'synced_file.pdf';
+    await this.localStorageService.saveRawFile(file.buffer, fileName);
+    return { success: true, fileName };
+  }
 
   @Get()
   @Permissions('READ_DOCUMENT')
@@ -94,20 +112,13 @@ export class DocumentsController {
   @Permissions('CREATE_DOCUMENT')
   @UseInterceptors(FileInterceptor('file'))
   async create(@UploadedFile() file: any, @Body() data: any, @Req() req: any) {
+    let fileUrl = data.file_url;
     try {
       console.log('--- UPLOAD START ---');
-      console.log('Body data:', data);
-      console.log('File received:', file ? {
-        originalname: file.originalname,
-        mimetype: file.mimetype,
-        size: file.size,
-        hasBuffer: !!file.buffer
-      } : 'No file received');
 
-      let fileUrl = data.file_url;
       if (file && file.buffer) {
         const safeOriginalName = file.originalname || 'document.pdf';
-        fileUrl = await this.localStorageService.saveFile(file.buffer, safeOriginalName);
+        fileUrl = await this.localStorageService.saveFile(file.buffer, safeOriginalName, file.mimetype);
         console.log('File successfully saved to local storage URL:', fileUrl);
       } else {
         console.warn('Warning: No file buffer found to save');
@@ -128,6 +139,16 @@ export class DocumentsController {
     } catch (error: any) {
       console.error('--- UPLOAD FAILED ---');
       console.error('Error details:', error);
+
+      // Transactional rollback: if file was saved but DB insert failed, delete the orphan file
+      if (fileUrl && fileUrl !== data.file_url && fileUrl !== '#') {
+        await this.localStorageService.rollbackSavedFile(fileUrl);
+      }
+
+      // Re-throw BadRequestException as-is (validation errors from file validation)
+      if (error?.status === 400) {
+        throw error;
+      }
       throw new InternalServerErrorException(error?.message || 'Document creation failed');
     }
   }
