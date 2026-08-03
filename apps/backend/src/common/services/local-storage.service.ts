@@ -34,9 +34,13 @@ export class LocalStorageService {
     private readonly persistentDir: string;
 
     constructor() {
-        // Locate monorepo root folder cleanly regardless of where backend is executed
         const cwd = process.cwd();
-        if (cwd.endsWith('apps/backend') || cwd.endsWith('apps\\backend')) {
+        const hostingerAccountDir = '/home/u745630191';
+        
+        // If running on Hostinger Linux environment, target absolute account root persistent_uploads
+        if (fs.existsSync(hostingerAccountDir) || (process.platform === 'linux' && !cwd.includes(':\\'))) {
+            this.persistentDir = path.join(hostingerAccountDir, 'persistent_uploads');
+        } else if (cwd.endsWith('apps/backend') || cwd.endsWith('apps\\backend')) {
             this.persistentDir = path.join(cwd, '..', '..', 'persistent_uploads');
         } else {
             this.persistentDir = path.join(cwd, 'persistent_uploads');

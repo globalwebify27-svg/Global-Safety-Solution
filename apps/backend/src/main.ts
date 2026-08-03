@@ -44,9 +44,16 @@ async function bootstrap() {
   // Serve static assets from external persistent_uploads folder (outside git root)
   const fs = require('fs');
   const mainCwd = process.cwd();
-  const persistentUploadsDir = (mainCwd.endsWith('apps/backend') || mainCwd.endsWith('apps\\backend'))
-    ? join(mainCwd, '..', '..', 'persistent_uploads')
-    : join(mainCwd, 'persistent_uploads');
+  const hostingerAccountDir = '/home/u745630191';
+  
+  let persistentUploadsDir: string;
+  if (fs.existsSync(hostingerAccountDir) || (process.platform === 'linux' && !mainCwd.includes(':\\'))) {
+    persistentUploadsDir = join(hostingerAccountDir, 'persistent_uploads');
+  } else if (mainCwd.endsWith('apps/backend') || mainCwd.endsWith('apps\\backend')) {
+    persistentUploadsDir = join(mainCwd, '..', '..', 'persistent_uploads');
+  } else {
+    persistentUploadsDir = join(mainCwd, 'persistent_uploads');
+  }
 
   if (!fs.existsSync(persistentUploadsDir)) {
     try {
