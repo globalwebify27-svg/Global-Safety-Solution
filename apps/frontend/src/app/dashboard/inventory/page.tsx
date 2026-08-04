@@ -255,15 +255,6 @@ export default function InventoryPage() {
     e.preventDefault();
     if (!token) return;
 
-    if (!calibUrl) {
-      toast.error("Calibration Certificate PDF is required.");
-      return;
-    }
-    if (!invoiceUrl) {
-      toast.error("Invoice PDF is required.");
-      return;
-    }
-
     setSubmitting(true);
     try {
       const res = await fetch(`${API_BASE_URL}/inventory`, {
@@ -274,8 +265,8 @@ export default function InventoryPage() {
         },
         body: JSON.stringify({
           ...formData,
-          calibration_cert_url: calibUrl,
-          invoice_url: invoiceUrl,
+          calibration_cert_url: calibUrl || null,
+          invoice_url: invoiceUrl || null,
         })
       });
       if (res.ok) {
@@ -543,17 +534,14 @@ export default function InventoryPage() {
                   <Label>Opening Stock</Label>
                   <Input type="number" value={formData.current_stock} onChange={(e) => setFormData({...formData, current_stock: Number(e.target.value)})} className="bg-background border-border text-foreground" />
                 </div>
-              </div>
-
-              {/* PDF Upload Section */}
+              </div>              {/* PDF Upload Section */}
               <div className="border border-border rounded-xl p-4 space-y-4 bg-muted/20">
                 <p className="text-xs font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
-                  <FileText className="w-3.5 h-3.5" /> Required Documents
+                  <FileText className="w-3.5 h-3.5" /> Optional Documents
                 </p>
                 <div className="grid grid-cols-2 gap-4">
                   <FileUploadField
                     label="Calibration Certificate"
-                    required
                     file={calibFile}
                     uploading={calibUploading}
                     uploadedUrl={calibUrl}
@@ -563,7 +551,6 @@ export default function InventoryPage() {
                   />
                   <FileUploadField
                     label="Invoice / Bill"
-                    required
                     file={invoiceFile}
                     uploading={invoiceUploading}
                     uploadedUrl={invoiceUrl}
@@ -573,16 +560,16 @@ export default function InventoryPage() {
                   />
                 </div>
                 {(!calibUrl || !invoiceUrl) && (
-                  <p className="text-[10px] text-rose-500 font-medium flex items-center gap-1">
-                    <AlertCircle className="w-3 h-3" /> Both PDFs must be uploaded before registering the item.
+                  <p className="text-[10px] text-muted-foreground font-medium flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3" /> Note: You can upload these documents later if skipped.
                   </p>
                 )}
               </div>
-
+ 
               <DialogFooter className="pt-4">
                 <Button
                   type="submit"
-                  disabled={submitting || calibUploading || invoiceUploading || !calibUrl || !invoiceUrl}
+                  disabled={submitting || calibUploading || invoiceUploading}
                   className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold w-full h-12 shadow-xl shadow-emerald-500/20 border-0 disabled:opacity-50"
                 >
                   {submitting ? (
@@ -849,7 +836,7 @@ export default function InventoryPage() {
         <DialogContent className="sm:max-w-[550px] bg-card border-border text-foreground">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold flex items-center gap-2">
-              <FileText className="w-5 h-5 text-indigo-500" /> Upload / Update Required Documents
+              <FileText className="w-5 h-5 text-indigo-500" /> Upload / Update Documents
             </DialogTitle>
             <DialogDescription className="text-muted-foreground">
               Attach Calibration Certificate and Invoice PDFs for <span className="text-foreground font-bold">{docsModalItem?.name}</span>
