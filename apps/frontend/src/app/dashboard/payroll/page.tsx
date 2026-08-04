@@ -31,6 +31,8 @@ interface PayrollRecord {
   base_salary: number;
   bonus: number;
   deductions: number;
+  pf_deduction: number;
+  esi_deduction: number;
   net_pay: number;
   status: string;
   paid_at: string | null;
@@ -141,7 +143,9 @@ export default function PayrollPage() {
       body: [
         ['Base Salary', `INR ${Number(record.base_salary).toLocaleString()}`, '-'],
         ['Bonus / Incentives', `INR ${Number(record.bonus).toLocaleString()}`, '-'],
-        ['Tax / PF Deductions', '-', `INR ${Number(record.deductions).toLocaleString()}`],
+        ['PF Deduction', '-', `INR ${Number(record.pf_deduction || 0).toLocaleString()}`],
+        ['ESI Deduction', '-', `INR ${Number(record.esi_deduction || 0).toLocaleString()}`],
+        ['Other Deductions', '-', `INR ${Number(record.deductions || 0).toLocaleString()}`],
       ],
       headStyles: { fillColor: [37, 99, 235], textColor: [255, 255, 255] },
       columnStyles: {
@@ -153,19 +157,29 @@ export default function PayrollPage() {
     // Summary
     const finalY = (doc as any).lastAutoTable.finalY;
     doc.setFillColor(245, 245, 245);
-    doc.rect(120, finalY + 5, 70, 20, 'F');
-    doc.setFontSize(11);
+    doc.rect(120, finalY + 5, 70, 36, 'F');
+    
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(80);
+    doc.text(`Gross Salary: INR ${(Number(record.base_salary) + Number(record.bonus)).toLocaleString()}`, 125, finalY + 12);
+    doc.text(`Total Deductions: INR ${(Number(record.pf_deduction || 0) + Number(record.esi_deduction || 0) + Number(record.deductions || 0)).toLocaleString()}`, 125, finalY + 18);
+    
+    doc.line(125, finalY + 22, 185, finalY + 22);
+    
+    doc.setFontSize(10);
     doc.setFont("helvetica", "bold");
-    doc.text("NET PAYOUT:", 125, finalY + 13);
-    doc.text(`INR ${Number(record.net_pay).toLocaleString()}`, 125, finalY + 20);
+    doc.setTextColor(0);
+    doc.text("NET PAYOUT:", 125, finalY + 27);
+    doc.text(`INR ${Number(record.net_pay).toLocaleString()}`, 125, finalY + 34);
     
     // Notes
     doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(100);
-    doc.text("Notes:", 20, finalY + 40);
-    doc.text("1. This is a computer-generated payslip and does not require a physical signature.", 20, finalY + 46);
-    doc.text("2. Please contact the HR department for any discrepancies.", 20, finalY + 52);
+    doc.text("Notes:", 20, finalY + 50);
+    doc.text("1. This is a computer-generated payslip and does not require a physical signature.", 20, finalY + 56);
+    doc.text("2. Please contact the HR department for any discrepancies.", 20, finalY + 62);
     
     doc.save(`Payslip_${record.user.name.replace(' ', '_')}_${getMonthName(record.month)}_${record.year}.pdf`);
   };
@@ -309,7 +323,16 @@ export default function PayrollPage() {
                       <span className="text-sm font-bold text-muted-foreground italic">₹{Number(record.base_salary).toLocaleString()}</span>
                     </td>
                     <td className="px-8 py-6">
-                      <span className="text-sm font-black text-foreground">₹{Number(record.net_pay).toLocaleString()}</span>
+                      <div className="flex flex-col">
+                        <span className="text-sm font-black text-foreground">₹{Number(record.net_pay).toLocaleString()}</span>
+                        {(Number(record.pf_deduction || 0) > 0 || Number(record.esi_deduction || 0) > 0 || Number(record.deductions || 0) > 0) && (
+                          <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-tighter mt-0.5">
+                            {Number(record.pf_deduction || 0) > 0 && `PF: ₹${Number(record.pf_deduction).toLocaleString()}`}
+                            {Number(record.esi_deduction || 0) > 0 && ` • ESI: ₹${Number(record.esi_deduction).toLocaleString()}`}
+                            {Number(record.deductions || 0) > 0 && ` • Other: ₹${Number(record.deductions).toLocaleString()}`}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-8 py-6">
                       <span className={cn("px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-tighter shadow-sm ring-1", 

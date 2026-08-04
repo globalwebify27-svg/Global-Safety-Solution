@@ -74,6 +74,45 @@ export class HRService {
       if (!emp.base_salary) continue;
 
       try {
+        const baseSal = Number(emp.base_salary);
+
+        // Calculate PF Deduction
+        let pf_deduction = 0;
+        if (emp.pf_applicable) {
+          if (emp.pf_contribution_type === 'PERCENTAGE') {
+            pf_deduction = baseSal * (Number(emp.pf_contribution_value || 0) / 100);
+          } else if (emp.pf_contribution_type === 'FIXED') {
+            pf_deduction = Number(emp.pf_contribution_value || 0);
+          }
+        }
+
+        // Calculate ESI Deduction
+        let esi_deduction = 0;
+        if (emp.esi_applicable) {
+          if (emp.esi_contribution_type === 'PERCENTAGE') {
+            esi_deduction = baseSal * (Number(emp.esi_contribution_value || 0) / 100);
+          } else if (emp.esi_contribution_type === 'FIXED') {
+            esi_deduction = Number(emp.esi_contribution_value || 0);
+          }
+        }
+
+        // Fetch existing record to preserve bonus / other deductions
+        const existingRecord = await this.prisma.payrollRecord.findUnique({
+          where: {
+            user_id_month_year: {
+              user_id: emp.id,
+              month,
+              year,
+            },
+          },
+        });
+
+        const bonus = existingRecord ? Number(existingRecord.bonus) : 0;
+        const otherDeductions = existingRecord ? Number(existingRecord.deductions) : 0;
+
+        // Net Salary = Base Salary + Bonus - PF - ESI - Other Deductions
+        const net_pay = baseSal + bonus - pf_deduction - esi_deduction - otherDeductions;
+
         const record = await this.prisma.payrollRecord.upsert({
           where: {
             user_id_month_year: {
@@ -84,7 +123,9 @@ export class HRService {
           },
           update: {
             base_salary: emp.base_salary,
-            net_pay: emp.base_salary,
+            pf_deduction,
+            esi_deduction,
+            net_pay,
           },
           create: {
             user_id: emp.id,
@@ -93,7 +134,9 @@ export class HRService {
             base_salary: emp.base_salary,
             bonus: 0,
             deductions: 0,
-            net_pay: emp.base_salary,
+            pf_deduction,
+            esi_deduction,
+            net_pay,
             status: 'PROCESSING',
           },
         });

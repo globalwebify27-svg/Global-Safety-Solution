@@ -49,6 +49,14 @@ interface Employee {
   is_on_hold: boolean;
   base_salary?: any;
   leave_balance: number;
+  pf_applicable?: boolean;
+  pf_number?: string;
+  pf_contribution_type?: string;
+  pf_contribution_value?: any;
+  esi_applicable?: boolean;
+  esi_number?: string;
+  esi_contribution_type?: string;
+  esi_contribution_value?: any;
 }
 
 export default function EmployeesPage() {
@@ -94,6 +102,14 @@ export default function EmployeesPage() {
     address: "",
     emergency_contact_name: "",
     emergency_contact_phone: "",
+    pf_applicable: false,
+    pf_number: "",
+    pf_contribution_type: "PERCENTAGE",
+    pf_contribution_value: "",
+    esi_applicable: false,
+    esi_number: "",
+    esi_contribution_type: "PERCENTAGE",
+    esi_contribution_value: "",
     join_date: new Date().toISOString().split('T')[0]
   });
 
@@ -108,6 +124,14 @@ export default function EmployeesPage() {
     address: "",
     emergency_contact_name: "",
     emergency_contact_phone: "",
+    pf_applicable: false,
+    pf_number: "",
+    pf_contribution_type: "PERCENTAGE",
+    pf_contribution_value: "",
+    esi_applicable: false,
+    esi_number: "",
+    esi_contribution_type: "PERCENTAGE",
+    esi_contribution_value: "",
   });
 
   useEffect(() => {
@@ -216,6 +240,14 @@ export default function EmployeesPage() {
           name: "", email: "", role_id: "", designation: "", department: "", phone: "", password_hash: "",
           base_salary: "", pan_number: "", aadhar_number: "", address: "",
           emergency_contact_name: "", emergency_contact_phone: "",
+          pf_applicable: false,
+          pf_number: "",
+          pf_contribution_type: "PERCENTAGE",
+          pf_contribution_value: "",
+          esi_applicable: false,
+          esi_number: "",
+          esi_contribution_type: "PERCENTAGE",
+          esi_contribution_value: "",
           join_date: new Date().toISOString().split('T')[0]
         });
         fetchEmployees();
@@ -269,6 +301,14 @@ export default function EmployeesPage() {
       address: emp.address || "",
       emergency_contact_name: emp.emergency_contact_name || "",
       emergency_contact_phone: emp.emergency_contact_phone || "",
+      pf_applicable: emp.pf_applicable || false,
+      pf_number: emp.pf_number || "",
+      pf_contribution_type: emp.pf_contribution_type || "PERCENTAGE",
+      pf_contribution_value: emp.pf_contribution_value?.toString() || "",
+      esi_applicable: emp.esi_applicable || false,
+      esi_number: emp.esi_number || "",
+      esi_contribution_type: emp.esi_contribution_type || "PERCENTAGE",
+      esi_contribution_value: emp.esi_contribution_value?.toString() || "",
     });
     setOpenEditDialog(true);
   };
@@ -487,6 +527,126 @@ export default function EmployeesPage() {
                 <div className="space-y-2">
                   <Label className="text-xs font-bold uppercase tracking-widest opacity-70">Permanent Address</Label>
                   <textarea value={onboardForm.address} onChange={(e) => setOnboardForm({...onboardForm, address: e.target.value})} className="w-full bg-background/50 border border-border rounded-xl p-4 text-sm min-h-[100px] focus:ring-emerald-500" placeholder="Full residential address..." />
+                </div>
+
+                <div className="border-t border-border/50 pt-6 space-y-4">
+                  <h4 className="text-sm font-black uppercase tracking-wider text-emerald-600">PF Configuration</h4>
+                  <div className="grid grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <Label className="text-xs font-bold uppercase tracking-widest opacity-70">PF Applicable *</Label>
+                      <select
+                        value={onboardForm.pf_applicable ? "true" : "false"}
+                        onChange={(e) => setOnboardForm({ ...onboardForm, pf_applicable: e.target.value === "true" })}
+                        required
+                        className="w-full h-12 px-4 bg-background/50 border border-border rounded-xl focus:ring-emerald-500 focus:outline-none appearance-none"
+                      >
+                        <option value="false">No</option>
+                        <option value="true">Yes</option>
+                      </select>
+                    </div>
+                    {onboardForm.pf_applicable && (
+                      <div className="space-y-2">
+                        <Label className="text-xs font-bold uppercase tracking-widest opacity-70">PF Number *</Label>
+                        <Input
+                          required
+                          value={onboardForm.pf_number}
+                          onChange={(e) => setOnboardForm({ ...onboardForm, pf_number: e.target.value })}
+                          className="h-12 bg-background/50 border-border rounded-xl focus:ring-emerald-500"
+                          placeholder="PF Number"
+                        />
+                      </div>
+                    )}
+                  </div>
+                  {onboardForm.pf_applicable && (
+                    <div className="grid grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <Label className="text-xs font-bold uppercase tracking-widest opacity-70">PF Contribution Type *</Label>
+                        <select
+                          value={onboardForm.pf_contribution_type}
+                          onChange={(e) => setOnboardForm({ ...onboardForm, pf_contribution_type: e.target.value })}
+                          required
+                          className="w-full h-12 px-4 bg-background/50 border border-border rounded-xl focus:ring-emerald-500 focus:outline-none appearance-none"
+                        >
+                          <option value="PERCENTAGE">Percentage (%)</option>
+                          <option value="FIXED">Fixed Amount (₹)</option>
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs font-bold uppercase tracking-widest opacity-70">
+                          PF Contribution Value ({onboardForm.pf_contribution_type === 'PERCENTAGE' ? '%' : '₹'}) *
+                        </Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          required
+                          value={onboardForm.pf_contribution_value}
+                          onChange={(e) => setOnboardForm({ ...onboardForm, pf_contribution_value: e.target.value })}
+                          className="h-12 bg-background/50 border-border rounded-xl focus:ring-emerald-500 font-mono"
+                          placeholder={onboardForm.pf_contribution_type === 'PERCENTAGE' ? '12' : '1800'}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="border-t border-border/50 pt-6 space-y-4">
+                  <h4 className="text-sm font-black uppercase tracking-wider text-emerald-600">ESI Configuration</h4>
+                  <div className="grid grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <Label className="text-xs font-bold uppercase tracking-widest opacity-70">ESI Applicable *</Label>
+                      <select
+                        value={onboardForm.esi_applicable ? "true" : "false"}
+                        onChange={(e) => setOnboardForm({ ...onboardForm, esi_applicable: e.target.value === "true" })}
+                        required
+                        className="w-full h-12 px-4 bg-background/50 border border-border rounded-xl focus:ring-emerald-500 focus:outline-none appearance-none"
+                      >
+                        <option value="false">No</option>
+                        <option value="true">Yes</option>
+                      </select>
+                    </div>
+                    {onboardForm.esi_applicable && (
+                      <div className="space-y-2">
+                        <Label className="text-xs font-bold uppercase tracking-widest opacity-70">ESI Number *</Label>
+                        <Input
+                          required
+                          value={onboardForm.esi_number}
+                          onChange={(e) => setOnboardForm({ ...onboardForm, esi_number: e.target.value })}
+                          className="h-12 bg-background/50 border-border rounded-xl focus:ring-emerald-500"
+                          placeholder="ESI Number"
+                        />
+                      </div>
+                    )}
+                  </div>
+                  {onboardForm.esi_applicable && (
+                    <div className="grid grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <Label className="text-xs font-bold uppercase tracking-widest opacity-70">ESI Contribution Type *</Label>
+                        <select
+                          value={onboardForm.esi_contribution_type}
+                          onChange={(e) => setOnboardForm({ ...onboardForm, esi_contribution_type: e.target.value })}
+                          required
+                          className="w-full h-12 px-4 bg-background/50 border border-border rounded-xl focus:ring-emerald-500 focus:outline-none appearance-none"
+                        >
+                          <option value="PERCENTAGE">Percentage (%)</option>
+                          <option value="FIXED">Fixed Amount (₹)</option>
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs font-bold uppercase tracking-widest opacity-70">
+                          ESI Contribution Value ({onboardForm.esi_contribution_type === 'PERCENTAGE' ? '%' : '₹'}) *
+                        </Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          required
+                          value={onboardForm.esi_contribution_value}
+                          onChange={(e) => setOnboardForm({ ...onboardForm, esi_contribution_value: e.target.value })}
+                          className="h-12 bg-background/50 border-border rounded-xl focus:ring-emerald-500 font-mono"
+                          placeholder={onboardForm.esi_contribution_type === 'PERCENTAGE' ? '0.75' : '300'}
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-6 border-t border-border/50 pt-6">
@@ -762,10 +922,22 @@ export default function EmployeesPage() {
                              <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Aadhar Number</span>
                              <span className="text-xs font-mono font-black text-foreground">{profileData.aadhar_number || 'PENDING'}</span>
                           </div>
-                          <div className="flex justify-between items-center">
+                          <div className="flex justify-between border-b border-border/50 pb-3.5 items-center">
                              <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Appointment Date</span>
                              <span className="text-xs font-black text-foreground">
                                {profileData.join_date ? new Date(profileData.join_date).toLocaleDateString([], { day: '2-digit', month: 'long', year: 'numeric' }) : 'N/A'}
+                             </span>
+                          </div>
+                          <div className="flex justify-between border-b border-border/50 pb-3.5 items-center">
+                             <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">PF Status</span>
+                             <span className="text-xs font-black text-foreground">
+                               {profileData.pf_applicable ? `Yes (${profileData.pf_number || 'N/A'}) - ${profileData.pf_contribution_type === 'PERCENTAGE' ? `${profileData.pf_contribution_value}%` : `₹${Number(profileData.pf_contribution_value).toLocaleString()}`}` : 'No'}
+                             </span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                             <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">ESI Status</span>
+                             <span className="text-xs font-black text-foreground">
+                               {profileData.esi_applicable ? `Yes (${profileData.esi_number || 'N/A'}) - ${profileData.esi_contribution_type === 'PERCENTAGE' ? `${profileData.esi_contribution_value}%` : `₹${Number(profileData.esi_contribution_value).toLocaleString()}`}` : 'No'}
                              </span>
                           </div>
                         </div>
@@ -991,6 +1163,116 @@ export default function EmployeesPage() {
                 <Label className="text-xs font-bold uppercase tracking-widest opacity-70">Contact Number</Label>
                 <Input value={editForm.phone} onChange={(e) => setEditForm({...editForm, phone: e.target.value})} className="h-12 bg-background border-border rounded-xl focus:ring-blue-500" />
               </div>
+            </div>
+
+            <div className="border-t border-border/50 pt-6 space-y-4">
+              <h4 className="text-sm font-black uppercase tracking-wider text-blue-600">PF Configuration</h4>
+              <div className="grid grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label className="text-xs font-bold uppercase tracking-widest opacity-70">PF Applicable</Label>
+                  <select
+                    value={editForm.pf_applicable ? "true" : "false"}
+                    onChange={(e) => setEditForm({ ...editForm, pf_applicable: e.target.value === "true" })}
+                    className="w-full h-12 px-4 bg-background border border-border rounded-xl focus:ring-blue-500 focus:outline-none appearance-none"
+                  >
+                    <option value="false">No</option>
+                    <option value="true">Yes</option>
+                  </select>
+                </div>
+                {editForm.pf_applicable && (
+                  <div className="space-y-2">
+                    <Label className="text-xs font-bold uppercase tracking-widest opacity-70">PF Number</Label>
+                    <Input
+                      value={editForm.pf_number}
+                      onChange={(e) => setEditForm({ ...editForm, pf_number: e.target.value })}
+                      className="h-12 bg-background border-border rounded-xl focus:ring-blue-500"
+                      placeholder="PF Number"
+                    />
+                  </div>
+                )}
+              </div>
+              {editForm.pf_applicable && (
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label className="text-xs font-bold uppercase tracking-widest opacity-70">PF Contribution Type</Label>
+                    <select
+                      value={editForm.pf_contribution_type}
+                      onChange={(e) => setEditForm({ ...editForm, pf_contribution_type: e.target.value })}
+                      className="w-full h-12 px-4 bg-background border border-border rounded-xl focus:ring-blue-500 focus:outline-none appearance-none"
+                    >
+                      <option value="PERCENTAGE">Percentage (%)</option>
+                      <option value="FIXED">Fixed Amount (₹)</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs font-bold uppercase tracking-widest opacity-70">
+                      PF Contribution Value ({editForm.pf_contribution_type === 'PERCENTAGE' ? '%' : '₹'})
+                    </Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={editForm.pf_contribution_value}
+                      onChange={(e) => setEditForm({ ...editForm, pf_contribution_value: e.target.value })}
+                      className="h-12 bg-background border-border rounded-xl focus:ring-blue-500 font-mono"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="border-t border-border/50 pt-6 space-y-4">
+              <h4 className="text-sm font-black uppercase tracking-wider text-blue-600">ESI Configuration</h4>
+              <div className="grid grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label className="text-xs font-bold uppercase tracking-widest opacity-70">ESI Applicable</Label>
+                  <select
+                    value={editForm.esi_applicable ? "true" : "false"}
+                    onChange={(e) => setEditForm({ ...editForm, esi_applicable: e.target.value === "true" })}
+                    className="w-full h-12 px-4 bg-background border border-border rounded-xl focus:ring-blue-500 focus:outline-none appearance-none"
+                  >
+                    <option value="false">No</option>
+                    <option value="true">Yes</option>
+                  </select>
+                </div>
+                {editForm.esi_applicable && (
+                  <div className="space-y-2">
+                    <Label className="text-xs font-bold uppercase tracking-widest opacity-70">ESI Number</Label>
+                    <Input
+                      value={editForm.esi_number}
+                      onChange={(e) => setEditForm({ ...editForm, esi_number: e.target.value })}
+                      className="h-12 bg-background border-border rounded-xl focus:ring-blue-500"
+                      placeholder="ESI Number"
+                    />
+                  </div>
+                )}
+              </div>
+              {editForm.esi_applicable && (
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label className="text-xs font-bold uppercase tracking-widest opacity-70">ESI Contribution Type</Label>
+                    <select
+                      value={editForm.esi_contribution_type}
+                      onChange={(e) => setEditForm({ ...editForm, esi_contribution_type: e.target.value })}
+                      className="w-full h-12 px-4 bg-background border border-border rounded-xl focus:ring-blue-500 focus:outline-none appearance-none"
+                    >
+                      <option value="PERCENTAGE">Percentage (%)</option>
+                      <option value="FIXED">Fixed Amount (₹)</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs font-bold uppercase tracking-widest opacity-70">
+                      ESI Contribution Value ({editForm.esi_contribution_type === 'PERCENTAGE' ? '%' : '₹'})
+                    </Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={editForm.esi_contribution_value}
+                      onChange={(e) => setEditForm({ ...editForm, esi_contribution_value: e.target.value })}
+                      className="h-12 bg-background border-border rounded-xl focus:ring-blue-500 font-mono"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-6 border-t border-border/50 pt-6">

@@ -55,6 +55,19 @@ export class UsersService {
         join_date: true,
         base_salary: true,
         leave_balance: true,
+        pan_number: true,
+        aadhar_number: true,
+        address: true,
+        emergency_contact_name: true,
+        emergency_contact_phone: true,
+        pf_number: true,
+        esi_number: true,
+        pf_applicable: true,
+        pf_contribution_type: true,
+        pf_contribution_value: true,
+        esi_applicable: true,
+        esi_contribution_type: true,
+        esi_contribution_value: true,
         roles: {
           include: {
             role: true,
@@ -81,6 +94,16 @@ export class UsersService {
         aadhar_number: data.aadhar_number || undefined,
         pf_number: data.pf_number || undefined,
         esi_number: data.esi_number || undefined,
+        pf_applicable: data.pf_applicable !== undefined ? data.pf_applicable : undefined,
+        pf_contribution_type: data.pf_contribution_type !== undefined ? data.pf_contribution_type : undefined,
+        pf_contribution_value: data.pf_contribution_value
+          ? new Prisma.Decimal(data.pf_contribution_value)
+          : (data.pf_contribution_value === null || data.pf_contribution_value === "" ? null : undefined),
+        esi_applicable: data.esi_applicable !== undefined ? data.esi_applicable : undefined,
+        esi_contribution_type: data.esi_contribution_type !== undefined ? data.esi_contribution_type : undefined,
+        esi_contribution_value: data.esi_contribution_value
+          ? new Prisma.Decimal(data.esi_contribution_value)
+          : (data.esi_contribution_value === null || data.esi_contribution_value === "" ? null : undefined),
         base_salary: data.base_salary
           ? new Prisma.Decimal(data.base_salary)
           : undefined,
@@ -109,7 +132,7 @@ export class UsersService {
       data.password_hash = await bcrypt.hash('Staff@123', 10);
     }
 
-    const { role_id, ...userData } = data;
+    const { role_id, pf_contribution_value, esi_contribution_value, ...userData } = data;
 
     const createdUser = await this.prisma.user.create({
       data: {
@@ -117,6 +140,12 @@ export class UsersService {
         employee_id: employeeId,
         base_salary: data.base_salary
           ? new Prisma.Decimal(data.base_salary)
+          : undefined,
+        pf_contribution_value: pf_contribution_value
+          ? new Prisma.Decimal(pf_contribution_value)
+          : undefined,
+        esi_contribution_value: esi_contribution_value
+          ? new Prisma.Decimal(esi_contribution_value)
           : undefined,
         join_date: data.join_date ? new Date(data.join_date) : new Date(),
         roles: role_id ? {

@@ -1,5 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
+  provider   = "prisma-client-js"
+  engineType = "library"
 }
 
 datasource db {
@@ -34,11 +35,18 @@ model User {
   leave_balance           Int                   @default(24)
   pan_number              String?               @db.VarChar(20)
   pf_number               String?               @db.VarChar(50)
+  pf_applicable           Boolean               @default(false)
+  pf_contribution_type    String?               @db.VarChar(20)
+  pf_contribution_value   Decimal?              @db.Decimal(12, 2)
+  esi_applicable          Boolean               @default(false)
+  esi_contribution_type   String?               @db.VarChar(20)
+  esi_contribution_value  Decimal?              @db.Decimal(12, 2)
   assets                  Asset[]               @relation("AssetAssignee")
   attendance              Attendance[]
   assigned_clients        Client[]              @relation("ClientStaff")
   compliance_logs         ComplianceLog[]
   documents_uploaded      Document[]            @relation("DocumentUploader")
+  delivery_receipts_uploaded Document[]          @relation("DeliveryReceiptUploader")
   approved_expenses       Expense[]             @relation("ExpenseApprover")
   expenses                Expense[]
   inspections             Inspection[]
@@ -243,6 +251,8 @@ model PayrollRecord {
   base_salary Decimal   @db.Decimal(12, 2)
   bonus       Decimal   @default(0.00) @db.Decimal(12, 2)
   deductions  Decimal   @default(0.00) @db.Decimal(12, 2)
+  pf_deduction Decimal   @default(0.00) @db.Decimal(12, 2)
+  esi_deduction Decimal   @default(0.00) @db.Decimal(12, 2)
   net_pay     Decimal   @db.Decimal(12, 2)
   status      String    @default("PROCESSING") @db.VarChar(50)
   paid_at     DateTime? @db.DateTime(6)
@@ -319,23 +329,42 @@ model Reminder {
 }
 
 model Project {
-  id          String       @id @default(uuid()) @db.VarChar(36)
-  client_id   String       @db.VarChar(36)
-  name        String       @db.VarChar(255)
-  description String?
-  start_date  DateTime?    @db.Date
-  end_date    DateTime?    @db.Date
-  status      String       @default("PENDING") @db.VarChar(50)
-  created_at  DateTime     @default(now()) @db.DateTime(6)
-  updated_at  DateTime     @updatedAt @db.DateTime(6)
-  documents   Document[]
-  inspections Inspection[]
-  client      Client       @relation(fields: [client_id], references: [id], onDelete: Cascade)
-  tasks       Task[]
-  work_orders WorkOrder[]
+  id             String            @id @default(uuid()) @db.VarChar(36)
+  client_id      String            @db.VarChar(36)
+  quotation_id   String?           @db.VarChar(36)
+  name           String            @db.VarChar(255)
+  description    String?
+  contract_value Decimal?          @default(0.00) @db.Decimal(15, 2)
+  stage          String            @default("PROJECT_CREATED") @db.VarChar(50)
+  start_date     DateTime?         @db.Date
+  end_date       DateTime?         @db.Date
+  status         String            @default("PENDING") @db.VarChar(50)
+  created_at     DateTime          @default(now()) @db.DateTime(6)
+  updated_at     DateTime          @updatedAt @db.DateTime(6)
+  documents      Document[]
+  inspections    Inspection[]
+  client         Client            @relation(fields: [client_id], references: [id], onDelete: Cascade)
+  quotation      Quotation?        @relation(fields: [quotation_id], references: [id])
+  tasks          Task[]
+  work_orders    WorkOrder[]
+  activities     ProjectActivity[]
 
   @@index([client_id], map: "projects_client_id_fkey")
+  @@index([quotation_id], map: "projects_quotation_id_fkey")
   @@map("projects")
+}
+
+model ProjectActivity {
+  id           String   @id @default(uuid()) @db.VarChar(36)
+  project_id   String   @db.VarChar(36)
+  action       String   @db.VarChar(255)
+  performed_by String?  @db.VarChar(255)
+  performed_at DateTime @default(now()) @db.DateTime(6)
+  remarks      String?  @db.Text
+  project      Project  @relation(fields: [project_id], references: [id], onDelete: Cascade)
+
+  @@index([project_id], map: "project_activities_project_id_fkey")
+  @@map("project_activities")
 }
 
 model Task {
@@ -472,6 +501,7 @@ model Quotation {
   lead         Lead?       @relation(fields: [lead_id], references: [id])
   items        QuoteItem[]
   work_orders  WorkOrder[]
+  projects     Project[]
 
   @@index([client_id], map: "quotations_client_id_fkey")
   @@index([lead_id], map: "quotations_lead_id_fkey")
@@ -557,18 +587,21 @@ model Payment {
 }
 
 model InventoryItem {
-  id             String             @id @default(uuid()) @db.VarChar(36)
-  sku            String             @unique @db.VarChar(50)
-  name           String             @db.VarChar(255)
-  category       String             @db.VarChar(100)
-  description    String?
-  unit           String             @default("PCS") @db.VarChar(20)
-  min_stock      Int                @default(0)
-  current_stock  Int                @default(0)
-  price_per_unit Decimal?           @db.Decimal(15, 2)
-  created_at     DateTime           @default(now()) @db.DateTime(6)
-  updated_at     DateTime           @updatedAt @db.DateTime(6)
-  transactions   StockTransaction[]
+  id                   String             @id @default(uuid()) @db.VarChar(36)
+  sku                  String             @unique @db.VarChar(50)
+  name                 String             @db.VarChar(255)
+  category             String             @db.VarChar(100)
+  description          String?
+  unit                 String             @default("PCS") @db.VarChar(20)
+  min_stock            Int                @default(0)
+  current_stock        Int                @default(0)
+  price_per_unit       Decimal?           @db.Decimal(15, 2)
+  status               String?            @default("AVAILABLE") @db.VarChar(50)
+  calibration_cert_url String?            @db.LongText
+  invoice_url          String?            @db.LongText
+  created_at           DateTime           @default(now()) @db.DateTime(6)
+  updated_at           DateTime           @updatedAt @db.DateTime(6)
+  transactions         StockTransaction[]
 
   @@map("inventory_items")
 }
@@ -624,19 +657,27 @@ model Document {
   created_at    DateTime    @default(now()) @db.DateTime(6)
   updated_at    DateTime    @updatedAt @db.DateTime(6)
   lead_id       String?     @db.VarChar(36)
-  notes         String?     @db.Text
-  test_date     DateTime?   @db.Date
-  client        Client?     @relation(fields: [client_id], references: [id])
-  compliance    Compliance? @relation(fields: [compliance_id], references: [id])
-  lead          Lead?       @relation(fields: [lead_id], references: [id])
-  project       Project?    @relation(fields: [project_id], references: [id])
-  uploader      User?       @relation("DocumentUploader", fields: [uploaded_by], references: [id])
+  notes                         String?   @db.Text
+  test_date                     DateTime? @db.Date
+  delivery_receipt_url          String?   @db.LongText
+  delivery_receipt_name         String?   @db.VarChar(255)
+  delivery_receipt_type         String?   @db.VarChar(50)
+  delivery_receipt_size         Int?
+  delivery_receipt_uploaded_at  DateTime? @db.DateTime(6)
+  delivery_receipt_uploaded_by  String?   @db.VarChar(36)
+  client                        Client?     @relation(fields: [client_id], references: [id])
+  compliance                    Compliance? @relation(fields: [compliance_id], references: [id])
+  lead                          Lead?       @relation(fields: [lead_id], references: [id])
+  project                       Project?    @relation(fields: [project_id], references: [id])
+  uploader                      User?       @relation("DocumentUploader", fields: [uploaded_by], references: [id])
+  receipt_uploader              User?       @relation("DeliveryReceiptUploader", fields: [delivery_receipt_uploaded_by], references: [id])
 
   @@index([client_id], map: "documents_client_id_fkey")
   @@index([compliance_id], map: "documents_compliance_id_fkey")
   @@index([lead_id], map: "documents_lead_id_fkey")
   @@index([project_id], map: "documents_project_id_fkey")
   @@index([uploaded_by], map: "documents_uploaded_by_fkey")
+  @@index([delivery_receipt_uploaded_by], map: "documents_delivery_receipt_uploaded_by_fkey")
   @@map("documents")
 }
 
@@ -656,6 +697,7 @@ model Inspection {
   client_id      String            @db.VarChar(36)
   project_id     String?           @db.VarChar(36)
   engineer_id    String?           @db.VarChar(36)
+  assigned_staff_id String?        @db.VarChar(36)
   scheduled_date DateTime          @db.Date
   completed_date DateTime?         @db.DateTime(6)
   status         String            @default("SCHEDULED") @db.VarChar(50)
@@ -864,7 +906,7 @@ model Certificate {
   created_at         DateTime        @default(now()) @db.DateTime(6)
   updated_at         DateTime        @updatedAt @db.DateTime(6)
   inspection         Inspection      @relation(fields: [inspection_id], references: [id], onDelete: Cascade)
-  inspection_item    InspectionItem? @relation(fields: [inspection_item_id], references: [id], onDelete: SetNull)
+  inspection_item    InspectionItem? @relation(fields: [inspection_item_id], references: [id], onDelete: Cascade)
 
   @@index([inspection_id], map: "certificates_inspection_id_fkey")
   @@map("certificates")
@@ -1029,27 +1071,48 @@ model Account {
 }
 
 model LedgerEntry {
-  id                String   @id @default(uuid()) @db.VarChar(36)
-  voucher_no        String   @unique @db.VarChar(100)
-  description       String   @db.Text
-  amount            Decimal  @db.Decimal(15, 2)
-  transaction_date  DateTime @default(now()) @db.DateTime(6)
-  debit_account_id  String   @db.VarChar(36)
-  credit_account_id String   @db.VarChar(36)
-  created_by        String   @db.VarChar(255)
-  created_at        DateTime @default(now()) @db.DateTime(6)
+  id                String           @id @default(uuid()) @db.VarChar(36)
+  voucher_no        String           @unique @db.VarChar(100)
+  description       String           @db.Text
+  amount            Decimal          @db.Decimal(15, 2)
+  transaction_date  DateTime         @default(now()) @db.DateTime(6)
+  debit_account_id  String           @db.VarChar(36)
+  credit_account_id String           @db.VarChar(36)
+  created_by        String           @db.VarChar(255)
+  created_at        DateTime         @default(now()) @db.DateTime(6)
+  is_corrected      Boolean          @default(false)
+  last_corrected_by String?          @db.VarChar(255)
+  last_corrected_at DateTime?        @db.DateTime(6)
 
-  debit_account     Account  @relation("DebitAccount", fields: [debit_account_id], references: [id])
-  credit_account    Account  @relation("CreditAccount", fields: [credit_account_id], references: [id])
+  debit_account     Account          @relation("DebitAccount", fields: [debit_account_id], references: [id])
+  credit_account    Account          @relation("CreditAccount", fields: [credit_account_id], references: [id])
 
-  invoice_id        String?  @db.VarChar(36)
-  payment_id        String?  @db.VarChar(36)
+  invoice_id        String?          @db.VarChar(36)
+  payment_id        String?          @db.VarChar(36)
+  audit_logs        LedgerAuditLog[]
 
   @@index([debit_account_id], map: "ledger_entries_debit_account_id_fkey")
   @@index([credit_account_id], map: "ledger_entries_credit_account_id_fkey")
   @@index([invoice_id], map: "ledger_entries_invoice_id_fkey")
   @@index([payment_id], map: "ledger_entries_payment_id_fkey")
   @@map("ledger_entries")
+}
+
+model LedgerAuditLog {
+  id                 String      @id @default(uuid()) @db.VarChar(36)
+  ledger_entry_id    String      @db.VarChar(36)
+  field_name         String      @db.VarChar(100)
+  old_value          String?     @db.Text
+  new_value          String?     @db.Text
+  reason             String      @db.Text
+  edited_by_user_id  String      @db.VarChar(36)
+  edited_by_name     String      @db.VarChar(255)
+  edited_by_role     String      @db.VarChar(100)
+  created_at         DateTime    @default(now()) @db.DateTime(6)
+  ledger_entry       LedgerEntry @relation(fields: [ledger_entry_id], references: [id], onDelete: Cascade)
+
+  @@index([ledger_entry_id], map: "ledger_audit_logs_ledger_entry_id_fkey")
+  @@map("ledger_audit_logs")
 }
 
 model CertificateTemplate {
@@ -1117,6 +1180,7 @@ model NotificationRule {
   description      String?  @db.Text
   is_email_enabled Boolean  @default(true)
   template_id      String?  @db.VarChar(36)
+  advanced_config  String?  @db.Text
   created_at       DateTime @default(now()) @db.DateTime(6)
   updated_at       DateTime @updatedAt @db.DateTime(6)
 
@@ -1128,10 +1192,16 @@ model EmailLog {
   recipient     String    @db.VarChar(255)
   subject       String    @db.VarChar(255)
   module        String    @db.VarChar(100)
+  template_code String?   @db.VarChar(100)
   status        String    @default("QUEUED") @db.VarChar(50)
+  retry_count   Int       @default(0)
+  max_retries   Int       @default(3)
+  scheduled_for DateTime? @db.DateTime(6)
   sent_date     DateTime? @db.DateTime(6)
   error_message String?   @db.Text
   metadata      String?   @db.Text
+  body_html     String?   @db.LongText
+  attachments   String?   @db.Text
   created_at    DateTime  @default(now()) @db.DateTime(6)
 
   @@map("email_logs")
