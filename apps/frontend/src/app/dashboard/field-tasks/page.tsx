@@ -18,7 +18,9 @@ import {
   Upload,
   Download,
   Loader2,
-  Eye
+  Eye,
+  ShieldCheck,
+  Sparkles
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -125,6 +127,7 @@ interface Task {
     }
   };
   items: any[];
+  certificates?: any[];
   remarks?: string | null;
   pdf_url?: string | null;
   expenditure?: number | string;
@@ -619,6 +622,93 @@ export default function FieldTasksPage() {
         setTasks(prev => prev.map(t => t.id === taskId ? data : t));
       }
     } catch (e) {}
+  };
+
+  const handleGenerateAllCertificates = async () => {
+    if (!token || !selectedTask || !selectedTask.items) return;
+
+    const existingCertList = selectedTask.certificates || [];
+    
+    // Filter items that do NOT have a certificate generated yet
+    const ungeneratedItems = selectedTask.items.filter((item: any) => {
+      const alreadyGenerated = existingCertList.some(
+        (c: any) => c.inspection_item_id === item.id || (item.cert_ref_no && c.certificate_no === item.cert_ref_no)
+      );
+      return !alreadyGenerated;
+    });
+
+    if (ungeneratedItems.length === 0) {
+      toast.info("All equipment certificates have already been generated and saved to Compliance & Digital Vault!");
+      return;
+    }
+
+    const loadingToast = toast.loading(`Generating certificates for ${ungeneratedItems.length} equipment section(s)...`);
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const item of ungeneratedItems) {
+      try {
+        const templateId = selectedTemplateIds[item.id] || (templates.length > 0 ? templates[0].id : null);
+        const certRefNo = item.cert_ref_no || `GSS/${item.id.substring(0, 4).toUpperCase()}/${new Date().getFullYear()}`;
+
+        let tempFields: any[] = [];
+        if (templateId) {
+          const activeTemp = templates.find((t: any) => t.id === templateId);
+          if (activeTemp?.fields) {
+            try { tempFields = JSON.parse(activeTemp.fields); } catch (e) {}
+          }
+        }
+
+        const fieldVals = { ...(templateFieldValues[item.id] || {}) };
+        for (const f of tempFields) {
+          if (!fieldVals[f.key]) {
+            fieldVals[f.key] = getDefaultFieldValue(f.key) || f.default || "";
+          }
+        }
+
+        const metadata = {
+          template_id: templateId,
+          field_values: fieldVals
+        };
+
+        const res = await fetch(`${API_BASE_URL}/certificates`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            inspection_id: selectedTask.id,
+            inspection_item_id: item.id,
+            certificate_no: certRefNo,
+            issue_date: item.cert_test_date || new Date().toISOString(),
+            validity_period: itemValidityPeriods[item.id] || calculateInitialValidity(item.cert_test_date, item.cert_expiry_date),
+            metadata
+          })
+        });
+
+        if (res.ok) {
+          successCount++;
+        } else {
+          failCount++;
+        }
+      } catch (err) {
+        failCount++;
+      }
+    }
+
+    toast.dismiss(loadingToast);
+    await refreshSelectedTask(selectedTask.id);
+
+    const alreadyCount = selectedTask.items.length - ungeneratedItems.length;
+    if (successCount > 0) {
+      toast.success(
+        `Successfully generated ${successCount} new certificate(s) and saved to Compliance & Digital Vault!` +
+        (alreadyCount > 0 ? ` (${alreadyCount} equipment section(s) were already generated)` : "")
+      );
+    } else if (failCount > 0) {
+      toast.error("Failed to generate some certificates. Please check template details.");
+    }
   };
 
   const updateExpenditures = async (expendituresList: any[]) => {
@@ -1177,7 +1267,20 @@ export default function FieldTasksPage() {
             {(selectedTask?.items || []).map((item, index) => (
               <div key={item.id} className="p-5 bg-card border border-border rounded-2xl space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="font-bold text-foreground">Equipment {index + 1}</span>
+                  <div className="flex items-center gap-3">
+                    <span className="font-bold text-foreground">Equipment {index + 1}</span>
+                    {selectedTask?.certificates?.some(
+                      (c: any) => c.inspection_item_id === item.id || (item.cert_ref_no && c.certificate_no === item.cert_ref_no)
+                    ) ? (
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center gap-1 shadow-sm">
+                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" /> Certificate Issued & Saved in Vault
+                      </span>
+                    ) : (
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-medium text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20">
+                        Pending Generation
+                      </span>
+                    )}
+                  </div>
                   <div className="flex items-center gap-2">
                     <Button 
                       size="sm" 
@@ -1453,20 +1556,7 @@ export default function FieldTasksPage() {
 
                             const cert = await res.json();
                             toast.dismiss(loadingToast);
-                            toast.success("Certificate issued successfully!");
-
-                            // 2. Load the certificate PDF
-                            const pdfRes = await fetch(`${API_BASE_URL}/certificates/${cert.id}/pdf`, {
-                              headers: { Authorization: `Bearer ${token}` }
-                            });
-
-                            if (pdfRes.ok) {
-                              const blob = await pdfRes.blob();
-                              const a = document.createElement("a");
-                              a.href = URL.createObjectURL(blob);
-                              a.download = `certificate-${item.cert_ref_no}.pdf`;
-                              a.click();
-                            }
+                            toast.success("Certificate generated and saved to Compliance & Digital Vault!");
                           } catch (err: any) {
                             toast.dismiss(loadingToast);
                             toast.error(err.message || "Failed to generate certificate");
@@ -1474,7 +1564,7 @@ export default function FieldTasksPage() {
                         }}
                         className="bg-blue-600 hover:bg-blue-500 text-white font-bold h-9 text-xs rounded-xl flex items-center justify-center gap-2 px-4 shadow-sm"
                       >
-                        Generate & Download Certificate
+                        Generate Certificate
                       </Button>
                     </div>
                   </div>
@@ -1513,36 +1603,13 @@ export default function FieldTasksPage() {
                 + Issue new certificate
               </Button>
 
-              {(selectedTask?.items || []).some(item => item.cert_template_id && item.cert_ref_no) && (
+              {(selectedTask?.items || []).length > 0 && (
                 <Button
                   type="button"
-                  onClick={async () => {
-                    if (!token) return;
-                    const loadingToast = toast.loading("Generating combined PDF...");
-                    try {
-                      const res = await fetch(`${API_BASE_URL}/inspections/${selectedTask.id}/certificates/download-all`, {
-                        headers: { Authorization: `Bearer ${token}` }
-                      });
-                      if (res.ok) {
-                        const blob = await res.blob();
-                        const a = document.createElement("a");
-                        a.href = URL.createObjectURL(blob);
-                        a.download = `combined-certificates-${selectedTask.id.substring(0, 8)}.pdf`;
-                        a.click();
-                        toast.dismiss(loadingToast);
-                        toast.success("Combined PDF downloaded successfully!");
-                      } else {
-                        toast.dismiss(loadingToast);
-                        toast.error("Failed to generate combined PDF");
-                      }
-                    } catch (e) {
-                      toast.dismiss(loadingToast);
-                      toast.error("Failed to generate combined PDF");
-                    }
-                  }}
+                  onClick={handleGenerateAllCertificates}
                   className="flex-1 rounded-2xl h-11 bg-blue-600 hover:bg-blue-700 text-white font-bold transition-all shadow-md flex items-center justify-center gap-2"
                 >
-                  Download All Certificates (PDF)
+                  <Sparkles className="w-4 h-4" /> Generate All Certificates
                 </Button>
               )}
             </div>

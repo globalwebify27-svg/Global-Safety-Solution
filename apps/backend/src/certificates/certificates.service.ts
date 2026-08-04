@@ -20,9 +20,28 @@ export class CertificatesService {
     const issueDate = new Date(issue_date);
     const expiryDate = computeExpiryDate(issueDate, validity_period);
 
-    const metadataStr = metadata && typeof metadata === 'object'
-      ? JSON.stringify(metadata)
-      : metadata;
+    let metaObj: any = {};
+    if (metadata) {
+      try {
+        metaObj = typeof metadata === 'string' ? JSON.parse(metadata) : metadata;
+      } catch (e) {
+        metaObj = { raw: metadata };
+      }
+    }
+
+    if (rest.inspection_item_id) {
+      const item = await this.prisma.inspectionItem.findUnique({
+        where: { id: rest.inspection_item_id },
+      });
+      if (item) {
+        metaObj.equipment_description = item.description;
+        metaObj.cert_ref_no = item.cert_ref_no || rest.certificate_no;
+        metaObj.cert_competency_no = item.cert_competency_no;
+        metaObj.cert_test_date = item.cert_test_date;
+      }
+    }
+
+    const metadataStr = JSON.stringify(metaObj);
 
     const existing = await this.prisma.certificate.findFirst({
       where: {
@@ -88,6 +107,7 @@ export class CertificatesService {
     const fileUrl = certificate.pdf_url || `/certificates/${certificate.id}/pdf`;
 
     try {
+      // 1. Sync to Digital Vault (Document)
       const existingDoc = await this.prisma.document.findFirst({
         where: {
           OR: [
@@ -129,8 +149,38 @@ export class CertificatesService {
           },
         });
       }
+
+      // 2. Sync to Compliance Table
+      const existingComp = await this.prisma.compliance.findFirst({
+        where: {
+          client_id: clientId,
+          reference_number: certNo,
+        },
+      });
+
+      if (existingComp) {
+        await this.prisma.compliance.update({
+          where: { id: existingComp.id },
+          data: {
+            issue_date: certificate.issue_date,
+            expiry_date: certificate.expiry_date,
+            status: certificate.status || 'ACTIVE',
+          },
+        });
+      } else {
+        await this.prisma.compliance.create({
+          data: {
+            client_id: clientId,
+            compliance_type: 'Safety Certificate',
+            reference_number: certNo,
+            issue_date: certificate.issue_date,
+            expiry_date: certificate.expiry_date,
+            status: certificate.status || 'ACTIVE',
+          },
+        });
+      }
     } catch (e) {
-      console.error('Failed to sync certificate to Digital Vault:', e);
+      console.error('Failed to sync certificate to Digital Vault & Compliance:', e);
     }
   }
 
@@ -418,10 +468,11 @@ export class CertificatesService {
         let result = text;
         
         // Dynamic section fields
+        const compNo = certificate.inspection_item?.cert_competency_no || fieldValues.cert_competency_no || (fieldValues.meta && fieldValues.meta.cert_competency_no) || '663';
         result = result.replace(/{{cert_ref_no}}/g, certificate.certificate_no);
         result = result.replace(/{{cert_test_date}}/g, issueDateStr);
         result = result.replace(/{{cert_expiry_date}}/g, expiryDateStr);
-        result = result.replace(/{{cert_competency_no}}/g, certificate.inspection_item?.cert_competency_no || '663');
+        result = result.replace(/{{cert_competency_no}}/g, compNo);
         
         // Client details
         result = result.replace(/{{client_name}}/g, certificate.inspection?.client?.name || '');

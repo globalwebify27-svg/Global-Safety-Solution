@@ -1144,6 +1144,18 @@ export default function DocumentVaultPage() {
                                                     </Button>
                                                   )}
 
+                                                  {!isClient && (
+                                                    <Button
+                                                      size="sm"
+                                                      variant="outline"
+                                                      onClick={() => handleDelete(cert.id)}
+                                                      className="h-8 px-2.5 text-xs font-bold border-rose-500/30 text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 hover:border-rose-500 transition-all"
+                                                      title="Revoke / Delete Certificate"
+                                                    >
+                                                      <Trash2 className="w-3.5 h-3.5 mr-1" /> Delete
+                                                    </Button>
+                                                  )}
+
                                                   <Button
                                                     size="sm"
                                                     variant="ghost"

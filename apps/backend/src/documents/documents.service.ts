@@ -67,7 +67,22 @@ export class DocumentsService {
           },
         });
 
-        if (!existingDoc) {
+        if (existingDoc) {
+          await this.prisma.document.update({
+            where: { id: existingDoc.id },
+            data: {
+              name: certName,
+              file_url: fileUrl,
+              file_type: 'PDF',
+              category: 'CERTIFICATE',
+              client_id: validClientId || existingDoc.client_id,
+              project_id: validProjectId || existingDoc.project_id,
+              expiry_date: cert.expiry_date,
+              test_date: cert.issue_date,
+              notes: `Certificate No. ${cert.certificate_no} | Status: ${cert.status || 'ACTIVE'}`,
+            },
+          });
+        } else {
           await this.prisma.document.create({
             data: {
               name: certName,
@@ -83,6 +98,38 @@ export class DocumentsService {
               uploaded_by: validEngineerId,
             },
           });
+        }
+
+        // Also sync to Compliance table
+        if (validClientId) {
+          const existingComp = await this.prisma.compliance.findFirst({
+            where: {
+              client_id: validClientId,
+              reference_number: cert.certificate_no,
+            },
+          });
+
+          if (existingComp) {
+            await this.prisma.compliance.update({
+              where: { id: existingComp.id },
+              data: {
+                issue_date: cert.issue_date,
+                expiry_date: cert.expiry_date,
+                status: cert.status || 'ACTIVE',
+              },
+            });
+          } else {
+            await this.prisma.compliance.create({
+              data: {
+                client_id: validClientId,
+                compliance_type: 'Safety Certificate',
+                reference_number: cert.certificate_no,
+                issue_date: cert.issue_date,
+                expiry_date: cert.expiry_date,
+                status: cert.status || 'ACTIVE',
+              },
+            });
+          }
         }
       }
     } catch (e) {
@@ -432,12 +479,22 @@ export class DocumentsService {
           if (match) certNumber = match[0];
         }
 
-        const clientName = doc.client?.name || 'General Safety Client';
-        const targetClientId = (doc.client_id && clientMap.has(doc.client_id)) ? doc.client_id : generalClientKey;
-        const targetClientNode = clientMap.get(targetClientId);
+        let resolvedClientId = doc.client_id;
+        if (!resolvedClientId && certRec?.inspection?.client_id) {
+          resolvedClientId = certRec.inspection.client_id;
+          this.prisma.document.update({
+            where: { id: doc.id },
+            data: { client_id: resolvedClientId }
+          }).catch(() => {});
+        }
+
+        const targetClientId = (resolvedClientId && clientMap.has(resolvedClientId)) ? resolvedClientId : generalClientKey;
+        const targetClientNode = clientMap.get(targetClientId) || clientMap.get(generalClientKey);
+        const clientName = doc.client?.name || targetClientNode?.client_name || 'General Safety Client';
         targetClientNode.total_certificates++;
 
-        const targetProjectKey = (doc.project_id && targetClientNode.projectMap.has(doc.project_id)) ? doc.project_id : 'general';
+        let resolvedProjectId = doc.project_id || certRec?.inspection?.project_id || certRec?.inspection?.work_order?.project_id;
+        const targetProjectKey = (resolvedProjectId && targetClientNode.projectMap.has(resolvedProjectId)) ? resolvedProjectId : 'general';
 
         if (!targetClientNode.projectMap.has(targetProjectKey)) {
           targetClientNode.projectMap.set(targetProjectKey, {
@@ -663,12 +720,32 @@ export class DocumentsService {
     const doc = await this.prisma.document.findUnique({ where: { id } });
     if (!doc) throw new NotFoundException('Document not found');
 
-    // 2. Delete DB record first
+    // 2. Find matching certificate and compliance records to delete them as well
+    const certRecord = await this.findMatchingCertificateRecord(doc);
+    if (certRecord) {
+      try {
+        if (doc.client_id && certRecord.certificate_no) {
+          await this.prisma.compliance.deleteMany({
+            where: {
+              client_id: doc.client_id,
+              reference_number: certRecord.certificate_no,
+            },
+          });
+        }
+        await this.prisma.certificate.delete({
+          where: { id: certRecord.id },
+        });
+      } catch (e) {
+        console.error('Non-blocking error deleting linked certificate/compliance:', e);
+      }
+    }
+
+    // 3. Delete DB record first
     const result = await this.prisma.document.delete({
       where: { id },
     });
 
-    // 3. Delete physical files from disk (non-blocking, best-effort)
+    // 4. Delete physical files from disk (non-blocking, best-effort)
     if (doc.file_url) {
       await this.localStorageService.deleteFile(doc.file_url);
     }
@@ -901,19 +978,6 @@ export class DocumentsService {
           },
         });
       }
-    }
-
-    if (!certRecord && doc.client_id) {
-      certRecord = await this.prisma.certificate.findFirst({
-        where: { inspection: { client_id: doc.client_id } },
-        orderBy: { created_at: 'desc' },
-      });
-    }
-
-    if (!certRecord) {
-      certRecord = await this.prisma.certificate.findFirst({
-        orderBy: { created_at: 'desc' },
-      });
     }
 
     return certRecord;

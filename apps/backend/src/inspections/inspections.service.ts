@@ -610,7 +610,48 @@ export class InspectionsService {
   async deleteItem(itemId: string) {
     const currentItem = await this.prisma.inspectionItem.findUnique({
       where: { id: itemId },
+      include: {
+        certificate: true,
+        inspection: true,
+      },
     });
+
+    if (currentItem) {
+      const cert = currentItem.certificate || await this.prisma.certificate.findFirst({
+        where: { inspection_item_id: itemId },
+      });
+
+      if (cert) {
+        try {
+          // 1. Delete matching Document from Digital Vault
+          await this.prisma.document.deleteMany({
+            where: {
+              OR: [
+                { file_url: cert.pdf_url || `/certificates/${cert.id}/pdf` },
+                { notes: { contains: cert.certificate_no } },
+              ],
+            },
+          });
+
+          // 2. Delete matching Compliance record from Compliance Hub
+          if (currentItem.inspection?.client_id) {
+            await this.prisma.compliance.deleteMany({
+              where: {
+                client_id: currentItem.inspection.client_id,
+                reference_number: cert.certificate_no,
+              },
+            });
+          }
+
+          // 3. Delete Certificate record
+          await this.prisma.certificate.delete({
+            where: { id: cert.id },
+          });
+        } catch (e) {
+          console.error('Error cleaning up certificate records during item deletion:', e);
+        }
+      }
+    }
 
     const deletedItem = await this.prisma.inspectionItem.delete({
       where: { id: itemId },
@@ -621,11 +662,9 @@ export class InspectionsService {
       const urls = this.parsePhotos(currentItem.photo_url);
       for (const url of urls) {
         try {
-          // Delete DB document record
           await this.prisma.document.deleteMany({
             where: { file_url: url },
           });
-          // Delete physical file from disk (both directories)
           await this.localStorageService.deleteFile(url);
         } catch (e) {
           console.error('Failed to clean up deleted document:', e);
