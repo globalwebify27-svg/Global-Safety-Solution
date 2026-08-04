@@ -328,6 +328,7 @@ export class CertificatesService {
           include: {
             client: true,
             engineer: true,
+            work_order: true,
           },
         },
         inspection_item: true,
@@ -469,7 +470,7 @@ export class CertificatesService {
         
         // Dynamic section fields
         const compNo = certificate.inspection_item?.cert_competency_no || fieldValues.cert_competency_no || (fieldValues.meta && fieldValues.meta.cert_competency_no) || '663';
-        result = result.replace(/{{cert_ref_no}}/g, certificate.certificate_no);
+        result = result.replace(/{{cert_ref_no}}/g, certificate.certificate_no || '');
         result = result.replace(/{{cert_test_date}}/g, issueDateStr);
         result = result.replace(/{{cert_expiry_date}}/g, expiryDateStr);
         result = result.replace(/{{cert_competency_no}}/g, compNo);
@@ -477,46 +478,37 @@ export class CertificatesService {
         // Client details
         result = result.replace(/{{client_name}}/g, certificate.inspection?.client?.name || '');
         result = result.replace(/{{client_city}}/g, certificate.inspection?.client?.city || '');
-        result = result.replace(/{{client_address}}/g, certificate.inspection?.client?.billing_address || '');
+        result = result.replace(/{{client_address}}/g, certificate.inspection?.client?.billing_address || certificate.inspection?.client?.city || '');
         
+        // Work order details
+        result = result.replace(/{{work_order_no}}/g, certificate.inspection?.work_order?.work_order_no || '');
+
         // Custom fields filled by staff
         Object.keys(fieldValues).forEach((key) => {
           const val = fieldValues[key];
-          result = result.replace(new RegExp(`{{${key}}}`, 'g'), val || '');
+          if (typeof val === 'string') {
+            result = result.replace(new RegExp(`{{${key}}}`, 'g'), val || '');
+          }
         });
 
         // Cleanup any remaining placeholders
         return result.replace(/{{.*?}}/g, 'N/A');
       };
 
-      // Draw Key-Value dynamic fields
-      let yRef = { val: 160 };
-      const drawRow = (num: string, label: string, val: string, labelWidth = 220) => {
-        const y = yRef.val;
-        
-        // Calculate dynamic heights based on text content and widths
-        doc.font('Helvetica-Bold').fontSize(7.5);
-        const labelHeight = doc.heightOfString(label, { width: labelWidth });
-        
-        doc.font('Helvetica').fontSize(7.5);
-        const valHeight = doc.heightOfString(`:  ${val || 'N/A'}`, { width: 560 - 56 - labelWidth - 4 });
-        
-        const rowHeight = Math.max(labelHeight, valHeight);
-        const rowPadding = 3; // Compact padding between content and bottom border line
-        
-        // Render texts using calculated layouts
-        doc.font('Helvetica-Bold').fontSize(7.5).fillColor(primaryColor).text(`${num}.`, 38, y, { width: 16 });
-        doc.font('Helvetica-Bold').text(label, 56, y, { width: labelWidth });
-        doc.font('Helvetica').text(`:  ${val || 'N/A'}`, 56 + labelWidth + 4, y, { width: 560 - 56 - labelWidth - 4 });
-        
-        yRef.val += rowHeight + rowPadding;
-        doc.moveTo(35, yRef.val - 1).lineTo(560, yRef.val - 1).lineWidth(0.3).stroke('#e2e8f0');
-      };
+      // Prepare all table rows
+      const rows: { num: string; label: string; val: string }[] = [];
 
-
-      // Draw Standard defaults
-      drawRow('1', 'Name of the occupier of the Factory', certificate.inspection?.client?.name || 'N/A');
-      drawRow('2', 'Address of the Factory', certificate.inspection?.client?.billing_address || certificate.inspection?.client?.city || 'N/A');
+      // Row 1 & 2 standard defaults
+      rows.push({
+        num: '1',
+        label: 'Name of the occupier of the Factory',
+        val: certificate.inspection?.client?.name || 'N/A',
+      });
+      rows.push({
+        num: '2',
+        label: 'Address of the Factory',
+        val: certificate.inspection?.client?.billing_address || certificate.inspection?.client?.city || 'N/A',
+      });
 
       // Parse custom template fields if defined
       let templateFields: any[] = [];
@@ -528,41 +520,128 @@ export class CertificatesService {
         }
       }
 
-      // Draw custom fields from template
       if (Array.isArray(templateFields) && templateFields.length > 0) {
         templateFields.forEach((field: any, index: number) => {
           const label = field.label || field.name || 'Field';
           const placeholderKey = field.key || field.name || '';
           const valueRaw = fieldValues[placeholderKey] || '';
           const finalVal = replacePlaceholders(valueRaw || field.default || '');
-          drawRow((index + 3).toString(), label, finalVal);
+          rows.push({
+            num: (index + 3).toString(),
+            label,
+            val: finalVal || 'N/A',
+          });
         });
       } else {
         // Fallback standard fields
-        drawRow('3', 'Description of Safety Check / Eqpt', certificate.inspection_item?.description || 'N/A');
-        drawRow('4', 'Observations / Notes', certificate.inspection_item?.notes || 'N/A');
-        drawRow('5', 'Scope of Inspection', certificate.inspection_item?.scope || 'N/A');
-        drawRow('6', 'Remarks & Recommendations', certificate.inspection_item?.recommendations || 'N/A');
+        rows.push({
+          num: '3',
+          label: 'Description of Safety Check / Eqpt',
+          val: certificate.inspection_item?.description || 'N/A',
+        });
+        rows.push({
+          num: '4',
+          label: 'Observations / Notes',
+          val: certificate.inspection_item?.notes || 'N/A',
+        });
+        rows.push({
+          num: '5',
+          label: 'Scope of Inspection',
+          val: certificate.inspection_item?.scope || 'N/A',
+        });
+        rows.push({
+          num: '6',
+          label: 'Remarks & Recommendations',
+          val: certificate.inspection_item?.recommendations || 'N/A',
+        });
       }
 
-      // Dynamic Certifying Statement
+      // Certifying Statement
       const finalStatementRaw = template?.html_content || `I / We certify that on {{cert_test_date}} the safety checklist section described above was thoroughly examined and found satisfactory, subject to notes and recommendations.`;
       const finalStatement = replacePlaceholders(finalStatementRaw);
 
-      const statementY = Math.min(yRef.val + 6, 620);
-      doc.fontSize(7.5).font('Helvetica-Oblique').fillColor(primaryColor);
+      // --- Dynamic Layout Scaling Engine ---
+      const startY = 158;
+      const maxAvailableHeight = 507; // Available height for table rows + statement (158 to 665)
+
+      // Candidate configurations for auto-fitting content onto a single page
+      const candidateConfigs = [
+        { fontSize: 7.5, rowPadding: 3.0, statementFontSize: 7.5, statementGap: 8, labelWidth: 220 },
+        { fontSize: 7.0, rowPadding: 2.2, statementFontSize: 7.0, statementGap: 6, labelWidth: 220 },
+        { fontSize: 6.5, rowPadding: 1.8, statementFontSize: 6.5, statementGap: 5, labelWidth: 225 },
+        { fontSize: 6.0, rowPadding: 1.2, statementFontSize: 6.0, statementGap: 4, labelWidth: 230 },
+        { fontSize: 5.5, rowPadding: 1.0, statementFontSize: 5.5, statementGap: 3, labelWidth: 235 },
+      ];
+
+      let selectedConfig = candidateConfigs[candidateConfigs.length - 1]; // fallback
+
+      for (const config of candidateConfigs) {
+        let testHeight = 0;
+        const valWidth = 560 - 56 - config.labelWidth - 4;
+
+        for (const row of rows) {
+          doc.font('Helvetica-Bold').fontSize(config.fontSize);
+          const lblH = doc.heightOfString(row.label, { width: config.labelWidth });
+          doc.font('Helvetica').fontSize(config.fontSize);
+          const valH = doc.heightOfString(`:  ${row.val}`, { width: valWidth });
+          const rowH = Math.max(lblH, valH) + config.rowPadding;
+          testHeight += rowH;
+        }
+
+        // Add statement height
+        doc.font('Helvetica-Oblique').fontSize(config.statementFontSize);
+        const stmtH = doc.heightOfString(finalStatement, { width: 516, lineGap: 1 });
+        testHeight += config.statementGap + stmtH;
+
+        if (testHeight <= maxAvailableHeight) {
+          selectedConfig = config;
+          break;
+        }
+      }
+
+      // Render Key-Value Rows using selectedConfig
+      const fontSz = selectedConfig.fontSize;
+      const rowPad = selectedConfig.rowPadding;
+      const lblW = selectedConfig.labelWidth;
+      const valW = 560 - 56 - lblW - 4;
+
+      let currentY = startY;
+
+      for (const row of rows) {
+        doc.font('Helvetica-Bold').fontSize(fontSz);
+        const lblH = doc.heightOfString(row.label, { width: lblW });
+
+        doc.font('Helvetica').fontSize(fontSz);
+        const valH = doc.heightOfString(`:  ${row.val}`, { width: valW });
+
+        const contentH = Math.max(lblH, valH);
+        const rowH = contentH + rowPad;
+
+        // Render number, label, and value
+        doc.font('Helvetica-Bold').fontSize(fontSz).fillColor(primaryColor).text(`${row.num}.`, 38, currentY, { width: 16 });
+        doc.font('Helvetica-Bold').text(row.label, 56, currentY, { width: lblW });
+        doc.font('Helvetica').text(`:  ${row.val}`, 56 + lblW + 4, currentY, { width: valW });
+
+        currentY += rowH;
+        doc.moveTo(35, currentY - 1).lineTo(560, currentY - 1).lineWidth(0.3).stroke('#e2e8f0');
+      }
+
+      // Render Certifying Statement
+      const statementY = currentY + selectedConfig.statementGap;
+      doc.fontSize(selectedConfig.statementFontSize).font('Helvetica-Oblique').fillColor(primaryColor);
       doc.text(finalStatement, 38, statementY, { width: 516, align: 'justify', lineGap: 1 });
 
-      // Signatures & Footer
-      const sigY = Math.min(statementY + 45, 680);
-      
-      // Divider
-      doc.moveTo(28, sigY - 6).lineTo(567, sigY - 6).lineWidth(0.5).stroke('#94a3b8');
+      // Signatures & Footer fixed bottom positioning
+      const sigY = 668;
+      const competencyNoVal = certificate.inspection_item?.cert_competency_no || fieldValues.cert_competency_no || '663';
+
+      // Divider line above signature section
+      doc.moveTo(28, sigY - 8).lineTo(567, sigY - 8).lineWidth(0.5).stroke('#94a3b8');
 
       doc.font('Helvetica-Bold').fontSize(7.5).fillColor(primaryColor);
       doc.text(`Test Date: ${issueDateStr}`, 38, sigY);
       doc.text(`Due Date: ${expiryDateStr}`, 38, sigY + 12);
-      doc.font('Helvetica').text(`Competency No – ${certificate.inspection_item?.cert_competency_no || '663'}`, 38, sigY + 24);
+      doc.font('Helvetica').text(`Competency No – ${competencyNoVal}`, 38, sigY + 24);
 
       // QR Code
       if (qrCodeBuffer) {
@@ -584,7 +663,7 @@ export class CertificatesService {
         doc.text('Competent Person under the Factories Act. 1948', 160, startY + 9, { align: 'center', width: 280 });
         doc.text(`Competency No. from Govt. – Memo. No.: ${competencyNo}`, 160, startY + 18, { align: 'center', width: 280 });
       };
-      drawCompetencyFooter(sigY + 60, certificate.inspection_item?.cert_competency_no || '663');
+      drawCompetencyFooter(sigY + 60, competencyNoVal);
 
       doc.end();
     });
