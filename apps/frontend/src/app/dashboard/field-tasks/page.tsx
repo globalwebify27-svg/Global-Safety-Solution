@@ -1269,17 +1269,31 @@ export default function FieldTasksPage() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <span className="font-bold text-foreground">Equipment {index + 1}</span>
-                    {selectedTask?.certificates?.some(
-                      (c: any) => c.inspection_item_id === item.id || (item.cert_ref_no && c.certificate_no === item.cert_ref_no)
-                    ) ? (
-                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center gap-1 shadow-sm">
-                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" /> Certificate Issued & Saved in Vault
-                      </span>
-                    ) : (
-                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-medium text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20">
-                        Pending Generation
-                      </span>
-                    )}
+                    {(() => {
+                      const certs = selectedTask?.certificates || [];
+                      const isGenerated = certs.some((c: any) => {
+                        if (!c) return false;
+                        if (c.inspection_item_id && c.inspection_item_id === item.id) return true;
+                        if (item.cert_ref_no && c.certificate_no) {
+                          const cleanRef = item.cert_ref_no.trim().toLowerCase();
+                          const cleanCertNo = c.certificate_no.trim().toLowerCase();
+                          if (cleanRef && cleanCertNo && (cleanRef === cleanCertNo || cleanCertNo.includes(cleanRef) || cleanRef.includes(cleanCertNo))) {
+                            return true;
+                          }
+                        }
+                        return false;
+                      });
+
+                      return isGenerated ? (
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center gap-1 shadow-sm">
+                          <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" /> Certificate Issued & Saved in Vault
+                        </span>
+                      ) : (
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-medium text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20">
+                          Pending Generation
+                        </span>
+                      );
+                    })()}
                   </div>
                   <div className="flex items-center gap-2">
                     <Button 
@@ -1557,6 +1571,7 @@ export default function FieldTasksPage() {
                             const cert = await res.json();
                             toast.dismiss(loadingToast);
                             toast.success("Certificate generated and saved to Compliance & Digital Vault!");
+                            await refreshSelectedTask(selectedTask.id);
                           } catch (err: any) {
                             toast.dismiss(loadingToast);
                             toast.error(err.message || "Failed to generate certificate");
