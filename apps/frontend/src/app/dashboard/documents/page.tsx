@@ -46,6 +46,7 @@ import {
   Mail,
   Pencil
 } from "lucide-react";
+import { InspectionImageVaultView } from "@/components/documents/InspectionImageVaultView";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -138,7 +139,7 @@ export default function DocumentVaultPage() {
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState("ALL");
-  const [viewMode, setViewMode] = useState<"HIERARCHY" | "REGISTRY">("HIERARCHY");
+  const [viewMode, setViewMode] = useState<"HIERARCHY" | "REGISTRY" | "IMAGES">("HIERARCHY");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
@@ -721,6 +722,18 @@ export default function DocumentVaultPage() {
               <LayoutGrid className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
               All Vault Files
             </button>
+            <button
+              onClick={() => setViewMode("IMAGES")}
+              className={cn(
+                "flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all",
+                viewMode === "IMAGES"
+                  ? "bg-background text-foreground shadow-md font-extrabold"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <ImageIcon className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+              Inspection Image Vault
+            </button>
           </div>
 
           <Button 
@@ -880,6 +893,12 @@ export default function DocumentVaultPage() {
               <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground">
                 <Building2 className="w-4 h-4 text-blue-500" />
                 <span>Client & Project Vault Hierarchy</span>
+              </div>
+            )}
+            {viewMode === "IMAGES" && (
+              <div className="flex items-center gap-2 text-xs font-bold text-purple-600 dark:text-purple-400">
+                <ImageIcon className="w-4 h-4" />
+                <span>Inspection Image Repository & Equipment Photo Tree</span>
               </div>
             )}
           </div>
@@ -1153,6 +1172,13 @@ export default function DocumentVaultPage() {
                 );
               })
             )}
+          </div>
+        )}
+
+        {/* IMAGES VIEW (Inspection Image Vault) */}
+        {viewMode === "IMAGES" && (
+          <div className="p-6">
+            <InspectionImageVaultView token={token || ""} />
           </div>
         )}
 

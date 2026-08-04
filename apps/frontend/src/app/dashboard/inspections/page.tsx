@@ -2285,7 +2285,6 @@ export default function InspectionsPage() {
                                       template_id: templateId,
                                       field_values: fieldVals
                                     };
-                                    
                                     const loadingToast = toast.loading("Generating certificate...");
                                     try {
                                       // 1. Create the certificate

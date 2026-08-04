@@ -74,6 +74,15 @@ export class DocumentsController {
     return this.documentsService.getVaultHierarchy(req.user);
   }
 
+  @Get('image-vault-tree')
+  @Permissions('READ_DOCUMENT')
+  @Header('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+  @Header('Pragma', 'no-cache')
+  @Header('Expires', '0')
+  getImageVaultTree(@Req() req: any) {
+    return this.documentsService.getImageVaultTree(req.user);
+  }
+
   @Get('due/stats')
   @Permissions('READ_DOCUMENT')
   getDueStats(@Req() req: any) {

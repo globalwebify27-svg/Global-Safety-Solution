@@ -31,6 +31,15 @@ export class CertificatesController {
     return this.certificatesService.findAll();
   }
 
+  @Get('item/:itemId')
+  async findByItem(@Param('itemId') itemId: string) {
+    const cert = await this.certificatesService.findByItem(itemId);
+    if (!cert) {
+      return { exists: false, certificate: null };
+    }
+    return { exists: true, certificate: cert };
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.certificatesService.findOne(id);

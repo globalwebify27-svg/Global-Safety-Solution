@@ -90,6 +90,166 @@ export class DocumentsService {
     }
   }
 
+  private parsePhotos(photoUrl?: string | null): string[] {
+    if (!photoUrl) return [];
+    let clean = photoUrl.trim();
+    if (clean.startsWith('data:')) return [clean];
+    if (clean.startsWith('[') && clean.endsWith(']')) {
+      try {
+        const parsed = JSON.parse(clean);
+        if (Array.isArray(parsed)) {
+          return parsed.map((url) => (typeof url === 'string' ? url.trim() : url));
+        }
+      } catch (e) {}
+    }
+    return clean
+      .split(',')
+      .map((url) => url.trim())
+      .filter(Boolean);
+  }
+
+  async getImageVaultTree(userPayload?: any) {
+    try {
+      let userClientId: string | undefined;
+      const userId = userPayload?.userId || userPayload?.id || userPayload?.sub;
+      if (userId) {
+        const user = await this.prisma.user.findUnique({
+          where: { id: userId },
+          include: {
+            roles: { include: { role: true } },
+          },
+        });
+        const isClient =
+          user?.roles?.some(
+            (ur: any) => ur.role.name === 'CLIENT' || ur.role.name === 'CLIENTS',
+          ) || (user?.designation || '').toUpperCase().includes('CLIENT');
+
+        if (isClient && user?.email) {
+          const clientRecord = await this.prisma.client.findFirst({
+            where: { email: user.email },
+          });
+          userClientId = clientRecord?.id;
+        }
+      }
+
+      const clients = await this.prisma.client.findMany({
+        where: {
+          ...(userClientId ? { id: userClientId } : {}),
+        },
+        include: {
+          inspections: {
+            include: {
+              items: true,
+              work_order: true,
+              project: true,
+            },
+            orderBy: { scheduled_date: 'desc' },
+          },
+        },
+        orderBy: { name: 'asc' },
+      });
+
+      let grandTotalInspections = 0;
+      let grandTotalEquipments = 0;
+      let grandTotalPhotos = 0;
+
+      const clientNodes = clients
+        .map((client) => {
+          const inspectionNodes = client.inspections
+            .map((inspection) => {
+              const equipmentNodes = inspection.items
+                .map((item) => {
+                  const rawPhotos = this.parsePhotos(item.photo_url);
+                  if (rawPhotos.length === 0) return null;
+
+                  const photos = rawPhotos.map((url, idx) => ({
+                    id: `${item.id}_p${idx}`,
+                    url,
+                    name: `Inspection Photo ${idx + 1}`,
+                    uploaded_at: item.cert_test_date || inspection.completed_date || inspection.scheduled_date,
+                  }));
+
+                  return {
+                    item_id: item.id,
+                    description: item.description || 'Equipment Inspection Item',
+                    status: item.status || 'PENDING',
+                    notes: item.notes || '',
+                    cert_ref_no: item.cert_ref_no || null,
+                    cert_test_date: item.cert_test_date || null,
+                    cert_expiry_date: item.cert_expiry_date || null,
+                    photos,
+                    total_photos: photos.length,
+                  };
+                })
+                .filter(Boolean);
+
+              if (equipmentNodes.length === 0) return null;
+
+              const totalPhotosInInspection = equipmentNodes.reduce(
+                (sum, eq) => sum + (eq?.total_photos || 0),
+                0,
+              );
+
+              return {
+                inspection_id: inspection.id,
+                scheduled_date: inspection.scheduled_date,
+                completed_date: inspection.completed_date,
+                status: inspection.status,
+                title: inspection.work_order?.description || inspection.project?.name || `Inspection (${new Date(inspection.scheduled_date).toLocaleDateString()})`,
+                work_order_no: inspection.work_order?.work_order_no || null,
+                equipments: equipmentNodes,
+                total_equipments: equipmentNodes.length,
+                total_photos: totalPhotosInInspection,
+              };
+            })
+            .filter(Boolean);
+
+          if (inspectionNodes.length === 0) return null;
+
+          const totalPhotosInClient = inspectionNodes.reduce(
+            (sum, insp) => sum + (insp?.total_photos || 0),
+            0,
+          );
+          const totalEquipmentsInClient = inspectionNodes.reduce(
+            (sum, insp) => sum + (insp?.total_equipments || 0),
+            0,
+          );
+
+          grandTotalInspections += inspectionNodes.length;
+          grandTotalEquipments += totalEquipmentsInClient;
+          grandTotalPhotos += totalPhotosInClient;
+
+          return {
+            client_id: client.id,
+            client_name: client.name,
+            industry: (client as any).industry || 'Safety Operations',
+            city: (client as any).city || 'Headquarters',
+            inspections: inspectionNodes,
+            total_inspections: inspectionNodes.length,
+            total_equipments: totalEquipmentsInClient,
+            total_photos: totalPhotosInClient,
+          };
+        })
+        .filter(Boolean);
+
+      return {
+        hierarchy: clientNodes,
+        stats: {
+          total_clients: clientNodes.length,
+          total_inspections: grandTotalInspections,
+          total_equipments: grandTotalEquipments,
+          total_photos: grandTotalPhotos,
+        },
+      };
+    } catch (error) {
+      console.error('Error in getImageVaultTree:', error);
+      return {
+        hierarchy: [],
+        stats: { total_clients: 0, total_inspections: 0, total_equipments: 0, total_photos: 0 },
+      };
+    }
+  }
+
   async getVaultHierarchy(userPayload?: any) {
     try {
       // 1. Ensure pre-existing certificates are synced to Digital Vault

@@ -171,6 +171,22 @@ export class CertificatesService {
     return certificate;
   }
 
+  async findByItem(itemId: string) {
+    if (!itemId) return null;
+    return this.prisma.certificate.findFirst({
+      where: { inspection_item_id: itemId },
+      include: {
+        inspection: {
+          include: {
+            client: true,
+            work_order: true,
+          },
+        },
+      },
+    });
+  }
+
+
   async update(id: string, updateCertificateDto: UpdateCertificateDto) {
     const { metadata, ...rest } = updateCertificateDto;
     const metadataStr = metadata && typeof metadata === 'object'
