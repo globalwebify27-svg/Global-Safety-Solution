@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Patch, Body, Query, Param, Req, UseGuards } from "@nestjs/common";
+import { Controller, Get, Post, Put, Patch, Delete, Body, Query, Param, Req, UseGuards } from "@nestjs/common";
 import { AccountingService } from "./accounting.service";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 
@@ -73,6 +73,14 @@ export class AccountingController {
   @Get("vouchers/:id/audit-trail")
   async getLedgerAuditLogs(@Param("id") id: string) {
     return this.accountingService.getLedgerAuditLogs(id);
+  }
+
+  @Delete("vouchers/:id")
+  async deleteVoucher(@Param("id") id: string, @Req() req: any) {
+    const user = req.user?.name 
+      ? `${req.user.name}${req.user.employee_id ? " (" + req.user.employee_id + ")" : ""}` 
+      : (req.user?.email === "admin@globalsafety.com" || req.user?.email === "amrvbloggers@gmail.com" ? "Super Admin (SYSTEM)" : req.user?.email || "System");
+    return this.accountingService.deleteVoucher(id, user);
   }
 
   @Post("transactions")

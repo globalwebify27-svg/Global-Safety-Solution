@@ -435,4 +435,61 @@ export class AccountingService {
       await tx.ledgerEntry.delete({ where: { id: entry.id } });
     });
   }
+
+  async deleteVoucher(id: string, deletedBy: string) {
+    const entry = await this.prisma.ledgerEntry.findUnique({
+      where: { id },
+      include: {
+        debit_account: true,
+        credit_account: true,
+      },
+    });
+    if (!entry) throw new NotFoundException(`Voucher with ID ${id} not found`);
+
+    const amt = Number(entry.amount);
+
+    return this.prisma.$transaction(async (tx) => {
+      // Revert debit account balance change
+      const debitMult = (entry.debit_account.type === "ASSET" || entry.debit_account.type === "EXPENSE") ? 1 : -1;
+      await tx.account.update({
+        where: { id: entry.debit_account_id },
+        data: { balance: { decrement: amt * debitMult } }
+      });
+
+      // Revert credit account balance change
+      const creditMult = (entry.credit_account.type === "ASSET" || entry.credit_account.type === "EXPENSE") ? -1 : 1;
+      await tx.account.update({
+        where: { id: entry.credit_account_id },
+        data: { balance: { decrement: amt * creditMult } }
+      });
+
+      // Delete the entry
+      await tx.ledgerEntry.delete({
+        where: { id }
+      });
+
+      // Record Audit Log
+      await tx.auditLog.create({
+        data: {
+          action: "DELETE_VOUCHER",
+          entity_type: "LEDGER_ENTRY",
+          entity_id: id,
+          old_data: JSON.stringify({
+            voucher_no: entry.voucher_no,
+            description: entry.description,
+            amount: entry.amount,
+            debit_account: `${entry.debit_account.name} (${entry.debit_account.code})`,
+            credit_account: `${entry.credit_account.name} (${entry.credit_account.code})`,
+            invoice_id: entry.invoice_id,
+            payment_id: entry.payment_id,
+            transaction_date: entry.transaction_date,
+            created_by: entry.created_by,
+          }),
+          user_id: deletedBy,
+        }
+      });
+
+      return { success: true };
+    });
+  }
 }

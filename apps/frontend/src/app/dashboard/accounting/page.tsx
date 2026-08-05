@@ -12,7 +12,7 @@ import {
   Plus, Calculator, ArrowUpRight, ArrowDownLeft, Search,
   Download, TrendingUp, DollarSign, ShieldAlert, ChevronDown,
   ChevronRight, Pencil, X, Activity, Scale, Waves, User,
-  FileSpreadsheet, Banknote, History
+  FileSpreadsheet, Banknote, History, AlertTriangle, Trash2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
@@ -63,6 +63,8 @@ export default function AccountingPage() {
   const [viewAuditVoucher, setViewAuditVoucher] = useState<Voucher | null>(null);
   const [voucherAuditLogs, setVoucherAuditLogs] = useState<any[]>([]);
   const [auditLoadingLogs, setAuditLoadingLogs] = useState(false);
+  const [deleteVoucherTarget, setDeleteVoucherTarget] = useState<Voucher | null>(null);
+  const [deletingVoucher, setDeletingVoucher] = useState(false);
   const [editOBAccount, setEditOBAccount] = useState<Account | null>(null);
   const [editOBAmount, setEditOBAmount] = useState("");
   const [editOBLoading, setEditOBLoading] = useState(false);
@@ -301,6 +303,31 @@ export default function AccountingPage() {
       setVoucherAuditLogs(v.audit_logs || []);
     } finally {
       setAuditLoadingLogs(false);
+    }
+  };
+
+  const handleDeleteVoucher = async () => {
+    if (!token || !deleteVoucherTarget) return;
+    try {
+      setDeletingVoucher(true);
+      const res = await fetch(`${API_BASE_URL}/accounting/vouchers/${deleteVoucherTarget.id}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      if (res.ok) {
+        toast.success(`Voucher ${deleteVoucherTarget.voucher_no} deleted successfully.`);
+        setDeleteVoucherTarget(null);
+        fetchAccountsAndVouchers();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.message || "Failed to delete voucher.");
+      }
+    } catch (e) {
+      toast.error("Network error occurred.");
+    } finally {
+      setDeletingVoucher(false);
     }
   };
 
@@ -810,7 +837,7 @@ export default function AccountingPage() {
                             >
                               <Pencil className="w-3.5 h-3.5 mr-1" /> Edit / Correct
                             </Button>
-                            {(v.is_corrected || (v.audit_logs && v.audit_logs.length > 0)) && (
+                             {(v.is_corrected || (v.audit_logs && v.audit_logs.length > 0)) && (
                               <Button
                                 size="sm"
                                 variant="outline"
@@ -820,6 +847,14 @@ export default function AccountingPage() {
                                 <History className="w-3.5 h-3.5 mr-1" /> Audit Trail
                               </Button>
                             )}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setDeleteVoucherTarget(v)}
+                              className="h-8 text-xs font-bold border-rose-500/30 text-rose-500 hover:bg-rose-500/10 rounded-lg"
+                            >
+                              <Trash2 className="w-3.5 h-3.5 mr-1" /> Delete
+                            </Button>
                           </div>
                         </td>
                       </tr>
@@ -1109,6 +1144,83 @@ export default function AccountingPage() {
           )}
         </>
       )}
+
+      {/* Delete Voucher Confirmation Dialog */}
+      <Dialog open={!!deleteVoucherTarget} onOpenChange={(open) => { if (!open) setDeleteVoucherTarget(null); }}>
+        <DialogContent className="sm:max-w-[500px] bg-card border-border text-foreground shadow-2xl rounded-3xl p-6 relative">
+          <div className="absolute top-0 left-0 w-full h-1.5 bg-rose-600" />
+          
+          <DialogHeader>
+            <DialogTitle className="text-xl font-black flex items-center gap-2 text-rose-600">
+              <AlertTriangle className="w-5 h-5" /> Confirm Voucher Deletion
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              This action will remove the voucher from the ledger, reverse the balances of linked accounts, and create a delete audit trail log.
+            </DialogDescription>
+          </DialogHeader>
+
+          {deleteVoucherTarget && (
+            <div className="space-y-4 my-2">
+              <div className="p-4 bg-rose-500/10 border border-rose-500/20 rounded-2xl space-y-2 text-xs">
+                <p className="font-bold text-rose-500">
+                  Are you sure you want to delete Voucher <span className="font-mono font-black">{deleteVoucherTarget.voucher_no}</span>?
+                </p>
+                {(deleteVoucherTarget.invoice_id || deleteVoucherTarget.payment_id) && (
+                  <p className="text-rose-400 font-bold bg-rose-500/5 p-2.5 rounded-xl border border-rose-500/10 flex items-start gap-1.5 mt-2">
+                    <AlertTriangle className="w-4 h-4 shrink-0 text-rose-500" />
+                    <span>
+                      WARNING: This voucher is associated with an {deleteVoucherTarget.invoice_id ? "Invoice" : "Payment"}. Deleting this voucher will decouple it and might lead to accounting mismatches.
+                    </span>
+                  </p>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 text-xs bg-muted/40 p-3 rounded-2xl border border-border">
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-muted-foreground">Debit Account</span>
+                  <p className="font-semibold text-emerald-500">{deleteVoucherTarget.debit_account?.name} ({deleteVoucherTarget.debit_account?.code})</p>
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-muted-foreground">Credit Account</span>
+                  <p className="font-semibold text-rose-500">{deleteVoucherTarget.credit_account?.name} ({deleteVoucherTarget.credit_account?.code})</p>
+                </div>
+                <div className="col-span-2">
+                  <span className="text-[10px] uppercase font-bold text-muted-foreground">Description</span>
+                  <p className="font-semibold">{deleteVoucherTarget.description}</p>
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-muted-foreground">Amount</span>
+                  <p className="font-bold text-foreground">₹{Number(deleteVoucherTarget.amount).toLocaleString()}</p>
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-muted-foreground">Transaction Date</span>
+                  <p className="font-bold text-foreground">{new Date(deleteVoucherTarget.transaction_date).toLocaleDateString()}</p>
+                </div>
+              </div>
+
+              <DialogFooter className="pt-3 border-t border-border flex items-center justify-between">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setDeleteVoucherTarget(null)}
+                  className="h-9 text-xs"
+                  disabled={deletingVoucher}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleDeleteVoucher}
+                  disabled={deletingVoucher}
+                  className="h-9 px-5 text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white"
+                >
+                  {deletingVoucher ? "Deleting..." : "Confirm Delete"}
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Edit / Correct Voucher Dialog Modal */}
       <Dialog open={!!correctVoucher} onOpenChange={(open) => { if (!open) setCorrectVoucher(null); }}>
