@@ -3,8 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAuthStore } from "@/store/auth";
 import { API_BASE_URL } from "@/lib/config";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
+
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { 
@@ -336,10 +335,12 @@ export default function FinancePage() {
     }
   };
 
-  const generatePDF = (invoice: Invoice) => {
+  const generatePDF = async (invoice: Invoice) => {
+    const jsPDF = (await import("jspdf")).default;
+    const autoTable = (await import("jspdf-autotable")).default;
     const doc = new jsPDF();
     const img = new Image();
-    img.src = '/logo.png';
+    img.src = '/logo.webp';
     
     const drawContent = (includeLogo: boolean) => {
       if (includeLogo) {

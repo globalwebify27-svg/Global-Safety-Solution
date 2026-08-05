@@ -3,9 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useAuthStore } from "@/store/auth";
 import { API_BASE_URL } from "@/lib/config";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
-import * as XLSX from "xlsx";
+
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
@@ -358,9 +356,10 @@ export default function AccountingPage() {
     } catch { toast.error("Network error."); } finally { setEditOBLoading(false); }
   };
 
-  const downloadExcelReport = () => {
+  const downloadExcelReport = async () => {
     if (!reportData) { toast.error("No report data."); return; }
     try {
+      const XLSX = await import("xlsx");
       const plData = [
         ["GLOBAL SAFETY SOLUTION"],
         ["PROFIT & LOSS STATEMENT"],
@@ -402,8 +401,10 @@ export default function AccountingPage() {
     } catch { toast.error("Excel generation failed."); }
   };
 
-  const downloadPDFReport = () => {
+  const downloadPDFReport = async () => {
     if (!reportData) return;
+    const jsPDF = (await import("jspdf")).default;
+    const autoTable = (await import("jspdf-autotable")).default;
     const doc = new jsPDF();
     const { period, year, month } = reportFilter;
     const ds = period === "monthly" ? new Date(year, month).toLocaleString("default", { month: "long", year: "numeric" }) : period === "halfyearly" ? `Half Yearly (${year})` : `Yearly (${year})`;
@@ -417,8 +418,9 @@ export default function AccountingPage() {
     toast.success("PDF downloaded!");
   };
 
-  const downloadCOAExcel = () => {
+  const downloadCOAExcel = async () => {
     try {
+      const XLSX = await import("xlsx");
       const data = [
         ["GLOBAL SAFETY SOLUTION"],
         ["CHART OF ACCOUNTS"],
@@ -433,7 +435,9 @@ export default function AccountingPage() {
     } catch { toast.error("COA Excel export failed."); }
   };
 
-  const downloadCOAPDF = () => {
+  const downloadCOAPDF = async () => {
+    const jsPDF = (await import("jspdf")).default;
+    const autoTable = (await import("jspdf-autotable")).default;
     const doc = new jsPDF();
     doc.setFontSize(18); doc.setFont("helvetica", "bold"); doc.text("GLOBAL SAFETY SOLUTION", 14, 20);
     doc.setFontSize(12); doc.setFont("helvetica", "normal"); doc.text("Chart of Accounts Registry", 14, 27); doc.line(14, 32, 196, 32);
@@ -448,9 +452,10 @@ export default function AccountingPage() {
     toast.success("COA PDF downloaded!");
   };
 
-  const downloadTrialBalanceExcel = () => {
+  const downloadTrialBalanceExcel = async () => {
     if (!reportData?.trialBalance) { toast.error("No trial balance data."); return; }
     try {
+      const XLSX = await import("xlsx");
       const tb = reportData.trialBalance;
       const td = tb.reduce((s: number, t: any) => s + Number(t.debit), 0);
       const tc = tb.reduce((s: number, t: any) => s + Number(t.credit), 0);
@@ -471,8 +476,10 @@ export default function AccountingPage() {
     } catch { toast.error("Trial Balance Excel export failed."); }
   };
 
-  const downloadTrialBalancePDF = () => {
+  const downloadTrialBalancePDF = async () => {
     if (!reportData?.trialBalance) { toast.error("No trial balance data."); return; }
+    const jsPDF = (await import("jspdf")).default;
+    const autoTable = (await import("jspdf-autotable")).default;
     const doc = new jsPDF();
     const tb = reportData.trialBalance;
     const td = tb.reduce((s: number, t: any) => s + Number(t.debit), 0);
@@ -495,8 +502,9 @@ export default function AccountingPage() {
     toast.success("Trial Balance PDF downloaded!");
   };
 
-  const downloadDrillLedgerExcel = (account: Account, entries: any[]) => {
+  const downloadDrillLedgerExcel = async (account: Account, entries: any[]) => {
     try {
+      const XLSX = await import("xlsx");
       const data = [
         ["GLOBAL SAFETY SOLUTION"],
         [`LEDGER STATEMENT: ${account.name.toUpperCase()} (${account.code})`],
@@ -519,7 +527,9 @@ export default function AccountingPage() {
     } catch { toast.error("Ledger Excel export failed."); }
   };
 
-  const downloadDrillLedgerPDF = (account: Account, entries: any[]) => {
+  const downloadDrillLedgerPDF = async (account: Account, entries: any[]) => {
+    const jsPDF = (await import("jspdf")).default;
+    const autoTable = (await import("jspdf-autotable")).default;
     const doc = new jsPDF();
     doc.setFontSize(18); doc.setFont("helvetica", "bold"); doc.text("GLOBAL SAFETY SOLUTION", 14, 20);
     doc.setFontSize(12); doc.setFont("helvetica", "normal"); doc.text(`Ledger Statement for Account: ${account.name} (${account.code})`, 14, 27); doc.line(14, 32, 196, 32);
@@ -542,8 +552,9 @@ export default function AccountingPage() {
     toast.success("Ledger PDF downloaded!");
   };
 
-  const downloadLedgerBoardExcel = () => {
+  const downloadLedgerBoardExcel = async () => {
     try {
+      const XLSX = await import("xlsx");
       const data = [
         ["GLOBAL SAFETY SOLUTION"],
         ["GENERAL LEDGER VOUCHERS BOARD"],
@@ -566,7 +577,9 @@ export default function AccountingPage() {
     } catch { toast.error("Ledger Board Excel export failed."); }
   };
 
-  const downloadLedgerBoardPDF = () => {
+  const downloadLedgerBoardPDF = async () => {
+    const jsPDF = (await import("jspdf")).default;
+    const autoTable = (await import("jspdf-autotable")).default;
     const doc = new jsPDF();
     doc.setFontSize(18); doc.setFont("helvetica", "bold"); doc.text("GLOBAL SAFETY SOLUTION", 14, 20);
     doc.setFontSize(12); doc.setFont("helvetica", "normal"); doc.text("General Ledger Vouchers Audit Log", 14, 27); doc.line(14, 32, 196, 32);

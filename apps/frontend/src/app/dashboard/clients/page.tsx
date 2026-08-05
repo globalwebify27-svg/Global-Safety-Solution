@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { useAuthStore } from "@/store/auth";
 import { API_BASE_URL } from "@/lib/config";
@@ -361,34 +361,36 @@ export default function ClientsPage() {
     }
   };
 
-  const filteredClients = clients.filter((c) => {
-    if (!searchQuery) return true;
-    const q = searchQuery.toLowerCase();
-    
-    // Check main client details
-    if (c.name.toLowerCase().includes(q)) return true;
-    if (c.email?.toLowerCase().includes(q)) return true;
-    if (c.gst_number?.toLowerCase().includes(q)) return true;
-    if (c.industry?.toLowerCase().includes(q)) return true;
-    if (c.city?.toLowerCase().includes(q)) return true;
-    
-    // Check assigned officer
-    if (c.assigned_staff?.name.toLowerCase().includes(q)) return true;
+  const filteredClients = useMemo(() => {
+    return clients.filter((c) => {
+      if (!searchQuery) return true;
+      const q = searchQuery.toLowerCase();
+      
+      // Check main client details
+      if (c.name.toLowerCase().includes(q)) return true;
+      if (c.email?.toLowerCase().includes(q)) return true;
+      if (c.gst_number?.toLowerCase().includes(q)) return true;
+      if (c.industry?.toLowerCase().includes(q)) return true;
+      if (c.city?.toLowerCase().includes(q)) return true;
+      
+      // Check assigned officer
+      if (c.assigned_staff?.name.toLowerCase().includes(q)) return true;
 
-    // Check nested projects and work orders
-    if (c.projects) {
-      for (const p of c.projects) {
-        if (p.name.toLowerCase().includes(q)) return true;
-        if (p.work_orders) {
-          for (const w of p.work_orders) {
-            if (w.work_order_no.toLowerCase().includes(q)) return true;
+      // Check nested projects and work orders
+      if (c.projects) {
+        for (const p of c.projects) {
+          if (p.name.toLowerCase().includes(q)) return true;
+          if (p.work_orders) {
+            for (const w of p.work_orders) {
+              if (w.work_order_no.toLowerCase().includes(q)) return true;
+            }
           }
         }
       }
-    }
 
-    return false;
-  });
+      return false;
+    });
+  }, [clients, searchQuery]);
 
   return (
     <div className="space-y-6">

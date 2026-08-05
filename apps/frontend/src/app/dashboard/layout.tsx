@@ -9,6 +9,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { NotificationCenter } from "@/components/notification-center";
 import { toast } from "sonner";
+import Image from "next/image";
 
 const navigation = [
   // MAIN
@@ -333,7 +334,7 @@ export default function DashboardLayout({
       {/* Desktop Sidebar (Hidden on Mobile) */}
       <aside className="hidden lg:flex w-64 border-r border-border bg-card flex-col backdrop-blur-xl shrink-0 shadow-xs">
         <div className="h-16 flex items-center px-6 border-b border-border gap-3">
-          <img src="/logo.png" alt="Logo" className="w-8 h-8 rounded-lg" />
+          <Image src="/logo.webp" alt="Logo" width={32} height={32} className="rounded-lg" />
           <span className="font-bold text-lg tracking-tight truncate text-foreground">{orgName}</span>
         </div>
         
@@ -432,7 +433,7 @@ export default function DashboardLayout({
       <aside className={`fixed inset-y-0 left-0 w-72 bg-card border-r border-border z-[60] lg:hidden transform transition-transform duration-300 ease-out flex flex-col ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"}`}>
         <div className="h-16 flex items-center justify-between px-6 border-b border-border">
           <div className="flex items-center gap-3">
-            <img src="/logo.png" alt="Logo" className="w-8 h-8 rounded-lg" />
+            <Image src="/logo.webp" alt="Logo" width={32} height={32} className="rounded-lg" />
             <span className="font-bold text-lg tracking-tight truncate text-foreground">{orgName}</span>
           </div>
           <button onClick={() => setIsMobileMenuOpen(false)} className="text-muted-foreground hover:text-foreground p-1">

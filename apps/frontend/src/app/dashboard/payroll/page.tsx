@@ -3,8 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAuthStore } from "@/store/auth";
 import { API_BASE_URL } from "@/lib/config";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
+
 import { 
   Banknote, 
   Plus, 
@@ -110,7 +109,9 @@ export default function PayrollPage() {
     return new Date(2000, m - 1).toLocaleString('default', { month: 'long' });
   };
 
-  const generatePayslipPDF = (record: PayrollRecord) => {
+  const generatePayslipPDF = async (record: PayrollRecord) => {
+    const jsPDF = (await import("jspdf")).default;
+    const autoTable = (await import("jspdf-autotable")).default;
     const doc = new jsPDF();
     
     // Header

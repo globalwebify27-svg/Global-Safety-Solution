@@ -945,7 +945,7 @@ function QuotationsContent() {
                     </div>
                   </td>
                   <td style={{ verticalAlign: 'top', textAlign: 'right', width: '40%' }}>
-                    <img src="/logo.png" alt="Logo" style={{ height: '60px', objectFit: 'contain', marginBottom: '5px', display: 'inline-block' }} />
+                    <img src="/logo.webp" alt="Logo" style={{ height: '60px', objectFit: 'contain', marginBottom: '5px', display: 'inline-block' }} />
                   </td>
                 </tr>
               </tbody>

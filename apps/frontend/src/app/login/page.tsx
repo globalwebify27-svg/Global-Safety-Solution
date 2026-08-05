@@ -76,7 +76,7 @@ export default function LoginPage() {
       {/* Hero Section */}
       <div className="hidden lg:flex flex-col justify-between p-12 bg-card/50 backdrop-blur-xl border-r border-border relative z-10">
         <div className="flex items-center gap-3">
-          <Image src="/logo.png" alt="Global Safety Logo" width={48} height={48} className="rounded-xl shadow-lg shadow-primary/20" />
+          <Image src="/logo.webp" alt="Global Safety Logo" width={48} height={48} className="rounded-xl shadow-lg shadow-primary/20" />
           <span className="text-2xl font-bold tracking-tight text-foreground">Global Safety Solution</span>
         </div>
         
@@ -98,7 +98,7 @@ export default function LoginPage() {
       <div className="flex items-center justify-center p-8 relative z-10">
         <div className="w-full max-w-md space-y-8">
           <div className="lg:hidden flex items-center justify-center gap-3 mb-10">
-            <Image src="/logo.png" alt="Global Safety Logo" width={40} height={40} className="rounded-xl shadow-lg" />
+            <Image src="/logo.webp" alt="Global Safety Logo" width={40} height={40} className="rounded-xl shadow-lg" />
             <span className="text-2xl font-bold text-foreground">Global Safety</span>
           </div>
 

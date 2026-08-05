@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/auth";
 import { API_BASE_URL } from "@/lib/config";
@@ -61,6 +61,19 @@ const KANBAN_STAGES = [
 export default function LeadsPage() {
   const router = useRouter();
   const [leads, setLeads] = useState<Lead[]>([]);
+  const leadsByStage = useMemo(() => {
+    const groups = KANBAN_STAGES.reduce((acc, stage) => {
+      acc[stage.id] = [];
+      return acc;
+    }, {} as Record<string, Lead[]>);
+    
+    leads.forEach(l => {
+      if (groups[l.status]) {
+        groups[l.status].push(l);
+      }
+    });
+    return groups;
+  }, [leads]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -633,7 +646,7 @@ export default function LeadsPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-5 gap-6 min-h-[500px]">
           {KANBAN_STAGES.map((stage) => {
-            const stageLeads = leads.filter((l) => l.status === stage.id);
+            const stageLeads = leadsByStage[stage.id] || [];
             return (
               <div 
                 key={stage.id} 
