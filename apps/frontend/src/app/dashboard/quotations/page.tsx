@@ -35,6 +35,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useSearchParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
+import dynamic from "next/dynamic";
+import { numberToWords } from "@/lib/numberToWords";
+
+const RichTextEditor = dynamic(() => import("@/components/RichTextEditor"), { ssr: false });
 
 interface QuoteItem {
   description: string;
@@ -282,10 +286,27 @@ function QuotationsContent() {
         const doc = iframe.contentWindow?.document;
         if (!doc) return;
         
-        doc.open();
         doc.write(`
           <html>
-            <head><title>Quotation ${quote.quote_number}</title></head>
+            <head>
+              <title>Quotation ${quote.quote_number}</title>
+              <style>
+                body { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; color: #333; margin: 0; padding: 0; }
+                ul { list-style-type: disc !important; margin: 5px 0 5px 20px !important; padding: 0 !important; }
+                ol { list-style-type: decimal !important; margin: 5px 0 5px 20px !important; padding: 0 !important; }
+                li { margin-bottom: 3px !important; display: list-item !important; }
+                p { margin: 5px 0 !important; }
+                @media print {
+                  html, body {
+                    height: auto !important;
+                    overflow: visible !important;
+                  }
+                  body { padding: 0; }
+                  @page { size: A4; margin: 20mm; }
+                  tr, img { page-break-inside: avoid !important; }
+                }
+              </style>
+            </head>
             <body>${printContent.innerHTML}</body>
           </html>
         `);
@@ -530,7 +551,8 @@ function QuotationsContent() {
                   
                   <div className="space-y-3">
                     {formData.items.map((item, idx) => (
-                      <div key={idx} className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end bg-muted/50 p-4 rounded-2xl border border-border group">
+                      <div key={idx} className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end bg-muted/50 p-4 rounded-2xl border border-border group relative">
+                        <div className="absolute -top-2 -left-1 bg-emerald-600 text-white text-[10px] font-black rounded-full w-5 h-5 flex items-center justify-center shadow">{idx + 1}</div>
                         <div className="col-span-1 md:col-span-5 space-y-1.5">
                           <Label className="text-[10px] uppercase font-black text-muted-foreground">Description</Label>
                           <Input 
@@ -590,11 +612,10 @@ function QuotationsContent() {
                 {/* Terms & Notes */}
                 <div className="space-y-2">
                   <Label className="text-foreground/80">Terms & Special Notes</Label>
-                  <textarea
-                    className="w-full bg-background border border-border rounded-xl p-3 text-sm focus:ring-2 focus:ring-emerald-500 text-foreground min-h-[80px] focus:outline-none"
+                  <RichTextEditor
+                    content={formData.notes}
+                    onChange={(html: string) => setFormData({...formData, notes: html})}
                     placeholder="Standard validities, milestone payments, etc."
-                    value={formData.notes}
-                    onChange={(e) => setFormData({...formData, notes: e.target.value})}
                   />
                 </div>
   
@@ -821,7 +842,10 @@ function QuotationsContent() {
                   <div className="space-y-2 text-right">
                     <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Recipient</p>
                     <div className="text-sm font-bold text-foreground">{selectedQuote.lead?.company_name || selectedQuote.client?.name}</div>
-                    <p className="text-xs text-muted-foreground leading-relaxed">{selectedQuote.lead?.contact_person || "Authorized Representative"}</p>
+                    <p className="text-xs text-muted-foreground leading-relaxed">{selectedQuote.authorized_rep_name || selectedQuote.lead?.contact_person || "—"}</p>
+                    {selectedQuote.authorized_rep_designation && (
+                      <p className="text-xs text-muted-foreground">{selectedQuote.authorized_rep_designation}</p>
+                    )}
                     {selectedQuote.billing_address && (
                       <p className="text-xs text-muted-foreground leading-relaxed whitespace-pre-line mt-1">{selectedQuote.billing_address}</p>
                     )}
@@ -832,6 +856,7 @@ function QuotationsContent() {
                   <table className="w-full text-left text-sm">
                     <thead className="bg-muted border-b border-border">
                       <tr>
+                        <th className="px-4 py-3 font-bold text-muted-foreground w-12">SR</th>
                         <th className="px-4 py-3 font-bold text-muted-foreground">Description</th>
                         <th className="px-4 py-3 font-bold text-muted-foreground text-center">Qty</th>
                         <th className="px-4 py-3 font-bold text-muted-foreground text-center">UOM</th>
@@ -842,6 +867,7 @@ function QuotationsContent() {
                     <tbody className="divide-y divide-border">
                       {selectedQuote.items?.map((item: any, i: number) => (
                         <tr key={i} className="hover:bg-accent/5 transition-colors">
+                          <td className="px-4 py-3 text-muted-foreground text-center font-mono text-xs">{i + 1}</td>
                           <td className="px-4 py-3 text-foreground/80 font-medium">{item.description}</td>
                           <td className="px-4 py-3 text-muted-foreground text-center">{item.quantity}</td>
                           <td className="px-4 py-3 text-muted-foreground text-center">{item.uom || "PCS"}</td>
@@ -852,27 +878,27 @@ function QuotationsContent() {
                     </tbody>
                     <tfoot className="bg-muted/50 font-black text-right">
                       <tr>
-                        <td colSpan={4} className="px-4 py-2 text-muted-foreground uppercase tracking-widest text-[10px]">Gross Subtotal</td>
+                        <td colSpan={5} className="px-4 py-2 text-muted-foreground uppercase tracking-widest text-[10px]">Gross Subtotal</td>
                         <td className="px-4 py-2 text-foreground tabular-nums">₹{Number(selectedQuote.subtotal).toLocaleString()}</td>
                       </tr>
                       {Number(selectedQuote.discount) > 0 && (
                         <tr className="text-rose-600">
-                          <td colSpan={4} className="px-4 py-2 uppercase tracking-widest text-[10px]">Discount Applied</td>
+                          <td colSpan={5} className="px-4 py-2 uppercase tracking-widest text-[10px]">Discount Applied</td>
                           <td className="px-4 py-2 tabular-nums">-₹{Number(selectedQuote.discount).toLocaleString()}</td>
                         </tr>
                       )}
                       <tr>
-                        <td colSpan={4} className="px-4 py-2 text-muted-foreground uppercase tracking-widest text-[10px]">Taxable Value</td>
+                        <td colSpan={5} className="px-4 py-2 text-muted-foreground uppercase tracking-widest text-[10px]">Taxable Value</td>
                         <td className="px-4 py-2 text-foreground tabular-nums">₹{Math.max(0, Number(selectedQuote.subtotal) - Number(selectedQuote.discount)).toLocaleString()}</td>
                       </tr>
                       {Number(selectedQuote.tax_amount) > 0 && (
                         <tr>
-                          <td colSpan={4} className="px-4 py-2 text-muted-foreground uppercase tracking-widest text-[10px]">GST (18%)</td>
+                          <td colSpan={5} className="px-4 py-2 text-muted-foreground uppercase tracking-widest text-[10px]">GST (18%)</td>
                           <td className="px-4 py-2 text-foreground tabular-nums">₹{Number(selectedQuote.tax_amount).toLocaleString()}</td>
                         </tr>
                       )}
                       <tr className="border-t border-border/80 bg-emerald-500/5 text-base font-black">
-                        <td colSpan={4} className="px-4 py-4 uppercase tracking-widest text-[10px] text-emerald-600 dark:text-emerald-400">Grand Total</td>
+                        <td colSpan={5} className="px-4 py-4 uppercase tracking-widest text-[10px] text-emerald-600 dark:text-emerald-400">Grand Total</td>
                         <td className="px-4 py-4 text-emerald-600 dark:text-emerald-400 text-xl tabular-nums">₹{Number(selectedQuote.total_amount).toLocaleString()}</td>
                       </tr>
                     </tfoot>
@@ -881,7 +907,11 @@ function QuotationsContent() {
 
                 <div className="space-y-2">
                   <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Terms & Notes</p>
-                  <p className="text-xs text-muted-foreground italic">{selectedQuote.notes || "Standard professional terms apply. This quotation is valid for 30 days from the date of issue."}</p>
+                  {selectedQuote.notes ? (
+                    <div className="text-xs text-muted-foreground prose prose-xs max-w-none [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4 [&_li]:my-0.5" dangerouslySetInnerHTML={{ __html: selectedQuote.notes }} />
+                  ) : (
+                    <p className="text-xs text-muted-foreground italic">Standard professional terms apply. This quotation is valid for 30 days from the date of issue.</p>
+                  )}
                 </div>
               </div>
 
@@ -900,85 +930,171 @@ function QuotationsContent() {
       {/* Hidden Print Area */}
       <div id="quotation-print-area" className="hidden">
         {selectedQuote && (
-            <div style={{ padding: '40px', fontFamily: 'sans-serif', color: '#000', backgroundColor: '#fff' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '2px solid #000', paddingBottom: '20px', marginBottom: '30px' }}>
-                    <div>
-                        <h1 style={{ margin: 0, fontSize: '28px' }}>QUOTATION</h1>
-                        <p style={{ margin: '5px 0', fontSize: '14px', color: '#666' }}>#{selectedQuote.quote_number}</p>
+          <div style={{ padding: '40px', fontFamily: '"Helvetica Neue", Helvetica, Arial, sans-serif', color: '#333', backgroundColor: '#fff', width: '100%', boxSizing: 'border-box' }}>
+            {/* Header */}
+            <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '25px' }}>
+              <tbody>
+                <tr>
+                  <td style={{ verticalAlign: 'top', width: '60%' }}>
+                    <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#0284c7', letterSpacing: '-0.5px', textTransform: 'uppercase' }}>Global Safety Solution</div>
+                    <div style={{ fontSize: '10px', color: '#555', marginTop: '5px', lineHeight: '1.4' }}>
+                      2nd Floor Shop No. 51, G.E.L. Church Shopping Complex,<br/>
+                      Main Road, Ranchi, Jharkhand - 834001, India<br/>
+                      Phone: +91 6201186550 | Email: info@globalsafetysolution.com<br/>
+                      <strong>GSTIN: 20BILPA8494E1ZE</strong> | State: 20-Jharkhand
                     </div>
-                    <div style={{ textAlign: 'right' }}>
-                        <h2 style={{ margin: 0, fontSize: '18px' }}>Global Safety Solution</h2>
-                        <p style={{ margin: '5px 0', fontSize: '12px' }}>Date: {new Date(selectedQuote.date).toLocaleDateString()}</p>
-                    </div>
-                </div>
+                  </td>
+                  <td style={{ verticalAlign: 'top', textAlign: 'right', width: '40%' }}>
+                    <img src="/logo.png" alt="Logo" style={{ height: '60px', objectFit: 'contain', marginBottom: '5px', display: 'inline-block' }} />
+                  </td>
+                </tr>
+              </tbody>
+            </table>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '40px' }}>
-                    <div>
-                        <h3 style={{ fontSize: '12px', textTransform: 'uppercase', color: '#666', marginBottom: '10px' }}>To:</h3>
-                        <p style={{ margin: 0, fontWeight: 'bold' }}>{selectedQuote.lead?.company_name || selectedQuote.client?.name}</p>
-                        <p style={{ margin: '5px 0', fontSize: '13px' }}>{selectedQuote.lead?.contact_person || "Authorized Representative"}</p>
-                        {selectedQuote.billing_address && (
-                            <p style={{ margin: '3px 0', fontSize: '12px', color: '#555', whiteSpace: 'pre-line' }}>{selectedQuote.billing_address}</p>
-                        )}
-                    </div>
-                </div>
+            <hr style={{ border: 'none', borderTop: '2px solid #0284c7', marginBottom: '20px' }}/>
 
-                <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '40px' }}>
-                    <thead>
-                        <tr style={{ backgroundColor: '#f5f5f5' }}>
-                            <th style={{ padding: '10px', textAlign: 'left', border: '1px solid #ddd' }}>Description</th>
-                            <th style={{ padding: '10px', textAlign: 'center', border: '1px solid #ddd' }}>Qty</th>
-                            <th style={{ padding: '10px', textAlign: 'center', border: '1px solid #ddd' }}>UOM</th>
-                            <th style={{ padding: '10px', textAlign: 'right', border: '1px solid #ddd' }}>Rate</th>
-                            <th style={{ padding: '10px', textAlign: 'right', border: '1px solid #ddd' }}>Total</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {selectedQuote.items?.map((item: any, i: number) => (
-                            <tr key={i}>
-                                <td style={{ padding: '10px', border: '1px solid #ddd' }}>{item.description}</td>
-                                <td style={{ padding: '10px', textAlign: 'center', border: '1px solid #ddd' }}>{item.quantity}</td>
-                                <td style={{ padding: '10px', textAlign: 'center', border: '1px solid #ddd' }}>{item.uom || "PCS"}</td>
-                                <td style={{ padding: '10px', textAlign: 'right', border: '1px solid #ddd' }}>₹{Number(item.unit_price).toLocaleString()}</td>
-                                <td style={{ padding: '10px', textAlign: 'right', border: '1px solid #ddd', fontWeight: 'bold' }}>₹{Number(item.total).toLocaleString()}</td>
-                            </tr>
-                        ))}
-                    </tbody>
-                    <tfoot>
+            {/* Document Title / Info */}
+            <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '25px' }}>
+              <tbody>
+                <tr>
+                  <td style={{ verticalAlign: 'top', width: '50%' }}>
+                    <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#0284c7', textTransform: 'uppercase', marginBottom: '5px' }}>Quotation To:</div>
+                    <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#111' }}>{selectedQuote.lead?.company_name || selectedQuote.client?.name}</div>
+                    <div style={{ fontSize: '11px', color: '#444', marginTop: '3px', lineHeight: '1.4' }}>
+                      <strong>Attn:</strong> {selectedQuote.authorized_rep_name || selectedQuote.lead?.contact_person || 'Authorized Representative'}<br/>
+                      {selectedQuote.authorized_rep_designation && <span><strong>Designation:</strong> {selectedQuote.authorized_rep_designation}<br/></span>}
+                      {selectedQuote.authorized_rep_email && <span><strong>Email:</strong> {selectedQuote.authorized_rep_email}<br/></span>}
+                      {selectedQuote.authorized_rep_phone && <span><strong>Phone:</strong> {selectedQuote.authorized_rep_phone}<br/></span>}
+                    </div>
+                    {selectedQuote.billing_address && (
+                      <div style={{ fontSize: '11px', color: '#555', marginTop: '6px', whiteSpace: 'pre-line', lineHeight: '1.4' }}>
+                        <strong>Billing Address:</strong><br/>{selectedQuote.billing_address}
+                      </div>
+                    )}
+                  </td>
+                  <td style={{ verticalAlign: 'top', textAlign: 'right', width: '50%' }}>
+                    <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#0284c7', marginBottom: '10px', textTransform: 'uppercase' }}>Quotation</div>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
+                      <tbody>
                         <tr>
-                            <td colSpan={4} style={{ padding: '8px 10px', textAlign: 'right', color: '#555', fontSize: '12px' }}>Gross Subtotal</td>
-                            <td style={{ padding: '8px 10px', textAlign: 'right', fontSize: '13px' }}>₹{Number(selectedQuote.subtotal).toLocaleString()}</td>
+                          <td style={{ textAlign: 'right', padding: '3px 0', color: '#666' }}><strong>Quotation No:</strong></td>
+                          <td style={{ textAlign: 'right', padding: '3px 0', paddingLeft: '15px', color: '#111', fontWeight: 'bold' }}>{selectedQuote.quote_number}</td>
                         </tr>
-                        {Number(selectedQuote.discount) > 0 && (
-                            <tr style={{ color: '#b91c1c' }}>
-                                <td colSpan={4} style={{ padding: '8px 10px', textAlign: 'right', fontSize: '12px' }}>Discount Applied</td>
-                                <td style={{ padding: '8px 10px', textAlign: 'right', fontSize: '13px', fontWeight: 'bold' }}>-₹{Number(selectedQuote.discount).toLocaleString()}</td>
-                            </tr>
+                        <tr>
+                          <td style={{ textAlign: 'right', padding: '3px 0', color: '#666' }}><strong>Date:</strong></td>
+                          <td style={{ textAlign: 'right', padding: '3px 0', paddingLeft: '15px', color: '#111' }}>{new Date(selectedQuote.date).toLocaleDateString()}</td>
+                        </tr>
+                        {selectedQuote.valid_until && (
+                          <tr>
+                            <td style={{ textAlign: 'right', padding: '3px 0', color: '#666' }}><strong>Valid Until:</strong></td>
+                            <td style={{ textAlign: 'right', padding: '3px 0', paddingLeft: '15px', color: '#111' }}>{new Date(selectedQuote.valid_until).toLocaleDateString()}</td>
+                          </tr>
                         )}
-                        <tr style={{ fontWeight: 'bold' }}>
-                            <td colSpan={4} style={{ padding: '8px 10px', textAlign: 'right', color: '#000', fontSize: '12px' }}>Taxable Value</td>
-                            <td style={{ padding: '8px 10px', textAlign: 'right', fontSize: '13px' }}>₹{Math.max(0, Number(selectedQuote.subtotal) - Number(selectedQuote.discount)).toLocaleString()}</td>
-                        </tr>
-                        {Number(selectedQuote.tax_amount) > 0 && (
-                            <tr>
-                                <td colSpan={4} style={{ padding: '8px 10px', textAlign: 'right', color: '#555', fontSize: '12px' }}>GST (18%)</td>
-                                <td style={{ padding: '8px 10px', textAlign: 'right', fontSize: '13px' }}>₹{Number(selectedQuote.tax_amount).toLocaleString()}</td>
-                            </tr>
-                        )}
-                        <tr style={{ fontWeight: 'bold', fontSize: '15px', backgroundColor: '#f3f4f6' }}>
-                            <td colSpan={4} style={{ padding: '12px 10px', textAlign: 'right', textTransform: 'uppercase' }}>Grand Total</td>
-                            <td style={{ padding: '12px 10px', textAlign: 'right', color: '#059669', fontSize: '16px' }}>₹{Number(selectedQuote.total_amount).toLocaleString()}</td>
-                        </tr>
-                    </tfoot>
-                </table>
+                      </tbody>
+                    </table>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
 
-                <div style={{ fontSize: '12px', color: '#666', borderTop: '1px solid #eee', paddingTop: '20px' }}>
-                    <p style={{ fontWeight: 'bold', marginBottom: '5px' }}>Terms & Conditions:</p>
-                    <p style={{ margin: 0 }}>1. This quotation is valid for 30 days.</p>
-                    <p style={{ margin: 0 }}>2. 50% advance payment required for processing.</p>
-                    <p style={{ margin: 0 }}>3. Standard delivery terms apply.</p>
-                </div>
+            {/* Items Table */}
+            <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '25px', fontSize: '11px' }}>
+              <thead>
+                <tr style={{ backgroundColor: '#0284c7', color: '#fff' }}>
+                  <th style={{ padding: '8px 10px', textAlign: 'center', border: '1px solid #0284c7', width: '8%' }}>SR No.</th>
+                  <th style={{ padding: '8px 10px', textAlign: 'left', border: '1px solid #0284c7', width: '47%' }}>Description</th>
+                  <th style={{ padding: '8px 10px', textAlign: 'center', border: '1px solid #0284c7', width: '10%' }}>Quantity</th>
+                  <th style={{ padding: '8px 10px', textAlign: 'center', border: '1px solid #0284c7', width: '10%' }}>Unit</th>
+                  <th style={{ padding: '8px 10px', textAlign: 'right', border: '1px solid #0284c7', width: '12%' }}>Rate (₹)</th>
+                  <th style={{ padding: '8px 10px', textAlign: 'right', border: '1px solid #0284c7', width: '13%' }}>Amount (₹)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {selectedQuote.items?.map((item: any, i: number) => (
+                  <tr key={i} style={{ backgroundColor: i % 2 === 0 ? '#fff' : '#f8fafc' }}>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', border: '1px solid #e2e8f0', fontFamily: 'monospace' }}>{i + 1}</td>
+                    <td style={{ padding: '8px 10px', border: '1px solid #e2e8f0', wordBreak: 'break-word' }}>{item.description}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', border: '1px solid #e2e8f0' }}>{item.quantity}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', border: '1px solid #e2e8f0' }}>{item.uom || 'PCS'}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'right', border: '1px solid #e2e8f0' }}>{Number(item.unit_price).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'right', border: '1px solid #e2e8f0', fontWeight: 'bold' }}>{Number(item.total).toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td colSpan={5} style={{ padding: '6px 10px', textAlign: 'right', border: '1px solid #e2e8f0', color: '#666' }}>Subtotal</td>
+                  <td style={{ padding: '6px 10px', textAlign: 'right', border: '1px solid #e2e8f0', fontWeight: 'bold' }}>₹{Number(selectedQuote.subtotal).toLocaleString()}</td>
+                </tr>
+                {Number(selectedQuote.discount) > 0 && (
+                  <tr style={{ color: '#b91c1c' }}>
+                    <td colSpan={5} style={{ padding: '6px 10px', textAlign: 'right', border: '1px solid #e2e8f0' }}>Discount Applied</td>
+                    <td style={{ padding: '6px 10px', textAlign: 'right', border: '1px solid #e2e8f0', fontWeight: 'bold' }}>-₹{Number(selectedQuote.discount).toLocaleString()}</td>
+                  </tr>
+                )}
+                {Number(selectedQuote.discount) > 0 && (
+                  <tr>
+                    <td colSpan={5} style={{ padding: '6px 10px', textAlign: 'right', border: '1px solid #e2e8f0', color: '#666' }}>Taxable Value</td>
+                    <td style={{ padding: '6px 10px', textAlign: 'right', border: '1px solid #e2e8f0', fontWeight: 'bold' }}>₹{Math.max(0, Number(selectedQuote.subtotal) - Number(selectedQuote.discount)).toLocaleString()}</td>
+                  </tr>
+                )}
+                {Number(selectedQuote.tax_amount) > 0 && (
+                  <>
+                    <tr>
+                      <td colSpan={5} style={{ padding: '6px 10px', textAlign: 'right', border: '1px solid #e2e8f0', color: '#666' }}>CGST (9%)</td>
+                      <td style={{ padding: '6px 10px', textAlign: 'right', border: '1px solid #e2e8f0' }}>₹{(Number(selectedQuote.tax_amount) / 2).toLocaleString()}</td>
+                    </tr>
+                    <tr>
+                      <td colSpan={5} style={{ padding: '6px 10px', textAlign: 'right', border: '1px solid #e2e8f0', color: '#666' }}>SGST (9%)</td>
+                      <td style={{ padding: '6px 10px', textAlign: 'right', border: '1px solid #e2e8f0' }}>₹{(Number(selectedQuote.tax_amount) / 2).toLocaleString()}</td>
+                    </tr>
+                  </>
+                )}
+                <tr style={{ backgroundColor: '#f1f5f9', fontWeight: 'bold', fontSize: '12px', color: '#0284c7' }}>
+                  <td colSpan={5} style={{ padding: '8px 10px', textAlign: 'right', border: '1px solid #cbd5e1', textTransform: 'uppercase' }}>Grand Total</td>
+                  <td style={{ padding: '8px 10px', textAlign: 'right', border: '1px solid #cbd5e1', fontSize: '13px' }}>₹{Number(selectedQuote.total_amount).toLocaleString()}</td>
+                </tr>
+              </tfoot>
+            </table>
+
+            {/* Amount in Words */}
+            <div style={{ fontSize: '11px', marginBottom: '25px', padding: '10px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
+              <strong>Amount in Words:</strong> <span style={{ textTransform: 'capitalize', color: '#0f172a' }}>{numberToWords(Number(selectedQuote.total_amount))}</span>
             </div>
+
+            {/* Terms & Conditions / Notes */}
+            <div style={{ fontSize: '10px', color: '#475569', marginBottom: '40px' }}>
+              <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#0284c7', marginBottom: '5px', borderBottom: '1px solid #e2e8f0', paddingBottom: '3px', textTransform: 'uppercase' }}>Terms & Conditions / Special Notes</div>
+              {selectedQuote.notes ? (
+                <div 
+                  className="prose prose-xs max-w-none [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4 [&_li]:my-0.5"
+                  style={{ lineHeight: '1.5', color: '#334155' }} 
+                  dangerouslySetInnerHTML={{ __html: selectedQuote.notes }} 
+                />
+              ) : (
+                <div style={{ lineHeight: '1.5', color: '#334155' }}>
+                  <p style={{ margin: '3px 0' }}>1. This quotation is valid for 30 days from the date of issue.</p>
+                  <p style={{ margin: '3px 0' }}>2. 50% advance payment required along with the work order. Balance within 15 days of service delivery.</p>
+                  <p style={{ margin: '3px 0' }}>3. Standard statutory taxes (GST) are charged as applicable.</p>
+                </div>
+              )}
+            </div>
+
+            {/* Footer Signatures */}
+            <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '30px', fontSize: '11px', pageBreakInside: 'avoid' }}>
+              <tbody>
+                <tr>
+                  <td style={{ width: '60%', verticalAlign: 'bottom', color: '#64748b', fontSize: '9px' }}>
+                    * This is a computer generated quotation and does not require a physical signature unless requested.
+                  </td>
+                  <td style={{ width: '40%', textAlign: 'right', verticalAlign: 'top' }}>
+                    <div style={{ fontWeight: 'bold', color: '#0f172a', marginBottom: '45px' }}>For Global Safety Solution</div>
+                    <div style={{ borderTop: '1px solid #94a3b8', display: 'inline-block', width: '150px', paddingTop: '5px', textAlign: 'center', color: '#64748b' }}>Authorized Signatory</div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </div>

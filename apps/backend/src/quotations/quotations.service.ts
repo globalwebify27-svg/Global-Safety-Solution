@@ -52,7 +52,7 @@ export class QuotationsService {
         ]
       } : undefined,
       include: {
-        items: true,
+        items: { orderBy: { sort_order: 'asc' } },
         lead: true,
         client: true,
         invoice: true,
@@ -129,6 +129,38 @@ export class QuotationsService {
     const taxAmount = cgst + sgst + igst;
     const totalAmount = taxableValue + taxAmount;
 
+    // Auto-populate Authorized Representative if not provided
+    if (!quoteData.authorized_rep_name) {
+      if (quoteData.client_id) {
+        // Try Primary Contact from ClientContact
+        const primaryContact = await this.prisma.clientContact.findFirst({
+          where: { client_id: quoteData.client_id, is_primary: true },
+        });
+        if (primaryContact) {
+          quoteData.authorized_rep_name = primaryContact.name;
+          quoteData.authorized_rep_designation = primaryContact.designation || null;
+          quoteData.authorized_rep_email = primaryContact.email || null;
+          quoteData.authorized_rep_phone = primaryContact.phone || null;
+        } else {
+          // Fallback to Client's contact_person
+          const client = await this.prisma.client.findUnique({ where: { id: quoteData.client_id } });
+          if (client) {
+            quoteData.authorized_rep_name = client.contact_person || client.name;
+            quoteData.authorized_rep_designation = client.contact_designation || null;
+            quoteData.authorized_rep_email = client.email || null;
+            quoteData.authorized_rep_phone = client.phone || null;
+          }
+        }
+      } else if (quoteData.lead_id) {
+        const lead = await this.prisma.lead.findUnique({ where: { id: quoteData.lead_id } });
+        if (lead) {
+          quoteData.authorized_rep_name = lead.contact_person;
+          quoteData.authorized_rep_email = lead.email || null;
+          quoteData.authorized_rep_phone = lead.phone || null;
+        }
+      }
+    }
+
     const quotation = await this.prisma.quotation.create({
       data: {
         ...quoteData,
@@ -141,16 +173,17 @@ export class QuotationsService {
         sgst,
         igst,
         items: {
-          create: items.map((item: any) => ({
+          create: items.map((item: any, index: number) => ({
             description: item.description,
             quantity: Number(item.quantity),
             unit_price: Number(item.unit_price),
             uom: item.uom || 'PCS',
             total: Number(item.quantity) * Number(item.unit_price),
+            sort_order: index,
           })),
         },
       },
-      include: { items: true, lead: true, client: true },
+      include: { items: { orderBy: { sort_order: 'asc' } }, lead: true, client: true },
     });
 
     // Auto-update the Lead to PROPOSAL status and update expected_value
@@ -210,7 +243,7 @@ export class QuotationsService {
   async findOne(id: string) {
     return this.prisma.quotation.findUnique({
       where: { id },
-      include: { items: true, lead: true, client: true },
+      include: { items: { orderBy: { sort_order: 'asc' } }, lead: true, client: true },
     });
   }
 
@@ -311,16 +344,17 @@ export class QuotationsService {
           sgst,
           igst,
           items: {
-            create: items.map((item: any) => ({
+            create: items.map((item: any, index: number) => ({
               description: item.description,
               quantity: Number(item.quantity),
               unit_price: Number(item.unit_price),
               uom: item.uom || 'PCS',
               total: Number(item.quantity) * Number(item.unit_price),
+              sort_order: index,
             })),
           },
         },
-        include: { items: true, lead: true, client: true },
+        include: { items: { orderBy: { sort_order: 'asc' } }, lead: true, client: true },
       });
     });
   }
@@ -338,7 +372,7 @@ export class QuotationsService {
           const year = new Date().getFullYear();
           const quotation = await tx.quotation.findUnique({
             where: { id },
-            include: { items: true, lead: true, client: true },
+            include: { items: { orderBy: { sort_order: 'asc' } }, lead: true, client: true },
           });
 
           if (!quotation) throw new NotFoundException('Quotation not found');
@@ -654,7 +688,7 @@ export class QuotationsService {
   async sendQuotationProposal(id: string, recipientEmail?: string) {
     const quotation = await this.prisma.quotation.findUnique({
       where: { id },
-      include: { client: true, lead: true, items: true },
+      include: { client: true, lead: true, items: { orderBy: { sort_order: 'asc' } } },
     });
 
     if (!quotation) {

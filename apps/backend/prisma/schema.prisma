@@ -432,7 +432,7 @@ model Lead {
   phone               String?           @db.VarChar(50)
   source              String?           @db.VarChar(100)
   status              String            @default("NEW") @db.VarChar(50)
-  notes               String?
+  notes               String?           @db.Text
   assigned_to         String?           @db.VarChar(36)
   created_at          DateTime          @default(now()) @db.DateTime(6)
   updated_at          DateTime          @updatedAt @db.DateTime(6)
@@ -493,11 +493,15 @@ model Quotation {
   sgst         Decimal     @default(0.00) @db.Decimal(15, 2)
   igst         Decimal     @default(0.00) @db.Decimal(15, 2)
   status       String      @default("DRAFT") @db.VarChar(50)
-  notes        String?
+  notes        String?     @db.Text
   billing_address String?
   created_at   DateTime    @default(now()) @db.DateTime(6)
   updated_at   DateTime    @updatedAt @db.DateTime(6)
   discount     Decimal     @default(0.00) @db.Decimal(15, 2)
+  authorized_rep_name        String?   @db.VarChar(255)
+  authorized_rep_designation String?   @db.VarChar(100)
+  authorized_rep_email       String?   @db.VarChar(255)
+  authorized_rep_phone       String?   @db.VarChar(50)
   invoice      Invoice?
   client       Client?     @relation(fields: [client_id], references: [id])
   lead         Lead?       @relation(fields: [lead_id], references: [id])
@@ -518,6 +522,7 @@ model QuoteItem {
   unit_price   Decimal   @db.Decimal(15, 2)
   total        Decimal   @db.Decimal(15, 2)
   uom          String?   @db.VarChar(50)
+  sort_order   Int       @default(0)
   quotation    Quotation @relation(fields: [quotation_id], references: [id], onDelete: Cascade)
 
   @@index([quotation_id], map: "quote_items_quotation_id_fkey")
@@ -538,7 +543,7 @@ model Invoice {
   igst           Decimal       @default(0.00) @db.Decimal(15, 2)
   total_amount   Decimal       @db.Decimal(15, 2)
   status         String        @default("UNPAID") @db.VarChar(50)
-  notes          String?
+  notes          String?       @db.Text
   created_at     DateTime      @default(now()) @db.DateTime(6)
   updated_at     DateTime      @updatedAt @db.DateTime(6)
   balance_amount Decimal       @default(0.00) @db.Decimal(15, 2)
@@ -580,7 +585,7 @@ model Payment {
   payment_method String   @db.VarChar(50)
   transaction_id String?  @db.VarChar(100)
   status         String   @default("COMPLETED") @db.VarChar(50)
-  notes          String?
+  notes          String?  @db.Text
   created_at     DateTime @default(now()) @db.DateTime(6)
   invoice        Invoice  @relation(fields: [invoice_id], references: [id], onDelete: Cascade)
 
@@ -601,6 +606,8 @@ model InventoryItem {
   status               String?            @default("AVAILABLE") @db.VarChar(50)
   calibration_cert_url String?            @db.LongText
   invoice_url          String?            @db.LongText
+  serial_number        String?            @db.VarChar(100)
+  make                 String?            @db.VarChar(100)
   created_at           DateTime           @default(now()) @db.DateTime(6)
   updated_at           DateTime           @updatedAt @db.DateTime(6)
   transactions         StockTransaction[]
@@ -759,11 +766,12 @@ model InspectionItem {
   inspection_id   String     @db.VarChar(36)
   description     String
   status          String     @default("PENDING") @db.VarChar(50)
-  notes           String?
+  notes           String?    @db.Text
   photo_url       String?    @db.LongText
   scope           String?    @db.Text
   recommendations String?    @db.Text
   expenditure     Decimal?   @default(0.00) @db.Decimal(15, 2)
+  sort_order      Int        @default(0)
   inspection      Inspection @relation(fields: [inspection_id], references: [id], onDelete: Cascade)
   certificate     Certificate?
 
@@ -831,7 +839,7 @@ model VendorPayment {
   payment_date   DateTime @default(now()) @db.DateTime(6)
   payment_method String   @db.VarChar(50)
   transaction_id String?  @db.VarChar(100)
-  notes          String?
+  notes          String?  @db.Text
   created_at     DateTime @default(now()) @db.DateTime(6)
   expense        Expense? @relation(fields: [expense_id], references: [id])
   vendor         Vendor   @relation(fields: [vendor_id], references: [id], onDelete: Cascade)

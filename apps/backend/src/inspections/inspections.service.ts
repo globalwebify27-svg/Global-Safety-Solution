@@ -51,7 +51,7 @@ export class InspectionsService {
         },
       },
       include: {
-        items: true,
+        items: { orderBy: { sort_order: 'asc' } },
         client: true,
         engineer: true,
         engineers: { include: { engineer: true } },
@@ -189,7 +189,7 @@ export class InspectionsService {
           engineers: { include: { engineer: true } },
           project: true,
           work_order: true,
-          items: true,
+          items: { orderBy: { sort_order: 'asc' } },
           expenditures: true,
         },
         orderBy: { scheduled_date: 'desc' },
@@ -203,7 +203,7 @@ export class InspectionsService {
             engineer: true,
             project: true,
             work_order: true,
-            items: true,
+            items: { orderBy: { sort_order: 'asc' } },
             expenditures: true,
           },
           orderBy: { scheduled_date: 'desc' },
@@ -228,7 +228,7 @@ export class InspectionsService {
               service_product: true,
             },
           },
-          items: true,
+          items: { orderBy: { sort_order: 'asc' } },
           expenditures: true,
           certificates: true,
         },
@@ -246,7 +246,7 @@ export class InspectionsService {
                 service_product: true,
               },
             },
-            items: true,
+            items: { orderBy: { sort_order: 'asc' } },
             expenditures: true,
             certificates: true,
           },
@@ -362,7 +362,7 @@ export class InspectionsService {
         ...(scheduled_date ? { scheduled_date } : {}),
       },
       include: {
-        items: true,
+        items: { orderBy: { sort_order: 'asc' } },
         client: true,
         engineer: true,
         engineers: { include: { engineer: true } },
@@ -495,7 +495,7 @@ export class InspectionsService {
   async autoUpdateInspectionStatus(inspectionId: string) {
     const inspection = await this.prisma.inspection.findUnique({
       where: { id: inspectionId },
-      include: { items: true },
+      include: { items: { orderBy: { sort_order: 'asc' } } },
     });
 
     if (!inspection) return;
@@ -689,6 +689,15 @@ export class InspectionsService {
       }
     }
 
+    // Calculate sort_order for new item (append at end)
+    const existingItems = await this.prisma.inspectionItem.findMany({
+      where: { inspection_id: data.inspection_id },
+      select: { sort_order: true },
+      orderBy: { sort_order: 'desc' },
+      take: 1,
+    });
+    const nextSortOrder = (existingItems[0]?.sort_order ?? -1) + 1;
+
     const item = await this.prisma.inspectionItem.create({
       data: {
         inspection_id: data.inspection_id,
@@ -703,6 +712,7 @@ export class InspectionsService {
         cert_test_date: data.cert_test_date ? new Date(data.cert_test_date) : null,
         cert_expiry_date: data.cert_expiry_date ? new Date(data.cert_expiry_date) : null,
         cert_competency_no: compNo,
+        sort_order: nextSortOrder,
       },
     });
 
@@ -735,7 +745,7 @@ export class InspectionsService {
             },
           },
         },
-        items: true,
+        items: { orderBy: { sort_order: 'asc' } },
         expenditures: true,
       },
       orderBy: { scheduled_date: 'asc' },
@@ -792,7 +802,7 @@ export class InspectionsService {
             ],
           },
         },
-        include: { items: true },
+        include: { items: { orderBy: { sort_order: 'asc' } } },
       });
 
       // 5. Notify Engineer
@@ -904,7 +914,7 @@ export class InspectionsService {
         client: true,
         engineer: true,
         certificates: { orderBy: { created_at: 'asc' } },
-        items: true,
+        items: { orderBy: { sort_order: 'asc' } },
         work_order: { include: { service_product: true } },
       },
     });
@@ -1472,7 +1482,7 @@ export class InspectionsService {
     const inspection = await this.prisma.inspection.findUnique({
       where: { id },
       include: {
-        items: true,
+        items: { orderBy: { sort_order: 'asc' } },
       },
     });
 

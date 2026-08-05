@@ -76,6 +76,7 @@ export default function InventoryPage() {
   const [openLedger, setOpenLedger] = useState(false);
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [customCategory, setCustomCategory] = useState("");
 
   // File upload states for Required Documents
   const [calibFile, setCalibFile] = useState<File | null>(null);
@@ -263,6 +264,7 @@ export default function InventoryPage() {
 
   const resetForm = () => {
     setFormData({ sku: "", name: "", category: "PPE", unit: "PCS", min_stock: 0, current_stock: 0, price_per_unit: 0, status: "AVAILABLE", description: "", serial_number: "", make: "" });
+    setCustomCategory("");
     setCalibFile(null);
     setInvoiceFile(null);
     setCalibUrl("");
@@ -272,6 +274,14 @@ export default function InventoryPage() {
   const handleCreateItem = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token) return;
+
+    // Resolve custom category
+    if (formData.category === "Others" && !customCategory.trim()) {
+      toast.error("Please enter a custom category name.");
+      setSubmitting(false);
+      return;
+    }
+    const resolvedCategory = formData.category === "Others" ? customCategory.trim() : formData.category;
 
     setSubmitting(true);
     try {
@@ -283,6 +293,7 @@ export default function InventoryPage() {
         },
         body: JSON.stringify({
           ...formData,
+          category: resolvedCategory,
           calibration_cert_url: calibUrl || null,
           invoice_url: invoiceUrl || null,
         })
@@ -515,11 +526,26 @@ export default function InventoryPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Category</Label>
-                  <select value={formData.category} onChange={(e) => setFormData({...formData, category: e.target.value})} className="w-full bg-background border border-border rounded-md h-10 px-3 text-sm text-foreground">
+                  <select value={formData.category} onChange={(e) => {
+                    setFormData({...formData, category: e.target.value});
+                    if (e.target.value !== "Others") setCustomCategory("");
+                  }} className="w-full bg-background border border-border rounded-md h-10 px-3 text-sm text-foreground">
                     {CATEGORY_OPTIONS.map((cat) => (
                       <option key={cat} value={cat}>{cat}</option>
                     ))}
                   </select>
+                  {formData.category === "Others" && (
+                    <div className="mt-2">
+                      <Label className="text-xs text-amber-500 font-bold">Category Name *</Label>
+                      <Input
+                        required
+                        value={customCategory}
+                        onChange={(e) => setCustomCategory(e.target.value)}
+                        placeholder="Enter custom category name..."
+                        className="bg-background border-amber-500/40 text-foreground mt-1"
+                      />
+                    </div>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label>Unit of Measure</Label>
