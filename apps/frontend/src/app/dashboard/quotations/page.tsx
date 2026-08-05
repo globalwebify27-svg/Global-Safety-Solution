@@ -84,6 +84,8 @@ function QuotationsContent() {
     apply_gst: true,
     discount_type: "flat", // "flat" or "percent"
     discount_value: 0,
+    quote_number: "",
+    date: "",
     items: [{ description: "", quantity: 1, unit_price: 0, uom: "PCS" }] as QuoteItem[]
   });
 
@@ -122,6 +124,8 @@ function QuotationsContent() {
       apply_gst: Number(quote.tax_amount) > 0,
       discount_type: discountType,
       discount_value: discountValue,
+      quote_number: quote.quote_number || "",
+      date: quote.date ? quote.date.split('T')[0] : "",
       items: quote.items.map((item: any) => ({
         description: item.description,
         quantity: item.quantity,
@@ -357,6 +361,8 @@ function QuotationsContent() {
       billing_address: formData.billing_address,
       apply_gst: formData.apply_gst,
       discount: calculateDiscountAmount(),
+      quote_number: formData.quote_number || undefined,
+      date: formData.date || undefined,
       items: formData.items
     };
 
@@ -376,7 +382,7 @@ function QuotationsContent() {
       });
       if (res.ok) {
         setOpen(false);
-        setFormData({ lead_id: "", client_id: "", notes: "", billing_address: "", apply_gst: true, discount_type: "flat", discount_value: 0, items: [{ description: "", quantity: 1, unit_price: 0 }] });
+        setFormData({ lead_id: "", client_id: "", notes: "", billing_address: "", apply_gst: true, discount_type: "flat", discount_value: 0, quote_number: "", date: "", items: [{ description: "", quantity: 1, unit_price: 0 }] });
         setEditMode(false);
         setEditQuoteId(null);
         toast.success(editMode ? "Proposal updated successfully!" : "Quotation generated successfully!");
@@ -420,7 +426,7 @@ function QuotationsContent() {
           <Dialog open={open} onOpenChange={(isOpen) => {
             setOpen(isOpen);
             if (!isOpen) {
-              setFormData({ lead_id: "", client_id: "", notes: "", billing_address: "", apply_gst: true, discount_type: "flat", discount_value: 0, items: [{ description: "", quantity: 1, unit_price: 0 }] });
+              setFormData({ lead_id: "", client_id: "", notes: "", billing_address: "", apply_gst: true, discount_type: "flat", discount_value: 0, quote_number: "", date: "", items: [{ description: "", quantity: 1, unit_price: 0 }] });
               setEditMode(false);
               setEditQuoteId(null);
             }
@@ -493,6 +499,28 @@ function QuotationsContent() {
                     value={formData.billing_address}
                     onChange={(e) => setFormData({...formData, billing_address: e.target.value})}
                   />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label className="text-foreground/80 font-bold text-xs uppercase tracking-wider">Quotation Number (Optional)</Label>
+                    <Input 
+                      placeholder="e.g. QT-2026-0001 (Leave empty to auto-generate)"
+                      className="w-full bg-background border-border text-foreground h-11 text-sm rounded-xl"
+                      value={formData.quote_number || ""}
+                      onChange={(e) => setFormData({...formData, quote_number: e.target.value})}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-foreground/80 font-bold text-xs uppercase tracking-wider">Quotation Date (Optional)</Label>
+                    <Input 
+                      type="date"
+                      className="w-full bg-background border-border text-foreground h-11 text-sm rounded-xl"
+                      value={formData.date || ""}
+                      onChange={(e) => setFormData({...formData, date: e.target.value})}
+                    />
+                  </div>
                 </div>
   
                 <div className="space-y-4">

@@ -68,28 +68,48 @@ export class QuotationsService {
     if (quoteData.lead_id === '') quoteData.lead_id = null;
     if (quoteData.client_id === '') quoteData.client_id = null;
 
-    // Generate professional quote number: GSS/YEAR/SERIAL (Scoped to current year)
-    const year = new Date().getFullYear();
-    const latestQuote = await this.prisma.quotation.findFirst({
-      where: {
-        quote_number: {
-          startsWith: `GSS/${year}/`,
-        },
-      },
-      orderBy: {
-        quote_number: 'desc',
-      },
-    });
-
-    let nextSerial = 1;
-    if (latestQuote) {
-      const parts = latestQuote.quote_number.split('/');
-      const lastSerial = parseInt(parts[parts.length - 1], 10);
-      if (!isNaN(lastSerial)) {
-        nextSerial = lastSerial + 1;
-      }
+    if (quoteData.date) {
+      quoteData.date = new Date(quoteData.date);
+    } else {
+      delete quoteData.date;
     }
-    const quoteNumber = `GSS/${year}/${String(nextSerial).padStart(3, '0')}`;
+
+    // Generate or validate quote number
+    let quoteNumber = quoteData.quote_number?.trim();
+    delete quoteData.quote_number;
+
+    if (quoteNumber) {
+      // Check uniqueness of manually entered quote number
+      const existing = await this.prisma.quotation.findUnique({
+        where: { quote_number: quoteNumber }
+      });
+      if (existing) {
+        throw new BadRequestException(`Quotation number "${quoteNumber}" already exists.`);
+      }
+    } else {
+      // Auto-generate: QT-YEAR-SERIAL (Scoped to current year)
+      const year = new Date().getFullYear();
+      const latestQuote = await this.prisma.quotation.findFirst({
+        where: {
+          quote_number: {
+            startsWith: `QT-${year}-`,
+          },
+        },
+        orderBy: {
+          quote_number: 'desc',
+        },
+      });
+
+      let nextSerial = 1;
+      if (latestQuote) {
+        const parts = latestQuote.quote_number.split('-');
+        const lastSerial = parseInt(parts[parts.length - 1], 10);
+        if (!isNaN(lastSerial)) {
+          nextSerial = lastSerial + 1;
+        }
+      }
+      quoteNumber = `QT-${year}-${String(nextSerial).padStart(4, '0')}`;
+    }
 
     // Calculate totals on server-side for integrity
     const subtotal = items.reduce(
@@ -234,6 +254,25 @@ export class QuotationsService {
 
     if (quoteData.lead_id === '') quoteData.lead_id = null;
     if (quoteData.client_id === '') quoteData.client_id = null;
+
+    if (quoteData.quote_number) {
+      quoteData.quote_number = quoteData.quote_number.trim();
+      const existing = await this.prisma.quotation.findFirst({
+        where: {
+          quote_number: quoteData.quote_number,
+          id: { not: id }
+        }
+      });
+      if (existing) {
+        throw new BadRequestException(`Quotation number "${quoteData.quote_number}" already exists.`);
+      }
+    }
+
+    if (quoteData.date) {
+      quoteData.date = new Date(quoteData.date);
+    } else {
+      delete quoteData.date;
+    }
 
     // Calculate totals on server-side for integrity
     const subtotal = items.reduce(
