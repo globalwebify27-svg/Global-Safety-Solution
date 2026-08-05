@@ -178,6 +178,7 @@ export default function DocumentVaultPage() {
     reason: ""
   });
   const [savingEdit, setSavingEdit] = useState(false);
+  const [editCertFieldValues, setEditCertFieldValues] = useState<Record<string, string>>({});
 
   const [auditHistoryOpen, setAuditHistoryOpen] = useState(false);
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
@@ -284,8 +285,9 @@ export default function DocumentVaultPage() {
     }
   };
 
-  const handleOpenEditCert = (certItem: any) => {
+  const handleOpenEditCert = async (certItem: any) => {
     setEditingCertDoc(certItem);
+    setEditCertFieldValues({});
     setEditForm({
       name: certItem.name || "",
       certificate_number: certItem.certificate_number || certItem.certificate_no || "",
@@ -297,6 +299,36 @@ export default function DocumentVaultPage() {
       reason: ""
     });
     setEditCertOpen(true);
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/documents/${certItem.id}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const fullDoc = await res.json();
+        let fieldVals: Record<string, string> = {};
+        if (fullDoc.certificate?.metadata) {
+          try {
+            const meta = JSON.parse(fullDoc.certificate.metadata);
+            fieldVals = meta.field_values || {};
+          } catch (e) {}
+        }
+        setEditingCertDoc(fullDoc);
+        setEditForm({
+          name: fullDoc.name || "",
+          certificate_number: fullDoc.certificate?.certificate_no || fullDoc.certificate_number || "",
+          cert_competency_no: fullDoc.certificate?.inspection_item?.cert_competency_no || fullDoc.cert_competency_no || "",
+          issue_date: fullDoc.certificate?.issue_date ? fullDoc.certificate.issue_date.split('T')[0] : (fullDoc.test_date ? fullDoc.test_date.split('T')[0] : ""),
+          expiry_date: fullDoc.certificate?.expiry_date ? fullDoc.certificate.expiry_date.split('T')[0] : (fullDoc.expiry_date ? fullDoc.expiry_date.split('T')[0] : ""),
+          validity_period: fullDoc.certificate?.validity_period || fullDoc.validity_period || "1 Year",
+          notes: fullDoc.notes || "",
+          reason: ""
+        });
+        setEditCertFieldValues(fieldVals);
+      }
+    } catch (err) {
+      console.error("Failed to load certificate template fields", err);
+    }
   };
 
   const handleSaveEditCert = async (e: React.FormEvent) => {
@@ -304,13 +336,19 @@ export default function DocumentVaultPage() {
     if (!editingCertDoc || !token) return;
     try {
       setSavingEdit(true);
+      const payload = {
+        ...editForm,
+        metadata: {
+          field_values: editCertFieldValues
+        }
+      };
       const res = await fetch(`${API_BASE_URL}/documents/${editingCertDoc.id}/edit-certificate`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify(editForm)
+        body: JSON.stringify(payload)
       });
       if (res.ok) {
         const data = await res.json();
@@ -1622,7 +1660,7 @@ export default function DocumentVaultPage() {
                   />
                 </div>
 
-                <div className="space-y-1 md:col-span-2">
+                 <div className="space-y-1 md:col-span-2">
                   <Label className="text-xs font-bold">Certificate Remarks / Notes</Label>
                   <Input
                     value={editForm.notes}
@@ -1631,6 +1669,42 @@ export default function DocumentVaultPage() {
                     placeholder="Optional remarks or inspector observations"
                   />
                 </div>
+
+                {/* Custom Fields based on template */}
+                {editingCertDoc?.template && (() => {
+                  let tempFields: any[] = [];
+                  try {
+                    tempFields = typeof editingCertDoc.template.fields === 'string'
+                      ? JSON.parse(editingCertDoc.template.fields)
+                      : editingCertDoc.template.fields;
+                  } catch(e){}
+
+                  if (!Array.isArray(tempFields) || tempFields.length === 0) return null;
+
+                  return (
+                    <div className="space-y-4 md:col-span-2 pt-4 border-t border-border">
+                      <h4 className="text-xs font-black text-blue-600 dark:text-blue-400 uppercase tracking-wider">Template Fields</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {tempFields.map((field: any, idx: number) => (
+                          <div key={idx} className="space-y-1">
+                            <Label className="text-xs font-bold text-slate-400">{field.label}</Label>
+                            <textarea
+                              placeholder={field.default || "Enter value..."}
+                              className="w-full bg-background border border-border rounded-xl p-2.5 text-xs text-foreground focus:outline-none min-h-[80px] resize-y"
+                              value={(editCertFieldValues[field.key] ?? field.default) || ""}
+                              onChange={(e) => {
+                                setEditCertFieldValues({
+                                  ...editCertFieldValues,
+                                  [field.key]: e.target.value
+                                });
+                              }}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 <div className="space-y-1 md:col-span-2">
                   <Label className="text-xs font-bold">Reason for Edit (Required for Audit Log)</Label>

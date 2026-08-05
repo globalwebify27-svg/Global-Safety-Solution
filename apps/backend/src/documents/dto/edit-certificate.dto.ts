@@ -36,4 +36,7 @@ export class EditCertificateDto {
   @IsOptional()
   @IsString()
   reason?: string;
+
+  @IsOptional()
+  metadata?: any;
 }

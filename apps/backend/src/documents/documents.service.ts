@@ -644,7 +644,32 @@ export class DocumentsService {
       },
     });
     if (!doc) throw new NotFoundException('Document not found');
-    return doc;
+
+    const certRecord = await this.findMatchingCertificateRecord(doc);
+    let certificate: any = null;
+    let template: any = null;
+
+    if (certRecord) {
+      certificate = certRecord;
+      let templateId: string | null = null;
+      if (certRecord.metadata) {
+        try {
+          const meta = JSON.parse(certRecord.metadata);
+          templateId = meta.template_id || null;
+        } catch (e) {}
+      }
+      if (templateId) {
+        template = await this.prisma.certificateTemplate.findUnique({
+          where: { id: templateId }
+        });
+      }
+    }
+
+    return {
+      ...doc,
+      certificate,
+      template
+    };
   }
 
   async create(data: any, uploaderId?: string) {
@@ -1186,6 +1211,10 @@ export class DocumentsService {
         changes['validity_period'] = { old: certRecord.validity_period, new: dto.validity_period };
       }
 
+      if (dto.metadata && certRecord) {
+        changes['metadata'] = { old: certRecord.metadata || null, new: JSON.stringify(dto.metadata) };
+      }
+
       // Execute atomic update across all linked records
       await this.prisma.$transaction(async (tx) => {
         // 1. Update Document
@@ -1212,6 +1241,23 @@ export class DocumentsService {
 
         // 2. Update Certificate if exists
         if (certRecord) {
+          let finalMetadata = certRecord.metadata;
+          if (dto.metadata) {
+            let metaObj = typeof dto.metadata === 'string' ? JSON.parse(dto.metadata) : dto.metadata;
+            let existingMeta: any = {};
+            if (certRecord.metadata) {
+              try { existingMeta = JSON.parse(certRecord.metadata); } catch (e) {}
+            }
+            finalMetadata = JSON.stringify({
+              ...existingMeta,
+              ...metaObj,
+              field_values: {
+                ...(existingMeta.field_values || {}),
+                ...(metaObj.field_values || {})
+              }
+            });
+          }
+
           await tx.certificate.update({
             where: { id: certRecord.id },
             data: {
@@ -1219,6 +1265,7 @@ export class DocumentsService {
               issue_date: newTestDate || certRecord.issue_date,
               expiry_date: newExpiryDate || certRecord.expiry_date,
               validity_period: dto.validity_period || certRecord.validity_period,
+              metadata: finalMetadata,
             }
           });
 
@@ -1230,6 +1277,12 @@ export class DocumentsService {
             if (newTestDate) itemData.cert_test_date = newTestDate;
             if (newExpiryDate) itemData.cert_expiry_date = newExpiryDate;
             if (dto.cert_competency_no) itemData.cert_competency_no = dto.cert_competency_no;
+            if (dto.metadata) {
+              let metaObj = typeof dto.metadata === 'string' ? JSON.parse(dto.metadata) : dto.metadata;
+              if (metaObj.field_values) {
+                itemData.cert_template_fields = JSON.stringify(metaObj.field_values);
+              }
+            }
 
             if (Object.keys(itemData).length > 0) {
               await tx.inspectionItem.update({
