@@ -464,8 +464,13 @@ export default function ClientProfilePage({ params }: { params: Promise<{ id: st
             {client.contacts && client.contacts.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {client.contacts.map((contact: any) => (
-                  <div key={contact.id} className="flex flex-col p-5 rounded-2xl bg-background border border-border shadow-sm">
-                    <p className="font-bold text-foreground text-lg mb-1">{contact.name || "Unnamed Contact"}</p>
+                  <div key={contact.id} className={`flex flex-col p-5 rounded-2xl bg-background border shadow-sm transition-all duration-300 ${contact.is_primary ? 'border-emerald-500/30 ring-1 ring-emerald-500/20' : 'border-border'}`}>
+                    <div className="flex items-start justify-between gap-2 mb-1">
+                      <p className="font-bold text-foreground text-lg truncate">{contact.name || "Unnamed Contact"}</p>
+                      {contact.is_primary && (
+                        <span className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded border border-emerald-500/20 shrink-0">Primary</span>
+                      )}
+                    </div>
                     <p className="text-sm font-semibold text-primary mb-4">{contact.designation || "Designation not provided"}</p>
 
                     <div className="space-y-2 mt-auto">

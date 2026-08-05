@@ -40,6 +40,8 @@ interface Client {
   name: string;
   email?: string;
   phone?: string;
+  contact_person?: string;
+  contact_designation?: string;
   gst_number?: string;
   pan_number?: string;
   industry?: string;
@@ -53,6 +55,14 @@ interface Client {
   };
   projects?: Project[];
   inspections?: Inspection[];
+  contacts?: {
+    id?: string;
+    name: string;
+    designation?: string;
+    email?: string;
+    phone?: string;
+    is_primary?: boolean;
+  }[];
 }
 
 function getClientWorkStats(client: Client) {
@@ -144,7 +154,7 @@ export default function ClientsPage() {
     state: '',
     billing_address: '',
     assigned_staff_id: '',
-    contacts: [{ name: '', designation: '', email: '', phone: '' }]
+    contacts: [{ name: '', designation: '', email: '', phone: '', is_primary: true }]
   });
   const [activeTab, setActiveTab] = useState("basic");
   const [submitting, setSubmitting] = useState(false);
@@ -162,7 +172,7 @@ export default function ClientsPage() {
     state: '',
     billing_address: '',
     assigned_staff_id: '',
-    contacts: [{ name: '', designation: '', email: '', phone: '' }]
+    contacts: [{ name: '', designation: '', email: '', phone: '', is_primary: true }]
   });
   const [editActiveTab, setEditActiveTab] = useState("basic");
 
@@ -214,6 +224,33 @@ export default function ClientsPage() {
     })
     .catch(console.error);
   };
+  const handleSelectPrimary = (index: number) => {
+    const newContacts = formData.contacts.map((c, i) => ({
+      ...c,
+      is_primary: i === index
+    }));
+    const primary = newContacts[index];
+    setFormData({
+      ...formData,
+      contacts: newContacts,
+      email: primary.email || formData.email,
+      phone: primary.phone || formData.phone,
+    });
+  };
+
+  const handleSelectEditPrimary = (index: number) => {
+    const newContacts = editFormData.contacts.map((c, i) => ({
+      ...c,
+      is_primary: i === index
+    }));
+    const primary = newContacts[index];
+    setEditFormData({
+      ...editFormData,
+      contacts: newContacts,
+      email: primary.email || editFormData.email,
+      phone: primary.phone || editFormData.phone,
+    });
+  };
 
   const handleCreateClient = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -238,6 +275,7 @@ export default function ClientsPage() {
             designation: c.designation.trim() || undefined,
             email: c.email.trim() || undefined,
             phone: c.phone.trim() || undefined,
+            is_primary: !!c.is_primary,
           }))
           .filter(c => c.name || c.email || c.phone)
       };
@@ -252,7 +290,7 @@ export default function ClientsPage() {
       });
       if (res.ok) {
         setOpen(false);
-        setFormData({ name: '', email: '', phone: '', gst_number: '', pan_number: '', industry: '', city: '', state: '', billing_address: '', assigned_staff_id: '', contacts: [{ name: '', designation: '', email: '', phone: '' }] });
+        setFormData({ name: '', email: '', phone: '', gst_number: '', pan_number: '', industry: '', city: '', state: '', billing_address: '', assigned_staff_id: '', contacts: [{ name: '', designation: '', email: '', phone: '', is_primary: true }] });
         setActiveTab("basic");
         fetchClients();
       } else {
@@ -291,6 +329,7 @@ export default function ClientsPage() {
             designation: c.designation.trim() || undefined,
             email: c.email.trim() || undefined,
             phone: c.phone.trim() || undefined,
+            is_primary: !!c.is_primary,
           }))
           .filter(c => c.name || c.email || c.phone)
       };
@@ -629,6 +668,25 @@ export default function ClientsPage() {
                             />
                           </div>
                         </div>
+                        <div className="space-y-2 col-span-2">
+                          <div className="flex items-center gap-2 pt-2 border-t border-border/40">
+                            <input 
+                              type="radio" 
+                              id={`primary-onboard-${index}`}
+                              name="primary-onboard"
+                              checked={!!contact.is_primary}
+                              onChange={() => handleSelectPrimary(index)}
+                              className="h-4 w-4 border-border text-primary focus:ring-primary accent-emerald-500 cursor-pointer"
+                            />
+                            <Label htmlFor={`primary-onboard-${index}`} className="text-xs font-bold text-foreground cursor-pointer flex items-center gap-1.5">
+                              {contact.is_primary ? (
+                                <span className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full border border-emerald-500/20">Primary Contact</span>
+                              ) : (
+                                <span className="text-muted-foreground hover:text-foreground transition-colors">Set as Primary Contact</span>
+                              )}
+                            </Label>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -639,7 +697,7 @@ export default function ClientsPage() {
                     onClick={() => {
                       setFormData({
                         ...formData,
-                        contacts: [...formData.contacts, { name: '', designation: '', email: '', phone: '' }]
+                        contacts: [...formData.contacts, { name: '', designation: '', email: '', phone: '', is_primary: false }]
                       });
                     }}
                     className="w-full border-dashed border-2 text-primary hover:text-primary hover:bg-primary/5"
@@ -895,6 +953,25 @@ export default function ClientsPage() {
                               />
                             </div>
                           </div>
+                          <div className="space-y-2 col-span-2">
+                            <div className="flex items-center gap-2 pt-2 border-t border-border/40">
+                              <input 
+                                type="radio" 
+                                id={`primary-edit-${index}`}
+                                name="primary-edit"
+                                checked={!!contact.is_primary}
+                                onChange={() => handleSelectEditPrimary(index)}
+                                className="h-4 w-4 border-border text-primary focus:ring-primary accent-emerald-500 cursor-pointer"
+                              />
+                              <Label htmlFor={`primary-edit-${index}`} className="text-xs font-bold text-foreground cursor-pointer flex items-center gap-1.5">
+                                {contact.is_primary ? (
+                                  <span className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full border border-emerald-500/20">Primary Contact</span>
+                                ) : (
+                                  <span className="text-muted-foreground hover:text-foreground transition-colors">Set as Primary Contact</span>
+                                )}
+                              </Label>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -905,7 +982,7 @@ export default function ClientsPage() {
                       onClick={() => {
                         setEditFormData({
                           ...editFormData,
-                          contacts: [...editFormData.contacts, { name: '', designation: '', email: '', phone: '' }]
+                          contacts: [...editFormData.contacts, { name: '', designation: '', email: '', phone: '', is_primary: false }]
                         });
                       }}
                       className="w-full border-dashed border-2 text-primary hover:text-primary hover:bg-primary/5"
@@ -1031,8 +1108,9 @@ export default function ClientsPage() {
                                   designation: contact.designation || "",
                                   email: contact.email || "",
                                   phone: contact.phone || "",
+                                  is_primary: !!contact.is_primary,
                                 }))
-                              : [{ name: '', designation: '', email: '', phone: '' }]
+                              : [{ name: '', designation: '', email: '', phone: '', is_primary: true }]
                           });
                           setEditActiveTab("basic");
                           setEditOpen(true);

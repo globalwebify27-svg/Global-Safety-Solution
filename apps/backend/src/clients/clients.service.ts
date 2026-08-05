@@ -73,9 +73,30 @@ export class ClientsService {
 
   async create(data: any) {
     if (data.contacts && Array.isArray(data.contacts)) {
-      data.contacts = {
-        create: data.contacts.filter((c: any) => c.name || c.email || c.phone)
-      };
+      const validContacts = data.contacts.filter((c: any) => c.name || c.email || c.phone);
+      if (validContacts.length > 0) {
+        let primaryContact = validContacts.find((c: any) => c.is_primary);
+        if (!primaryContact) {
+          primaryContact = validContacts[0];
+          primaryContact.is_primary = true;
+        }
+        data.email = data.email || primaryContact.email || null;
+        data.phone = data.phone || primaryContact.phone || null;
+        data.contact_person = primaryContact.name || null;
+        data.contact_designation = primaryContact.designation || null;
+
+        data.contacts = {
+          create: validContacts.map((c: any) => ({
+            name: c.name,
+            designation: c.designation || null,
+            email: c.email || null,
+            phone: c.phone || null,
+            is_primary: !!c.is_primary,
+          }))
+        };
+      } else {
+        delete data.contacts;
+      }
     } else {
       delete data.contacts;
     }
@@ -181,13 +202,27 @@ export class ClientsService {
     const { contacts, ...rest } = data;
     const updateData: any = { ...rest };
     if (contacts && Array.isArray(contacts)) {
+      const validContacts = contacts.filter((c: any) => c.name || c.email || c.phone);
+      
+      // Sync primary contact details with client main contact info
+      const primaryContact = validContacts.find((c: any) => c.is_primary) || validContacts[0];
+      if (primaryContact) {
+        // Enforce is_primary = true on the selected one
+        primaryContact.is_primary = true;
+        updateData.email = primaryContact.email || null;
+        updateData.phone = primaryContact.phone || null;
+        updateData.contact_person = primaryContact.name || null;
+        updateData.contact_designation = primaryContact.designation || null;
+      }
+
       updateData.contacts = {
         deleteMany: {},
-        create: contacts.filter((c: any) => c.name || c.email || c.phone).map(c => ({
+        create: validContacts.map(c => ({
           name: c.name || undefined,
           designation: c.designation || undefined,
           email: c.email || undefined,
           phone: c.phone || undefined,
+          is_primary: !!c.is_primary,
         }))
       };
     }
