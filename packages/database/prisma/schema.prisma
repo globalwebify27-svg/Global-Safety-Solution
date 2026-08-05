@@ -601,6 +601,8 @@ model InventoryItem {
   status               String?            @default("AVAILABLE") @db.VarChar(50)
   calibration_cert_url String?            @db.LongText
   invoice_url          String?            @db.LongText
+  serial_number        String?            @db.VarChar(100)
+  make                 String?            @db.VarChar(100)
   created_at           DateTime           @default(now()) @db.DateTime(6)
   updated_at           DateTime           @updatedAt @db.DateTime(6)
   transactions         StockTransaction[]

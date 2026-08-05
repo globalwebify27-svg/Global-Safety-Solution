@@ -44,4 +44,12 @@ export class CreateInventoryDto {
   @IsOptional()
   @IsString()
   invoice_url?: string;
+
+  @IsOptional()
+  @IsString()
+  serial_number?: string;
+
+  @IsOptional()
+  @IsString()
+  make?: string;
 }

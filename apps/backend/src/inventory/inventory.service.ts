@@ -47,6 +47,8 @@ export class InventoryService {
         status: data.status || 'AVAILABLE',
         calibration_cert_url: data.calibration_cert_url || null,
         invoice_url: data.invoice_url || null,
+        serial_number: data.serial_number || null,
+        make: data.make || null,
       },
     });
   }

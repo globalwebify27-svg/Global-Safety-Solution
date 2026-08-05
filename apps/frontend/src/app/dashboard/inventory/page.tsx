@@ -49,8 +49,24 @@ interface InventoryItem {
   status?: string;
   calibration_cert_url?: string;
   invoice_url?: string;
+  serial_number?: string;
+  make?: string;
   transactions?: any[];
 }
+
+const CATEGORY_OPTIONS = [
+  "PPE",
+  "Signage",
+  "Tools",
+  "Electrical Safety",
+  "Fall Protection",
+  "Gas Detection",
+  "Confined Space",
+  "Environmental Safety",
+  "Traffic Safety",
+  "Lifting Equipment",
+  "Others"
+];
 
 export default function InventoryPage() {
   const [items, setItems] = useState<InventoryItem[]>([]);
@@ -163,7 +179,9 @@ export default function InventoryPage() {
     current_stock: 0,
     price_per_unit: 0,
     status: "AVAILABLE",
-    description: ""
+    description: "",
+    serial_number: "",
+    make: ""
   });
 
   const [adjustData, setAdjustData] = useState({
@@ -244,7 +262,7 @@ export default function InventoryPage() {
   };
 
   const resetForm = () => {
-    setFormData({ sku: "", name: "", category: "PPE", unit: "PCS", min_stock: 0, current_stock: 0, price_per_unit: 0, status: "AVAILABLE", description: "" });
+    setFormData({ sku: "", name: "", category: "PPE", unit: "PCS", min_stock: 0, current_stock: 0, price_per_unit: 0, status: "AVAILABLE", description: "", serial_number: "", make: "" });
     setCalibFile(null);
     setInvoiceFile(null);
     setCalibUrl("");
@@ -498,11 +516,9 @@ export default function InventoryPage() {
                 <div className="space-y-2">
                   <Label>Category</Label>
                   <select value={formData.category} onChange={(e) => setFormData({...formData, category: e.target.value})} className="w-full bg-background border border-border rounded-md h-10 px-3 text-sm text-foreground">
-                    <option>PPE</option>
-                    <option>Fire Safety</option>
-                    <option>Medical / First Aid</option>
-                    <option>Signage</option>
-                    <option>Tools</option>
+                    {CATEGORY_OPTIONS.map((cat) => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
                   </select>
                 </div>
                 <div className="space-y-2">
@@ -527,12 +543,22 @@ export default function InventoryPage() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Min Stock Level</Label>
+                  <Label>Quantity</Label>
                   <Input type="number" value={formData.min_stock} onChange={(e) => setFormData({...formData, min_stock: Number(e.target.value)})} className="bg-background border-border text-foreground" />
                 </div>
                 <div className="space-y-2">
                   <Label>Opening Stock</Label>
                   <Input type="number" value={formData.current_stock} onChange={(e) => setFormData({...formData, current_stock: Number(e.target.value)})} className="bg-background border-border text-foreground" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Serial Number</Label>
+                  <Input value={formData.serial_number} onChange={(e) => setFormData({...formData, serial_number: e.target.value})} placeholder="e.g. SN-20240001" className="bg-background border-border text-foreground" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Make (Manufacturer)</Label>
+                  <Input value={formData.make} onChange={(e) => setFormData({...formData, make: e.target.value})} placeholder="e.g. 3M, Honeywell" className="bg-background border-border text-foreground" />
                 </div>
               </div>              {/* PDF Upload Section */}
               <div className="border border-border rounded-xl p-4 space-y-4 bg-muted/20">
@@ -607,6 +633,8 @@ export default function InventoryPage() {
               <tr>
                 <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-widest">Item Details</th>
                 <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-widest">Category</th>
+                <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-widest">Serial No.</th>
+                <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-widest">Make</th>
                 <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-widest text-center">Stock Level</th>
                 <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-widest">Status</th>
                 <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-widest">Documents</th>
@@ -616,11 +644,11 @@ export default function InventoryPage() {
             <tbody className="divide-y divide-border">
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-muted-foreground italic font-medium">Syncing with warehouse database...</td>
+                  <td colSpan={8} className="px-6 py-12 text-center text-muted-foreground italic font-medium">Syncing with warehouse database...</td>
                 </tr>
               ) : items.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-muted-foreground italic text-[10px] uppercase font-bold tracking-widest">No items found in the registry.</td>
+                  <td colSpan={8} className="px-6 py-12 text-center text-muted-foreground italic text-[10px] uppercase font-bold tracking-widest">No items found in the registry.</td>
                 </tr>
               ) : items.map((item) => (
                 <tr key={item.id} className="hover:bg-accent/5 transition-colors group">
@@ -638,9 +666,15 @@ export default function InventoryPage() {
                   <td className="px-6 py-5">
                     <span className="bg-muted px-2.5 py-1 rounded text-[10px] font-bold text-muted-foreground uppercase">{item.category}</span>
                   </td>
+                  <td className="px-6 py-5">
+                    <span className="text-sm text-foreground font-medium">{item.serial_number || '—'}</span>
+                  </td>
+                  <td className="px-6 py-5">
+                    <span className="text-sm text-foreground font-medium">{item.make || '—'}</span>
+                  </td>
                   <td className="px-6 py-5 text-center">
                     <div className="text-foreground font-black text-lg">{item.current_stock} <span className="text-[10px] font-medium text-muted-foreground">{item.unit}</span></div>
-                    <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Min: {item.min_stock}</div>
+                    <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Qty: {item.min_stock}</div>
                   </td>
                   <td className="px-6 py-5">
                     {item.current_stock === 0 ? (
