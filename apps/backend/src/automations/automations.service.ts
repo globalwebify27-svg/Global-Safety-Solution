@@ -1,12 +1,16 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
+import { WhatsAppNotificationService } from '../notifications/whatsapp-notification.service';
 
 @Injectable()
 export class AutomationsService {
   private readonly logger = new Logger(AutomationsService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private whatsappService: WhatsAppNotificationService,
+  ) {}
 
   @Cron(CronExpression.EVERY_DAY_AT_9AM)
   async handleOverdueInvoices() {
@@ -97,6 +101,7 @@ export class AutomationsService {
         },
         include: {
           inspection: { include: { client: true } },
+          inspection_item: true,
         },
       });
 
@@ -107,6 +112,43 @@ export class AutomationsService {
             : `Certificate ${cert.certificate_no} for client ${cert.inspection.client.name} will expire in ${days} days.`;
 
         this.logger.warn(message);
+
+        // Trigger WhatsApp alert when certificate is exactly 15 days from expiry
+        if (days === 15) {
+          try {
+            const client = cert.inspection.client;
+
+            // Fetch primary contact phone number, falling back to client base phone
+            let recipientPhone = client.phone;
+            let recipientName = client.contact_person || client.name;
+
+            const primaryContact = await this.prisma.clientContact.findFirst({
+              where: { client_id: client.id, is_primary: true },
+            });
+
+            if (primaryContact && primaryContact.phone) {
+              recipientPhone = primaryContact.phone;
+              recipientName = primaryContact.name;
+            }
+
+            if (recipientPhone) {
+              await this.whatsappService.sendCertificateReminder({
+                to: recipientPhone,
+                client_name: client.name,
+                cert_name: cert.inspection_item?.description || cert.certificate_no || 'Safety Certificate',
+                cert_no: cert.certificate_no,
+                expiry_date: new Date(cert.expiry_date).toLocaleDateString('en-IN'),
+                days_remaining: 15,
+                contact_name: recipientName,
+                contact_phone: recipientPhone,
+              });
+            } else {
+              this.logger.warn(`No phone number configured to send WhatsApp notification for client: ${client.name}`);
+            }
+          } catch (e: any) {
+            this.logger.error(`Error attempting WhatsApp trigger for cert ${cert.certificate_no}: ${e?.message}`);
+          }
+        }
 
         // Notify Admins
         const adminRoles = await this.prisma.userRole.findMany({

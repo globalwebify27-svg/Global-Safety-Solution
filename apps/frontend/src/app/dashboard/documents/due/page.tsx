@@ -51,6 +51,15 @@ export default function DueCertificatesPage() {
   const designation = (user?.designation || "").toUpperCase();
   const isClient = roleName === "CLIENT" || designation.includes("CLIENT");
 
+  const resolveFileUrl = (url: string) => {
+    if (!url) return "";
+    if (url.startsWith("data:") || url.startsWith("http://") || url.startsWith("https://")) {
+      return url;
+    }
+    const cleanUrl = url.startsWith("/api") ? url.substring(4) : url;
+    return `${API_BASE_URL}${cleanUrl}`;
+  };
+
   const [loading, setLoading] = useState(true);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [stats, setStats] = useState<Stats>({
@@ -337,7 +346,7 @@ export default function DueCertificatesPage() {
                           variant="ghost"
                           size="icon"
                           className="h-8 w-8 hover:text-primary"
-                          onClick={() => window.open(doc.file_url, "_blank")}
+                          onClick={() => window.open(resolveFileUrl(doc.file_url), "_blank")}
                         >
                           <Eye className="w-4 h-4" />
                         </Button>
@@ -347,7 +356,8 @@ export default function DueCertificatesPage() {
                           className="h-8 w-8 hover:text-primary"
                           onClick={() => {
                             const link = document.createElement("a");
-                            link.href = doc.file_url;
+                            link.href = resolveFileUrl(doc.file_url);
+                            link.target = "_blank";
                             link.download = doc.name;
                             link.click();
                           }}

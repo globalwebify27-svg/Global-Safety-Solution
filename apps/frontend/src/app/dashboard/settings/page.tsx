@@ -16,7 +16,8 @@ import {
   KeyRound, 
   Globe,
   ArrowRight,
-  FileText
+  FileText,
+  MessageSquare
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ProfileForm } from "./ProfileForm";
@@ -58,6 +59,16 @@ export default function SettingsPage() {
     defaultLicenseNo: ""
   });
 
+  const [whatsappForm, setWhatsappForm] = useState({
+    enabled: false,
+    provider: "Zavu",
+    apiKey: "",
+    environment: "sandbox",
+    phoneId: "",
+    accountId: "",
+    defaultTemplate: "certificate_due_reminder",
+  });
+
   useEffect(() => {
     let ignore = false;
     
@@ -75,6 +86,15 @@ export default function SettingsPage() {
             address: data.address || "",
             website: data.website || "",
             defaultLicenseNo: data.default_license_no || ""
+          });
+          setWhatsappForm({
+            enabled: data.whatsapp_enabled === "true",
+            provider: data.whatsapp_provider || "Zavu",
+            apiKey: data.whatsapp_api_key || "",
+            environment: data.whatsapp_environment || "sandbox",
+            phoneId: data.whatsapp_phone_number_id || "",
+            accountId: data.whatsapp_business_account_id || "",
+            defaultTemplate: data.whatsapp_default_template || "certificate_due_reminder",
           });
         }
       } catch (err) {
@@ -153,10 +173,45 @@ export default function SettingsPage() {
     }
   };
 
+  const handleUpdateWhatsApp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!token) return;
+    setLoading(true);
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/settings`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          whatsapp_enabled: whatsappForm.enabled ? "true" : "false",
+          whatsapp_provider: whatsappForm.provider,
+          whatsapp_api_key: whatsappForm.apiKey,
+          whatsapp_environment: whatsappForm.environment,
+          whatsapp_phone_number_id: whatsappForm.phoneId,
+          whatsapp_business_account_id: whatsappForm.accountId,
+          whatsapp_default_template: whatsappForm.defaultTemplate,
+        })
+      });
+
+      if (res.ok) {
+        toast.success("WhatsApp Configuration saved successfully!");
+      } else {
+        toast.error("Failed to save WhatsApp configuration.");
+      }
+    } catch {
+      toast.error("Network error occurred.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const isSuperAdmin = user?.email === "admin@globalsafety.com" || user?.email === "amrvbloggers@gmail.com" || user?.role === "SUPER_ADMIN";
 
   useEffect(() => {
-    if (activeTab === "roles" && !isSuperAdmin) {
+    if ((activeTab === "roles" || activeTab === "whatsapp") && !isSuperAdmin) {
       setActiveTab("profile");
     }
   }, [activeTab, isSuperAdmin]);
@@ -168,7 +223,8 @@ export default function SettingsPage() {
     { id: "notifications", label: "Notifications", icon: Bell },
     ...(isSuperAdmin ? [
       { id: "roles", label: "Roles & Permissions", icon: ShieldCheck },
-      { id: "templates", label: "Certificate Templates", icon: FileText }
+      { id: "templates", label: "Certificate Templates", icon: FileText },
+      { id: "whatsapp", label: "WhatsApp Configuration", icon: MessageSquare }
     ] : []),
   ];
 
@@ -455,6 +511,106 @@ export default function SettingsPage() {
                 </Link>
               </div>
             </div>
+          )}
+          {activeTab === "whatsapp" && (
+            <form onSubmit={handleUpdateWhatsApp} className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div className="space-y-1">
+                <h3 className="text-lg font-bold flex items-center gap-2 text-foreground uppercase tracking-tight">
+                  <MessageSquare className="w-5 h-5 text-emerald-600 dark:text-emerald-400" /> WhatsApp Notification Gateway
+                </h3>
+                <p className="text-sm text-muted-foreground font-medium">Configure API credentials and settings for Zavu WhatsApp integration.</p>
+              </div>
+
+              <div className="space-y-6">
+                <div className="flex items-center justify-between p-4 rounded-2xl bg-accent/5 border border-border hover:bg-accent/10 transition-all shadow-sm">
+                  <div>
+                    <div className="text-sm font-bold text-foreground">Enable WhatsApp Notifications</div>
+                    <div className="text-[10px] text-muted-foreground font-medium tracking-wide">Send automated certificate renewal alerts to clients via WhatsApp</div>
+                  </div>
+                  <div 
+                    onClick={() => setWhatsappForm(prev => ({ ...prev, enabled: !prev.enabled }))}
+                    className={cn(
+                      "w-12 h-6 rounded-full p-1 cursor-pointer transition-colors shadow-inner flex items-center", 
+                      whatsappForm.enabled ? "bg-emerald-600 justify-end" : "bg-muted justify-start"
+                    )}
+                  >
+                    <div className="w-4 h-4 rounded-full bg-white transition-all shadow-md" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label className="text-muted-foreground font-bold">API Provider</Label>
+                    <select 
+                      disabled
+                      value={whatsappForm.provider}
+                      className="w-full bg-background border border-border rounded-xl h-11 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 text-foreground font-medium opacity-60 cursor-not-allowed"
+                    >
+                      <option value="Zavu">Zavu WhatsApp Business API</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-muted-foreground font-bold">Environment</Label>
+                    <select 
+                      value={whatsappForm.environment} 
+                      onChange={(e) => setWhatsappForm({...whatsappForm, environment: e.target.value})}
+                      className="w-full bg-background border border-border rounded-xl h-11 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 text-foreground font-medium"
+                    >
+                      <option value="sandbox">Sandbox</option>
+                      <option value="live">Live / Production</option>
+                    </select>
+                  </div>
+
+                  <div className="md:col-span-2 space-y-2">
+                    <Label className="text-muted-foreground font-bold">API Authorization Token (Key)</Label>
+                    <Input 
+                      type="password"
+                      value={whatsappForm.apiKey} 
+                      onChange={(e) => setWhatsappForm({...whatsappForm, apiKey: e.target.value})} 
+                      placeholder="zavu_live_..."
+                      className="bg-background border-border h-11 text-foreground" 
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-muted-foreground font-bold">Phone Number ID (Optional)</Label>
+                    <Input 
+                      value={whatsappForm.phoneId} 
+                      onChange={(e) => setWhatsappForm({...whatsappForm, phoneId: e.target.value})} 
+                      placeholder="e.g. 10928374829374"
+                      className="bg-background border-border h-11 text-foreground" 
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-muted-foreground font-bold">Business Account ID (Optional)</Label>
+                    <Input 
+                      value={whatsappForm.accountId} 
+                      onChange={(e) => setWhatsappForm({...whatsappForm, accountId: e.target.value})} 
+                      placeholder="e.g. 8374829374829"
+                      className="bg-background border-border h-11 text-foreground" 
+                    />
+                  </div>
+
+                  <div className="md:col-span-2 space-y-2">
+                    <Label className="text-muted-foreground font-bold">Approved Default Message Template ID</Label>
+                    <Input 
+                      value={whatsappForm.defaultTemplate} 
+                      onChange={(e) => setWhatsappForm({...whatsappForm, defaultTemplate: e.target.value})} 
+                      placeholder="certificate_due_reminder"
+                      className="bg-background border-border h-11 text-foreground" 
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-4 flex justify-end">
+                <Button disabled={loading} type="submit" className="bg-emerald-600 hover:bg-emerald-500 text-white px-8 font-bold h-11 rounded-xl border-0 shadow-lg shadow-emerald-500/20">
+                  {loading ? "Saving Settings..." : "Save Configuration"} <Save className="w-4 h-4 ml-2" />
+                </Button>
+              </div>
+            </form>
           )}
         </div>
       </div>
