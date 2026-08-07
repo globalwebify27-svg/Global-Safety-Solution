@@ -12,4 +12,8 @@ export interface NotificationProvider {
     messageId?: string;
     errorMessage?: string;
   }>;
+  verifyConnection(apiKey: string): Promise<{
+    success: boolean;
+    message: string;
+  }>;
 }

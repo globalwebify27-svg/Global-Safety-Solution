@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, Building2, Mail, Phone, MapPin, FileText, ShieldAlert, CheckCircle2, User, Briefcase, CheckSquare, Calendar, Activity, AlertCircle, Clock, ChevronDown, ChevronUp, BarChart2, Users, Layers, ExternalLink, KeyRound, Send } from "lucide-react";
+import { ArrowLeft, Building2, Mail, Phone, MapPin, FileText, ShieldAlert, CheckCircle2, User, Briefcase, CheckSquare, Calendar, Activity, AlertCircle, Clock, ChevronDown, ChevronUp, BarChart2, Users, Layers, ExternalLink, KeyRound, Send, RefreshCw, MessageSquare } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -140,6 +140,102 @@ export default function ClientProfilePage({ params }: { params: Promise<{ id: st
   const [customSubject, setCustomSubject] = useState("");
   const [customMessage, setCustomMessage] = useState("");
   const [sendingCustomEmail, setSendingCustomEmail] = useState(false);
+
+  // Client WhatsApp Logs States
+  const [clientWaLogs, setClientWaLogs] = useState<any[]>([]);
+  const [loadingClientWa, setLoadingClientWa] = useState(false);
+  const [retryingLogId, setRetryingLogId] = useState<string | null>(null);
+
+  // Custom WhatsApp States
+  const [openCustomWaModal, setOpenCustomWaModal] = useState(false);
+  const [customWaRecipientPhone, setCustomWaRecipientPhone] = useState("");
+  const [customWaCompany, setCustomWaCompany] = useState("");
+  const [customWaCertificate, setCustomWaCertificate] = useState("");
+  const [customWaCertNo, setCustomWaCertNo] = useState("");
+  const [customWaExpiryDate, setCustomWaExpiryDate] = useState("");
+  const [customWaDaysRemaining, setCustomWaDaysRemaining] = useState("");
+  const [customWaContactName, setCustomWaContactName] = useState("GSS Support");
+  const [customWaContactPhone, setCustomWaContactPhone] = useState("");
+  const [sendingCustomWa, setSendingCustomWa] = useState(false);
+
+  const fetchClientWaLogs = async (phone: string) => {
+    if (!token || !phone) return;
+    setLoadingClientWa(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/whatsapp-logs?search=${encodeURIComponent(phone)}&limit=50`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setClientWaLogs(data.items || []);
+      }
+    } catch (e) {
+      console.error("Fetch client whatsapp logs error:", e);
+    } finally {
+      setLoadingClientWa(false);
+    }
+  };
+
+  const handleRetryClientLog = async (logId: string) => {
+    if (!token) return;
+    setRetryingLogId(logId);
+    try {
+      const res = await fetch(`${API_BASE_URL}/whatsapp-logs/${logId}/retry`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        toast.success("Retry request enqueued successfully!");
+        if (client?.phone) fetchClientWaLogs(client.phone);
+      } else {
+        toast.error("Failed to retry message.");
+      }
+    } catch {
+      toast.error("Network error occurred.");
+    } finally {
+      setRetryingLogId(null);
+    }
+  };
+
+  useEffect(() => {
+    if (client?.phone) {
+      fetchClientWaLogs(client.phone);
+    }
+  }, [client?.phone, token]);
+
+  const handleSendCustomWhatsAppSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!token || !client) return;
+    setSendingCustomWa(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/clients/${id}/send-whatsapp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          recipient: customWaRecipientPhone,
+          company_name: customWaCompany,
+          certificate_name: customWaCertificate,
+          certificate_number: customWaCertNo,
+          expiry_date: customWaExpiryDate,
+          days_remaining: customWaDaysRemaining,
+          contact_name: customWaContactName,
+          contact_phone: customWaContactPhone || customWaRecipientPhone,
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success(data.message || "Manual WhatsApp alert enqueued!");
+        setOpenCustomWaModal(false);
+        fetchClientWaLogs(customWaRecipientPhone || client.phone || "");
+      } else {
+        toast.error(data.message || "Failed to send manual WhatsApp alert");
+      }
+    } catch {
+      toast.error("Error connecting to WhatsApp service");
+    } finally {
+      setSendingCustomWa(false);
+    }
+  };
 
   const handleSendCustomEmail = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -375,6 +471,23 @@ export default function ClientProfilePage({ params }: { params: Promise<{ id: st
             className="font-bold text-xs rounded-xl h-10 px-4 bg-card border-border hover:bg-accent"
           >
             <KeyRound className="w-4 h-4 mr-1.5 text-emerald-500" /> Credentials
+          </Button>
+
+          <Button
+            onClick={() => {
+              setCustomWaRecipientPhone(client.phone || "");
+              setCustomWaCompany(client.name || "");
+              setCustomWaCertificate("Standard Safety Inspection");
+              setCustomWaCertNo("CERT-" + Math.floor(100000 + Math.random() * 900000));
+              setCustomWaExpiryDate(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString('en-IN'));
+              setCustomWaDaysRemaining("30");
+              setCustomWaContactPhone(client.phone || "");
+              setOpenCustomWaModal(true);
+            }}
+            variant="outline"
+            className="font-bold text-xs rounded-xl h-10 px-4 bg-card border-border hover:bg-accent"
+          >
+            <MessageSquare className="w-4 h-4 mr-1.5 text-emerald-500" /> Manual WhatsApp
           </Button>
 
           <Button
@@ -1248,6 +1361,93 @@ export default function ClientProfilePage({ params }: { params: Promise<{ id: st
               </div>
             </div>
 
+            {/* WhatsApp Dispatch & Interaction History Log */}
+            <div className="bg-card/40 backdrop-blur-md rounded-3xl border border-border p-8 shadow-sm space-y-6 mt-8">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-6">
+                <div>
+                  <h3 className="text-xl font-bold text-foreground flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                      <MessageSquare className="w-4 h-4 text-emerald-600" />
+                    </div>
+                    WhatsApp Notification History
+                  </h3>
+                  <p className="text-muted-foreground text-xs mt-1">
+                    Timeline and status delivery updates for WhatsApp alerts dispatched to this client profile.
+                  </p>
+                </div>
+              </div>
+
+              {loadingClientWa ? (
+                <div className="py-12 text-center text-xs text-muted-foreground font-bold animate-pulse uppercase tracking-widest">
+                  Loading WhatsApp Logs...
+                </div>
+              ) : clientWaLogs.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground bg-card/20 rounded-3xl border border-dashed border-border shadow-inner">
+                  <MessageSquare className="w-12 h-12 mb-4 opacity-15" />
+                  <p className="font-bold uppercase tracking-widest text-[9px]">No WhatsApp notifications sent to this profile number</p>
+                </div>
+              ) : (
+                <div className="border border-border/80 rounded-2xl overflow-hidden bg-muted/20">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr className="bg-accent/40 border-b border-border/80 text-muted-foreground uppercase font-black tracking-wider text-[10px]">
+                          <th className="p-4">Timestamp</th>
+                          <th className="p-4">Notification Type</th>
+                          <th className="p-4">Recipient Phone</th>
+                          <th className="p-4">Delivery Status</th>
+                          <th className="p-4 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border/60">
+                        {clientWaLogs.map((logItem, idx) => (
+                          <tr key={idx} className="hover:bg-accent/20 transition-all">
+                            <td className="p-4 font-medium text-foreground whitespace-nowrap">
+                              {new Date(logItem.created_at || logItem.sent_at).toLocaleString('en-IN')}
+                            </td>
+                            <td className="p-4">
+                              <div className="space-y-0.5">
+                                <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase bg-primary/10 text-primary">
+                                  {logItem.notification_type}
+                                </span>
+                                <p className="text-[10px] text-muted-foreground font-mono">{logItem.template_code}</p>
+                              </div>
+                            </td>
+                            <td className="p-4 font-mono font-medium text-muted-foreground">
+                              {logItem.recipient}
+                            </td>
+                            <td className="p-4">
+                              <span className={cn(
+                                "px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider",
+                                logItem.status === 'READ' && "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400",
+                                logItem.status === 'DELIVERED' && "bg-teal-500/10 text-teal-600 dark:text-teal-400",
+                                logItem.status === 'SENT' && "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+                                logItem.status === 'FAILED' && "bg-rose-500/10 text-rose-600 dark:text-rose-400",
+                                logItem.status === 'PENDING' && "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                              )}>
+                                {logItem.status}
+                              </span>
+                            </td>
+                            <td className="p-4 text-right">
+                              <Button
+                                disabled={retryingLogId === logItem.id}
+                                onClick={() => handleRetryClientLog(logItem.id)}
+                                variant="ghost"
+                                className="h-8 w-8 p-0 rounded-lg hover:bg-accent/10 border-0 text-muted-foreground hover:text-emerald-600"
+                                title="Resend Notification"
+                              >
+                                <RefreshCw className={cn("w-4 h-4", retryingLogId === logItem.id && "animate-spin")} />
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* Super Admin Safety Officer History & Progress Log */}
             {isSuperAdmin && (
               <div className="bg-card/40 backdrop-blur-md rounded-3xl border border-border p-8 shadow-sm space-y-6 mt-8">
@@ -1577,6 +1777,118 @@ export default function ClientProfilePage({ params }: { params: Promise<{ id: st
             <DialogFooter>
               <Button type="submit" disabled={sendingCustomEmail} className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold w-full h-12 shadow-xl shadow-indigo-500/20 rounded-xl mt-2 border-0">
                 {sendingCustomEmail ? "Sending Email..." : "Send Custom Email"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Compose Custom WhatsApp Dialog */}
+      <Dialog open={openCustomWaModal} onOpenChange={setOpenCustomWaModal}>
+        <DialogContent className="sm:max-w-[550px] bg-card border-border text-foreground rounded-[2rem] shadow-2xl overflow-y-auto max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold flex items-center gap-3">
+              <MessageSquare className="w-6 h-6 text-emerald-500" /> Dispatch Manual WhatsApp Alert
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground">
+              Draft and route a manual certificate warning alert to {client.name}.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleSendCustomWhatsAppSubmit} className="space-y-4 mt-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label className="font-bold text-muted-foreground text-[11px] uppercase">Recipient Phone</Label>
+                <Input
+                  value={customWaRecipientPhone}
+                  onChange={(e) => setCustomWaRecipientPhone(e.target.value)}
+                  placeholder="+919999999999"
+                  className="bg-background border-border h-10 rounded-xl"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="font-bold text-muted-foreground text-[11px] uppercase">Company Name</Label>
+                <Input
+                  value={customWaCompany}
+                  onChange={(e) => setCustomWaCompany(e.target.value)}
+                  placeholder="Company name"
+                  className="bg-background border-border h-10 rounded-xl"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="font-bold text-muted-foreground text-[11px] uppercase">Certificate Name</Label>
+                <Input
+                  value={customWaCertificate}
+                  onChange={(e) => setCustomWaCertificate(e.target.value)}
+                  placeholder="e.g. Fire Safety Cert"
+                  className="bg-background border-border h-10 rounded-xl"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="font-bold text-muted-foreground text-[11px] uppercase">Certificate Number</Label>
+                <Input
+                  value={customWaCertNo}
+                  onChange={(e) => setCustomWaCertNo(e.target.value)}
+                  placeholder="e.g. CERT-123"
+                  className="bg-background border-border h-10 rounded-xl"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="font-bold text-muted-foreground text-[11px] uppercase">Expiry Date</Label>
+                <Input
+                  value={customWaExpiryDate}
+                  onChange={(e) => setCustomWaExpiryDate(e.target.value)}
+                  placeholder="e.g. 15/09/2026"
+                  className="bg-background border-border h-10 rounded-xl"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="font-bold text-muted-foreground text-[11px] uppercase">Days Remaining</Label>
+                <Input
+                  value={customWaDaysRemaining}
+                  onChange={(e) => setCustomWaDaysRemaining(e.target.value)}
+                  placeholder="e.g. 15"
+                  className="bg-background border-border h-10 rounded-xl"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="font-bold text-muted-foreground text-[11px] uppercase">Contact Person Name</Label>
+                <Input
+                  value={customWaContactName}
+                  onChange={(e) => setCustomWaContactName(e.target.value)}
+                  placeholder="GSS Safety Officer"
+                  className="bg-background border-border h-10 rounded-xl"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="font-bold text-muted-foreground text-[11px] uppercase">Contact Phone Number</Label>
+                <Input
+                  value={customWaContactPhone}
+                  onChange={(e) => setCustomWaContactPhone(e.target.value)}
+                  placeholder="+919999999999"
+                  className="bg-background border-border h-10 rounded-xl"
+                  required
+                />
+              </div>
+            </div>
+
+            <DialogFooter className="mt-4">
+              <Button type="submit" disabled={sendingCustomWa} className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold w-full h-12 shadow-xl shadow-emerald-500/20 rounded-xl border-0">
+                {sendingCustomWa ? "Enqueuing Alert..." : "Dispatch Manual WhatsApp"}
               </Button>
             </DialogFooter>
           </form>

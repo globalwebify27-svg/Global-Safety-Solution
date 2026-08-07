@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { PrismaService } from '../prisma/prisma.service';
 import { TemplateEngineService } from '../email-management/template-engine.service';
 import { MailService } from '../email-management/mail.service';
+import { WhatsAppQueueService } from '../notifications/whatsapp-queue.service';
 
 @Injectable()
 export class ClientsService {
@@ -9,6 +10,7 @@ export class ClientsService {
     private prisma: PrismaService,
     private templateEngine: TemplateEngineService,
     private mailService: MailService,
+    private whatsappQueue: WhatsAppQueueService,
   ) {}
 
   async findAll() {
@@ -307,6 +309,45 @@ export class ClientsService {
     });
 
     return { success: true, message: `Custom email sent to ${targetEmail}`, result };
+  }
+
+  async sendCustomWhatsApp(
+    id: string,
+    body: {
+      recipient: string;
+      company_name: string;
+      certificate_name: string;
+      certificate_number: string;
+      expiry_date: string;
+      days_remaining: string;
+      contact_name: string;
+      contact_phone: string;
+    }
+  ) {
+    const client = await this.prisma.client.findUnique({ where: { id } });
+    if (!client) throw new NotFoundException('Client not found.');
+
+    const targetRecipient = body.recipient || client.phone;
+    if (!targetRecipient) throw new BadRequestException('Recipient phone number is required.');
+
+    await this.whatsappQueue.enqueueNotification({
+      to: targetRecipient,
+      templateCode: 'MANUAL_ALERT',
+      context: {
+        company_name: body.company_name,
+        certificate_name: body.certificate_name,
+        certificate_number: body.certificate_number,
+        expiry_date: body.expiry_date,
+        days_remaining: body.days_remaining,
+        contact_name: body.contact_name,
+        contact_phone: body.contact_phone,
+      },
+    });
+
+    return {
+      success: true,
+      message: `Manual WhatsApp alert enqueued successfully for ${targetRecipient}.`,
+    };
   }
 
   async setupPassword(clientId: string, password: string) {

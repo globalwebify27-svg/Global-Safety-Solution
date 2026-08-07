@@ -72,4 +72,33 @@ export class ZavuProvider implements NotificationProvider {
       };
     }
   }
+
+  async verifyConnection(apiKey: string): Promise<{ success: boolean; message: string }> {
+    const url = 'https://api.zavu.dev/v1/sender-profiles';
+    try {
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+        },
+      });
+
+      if (!response.ok) {
+        return {
+          success: false,
+          message: `API validation failed (HTTP ${response.status})`,
+        };
+      }
+
+      return {
+        success: true,
+        message: 'Successfully authenticated with Zavu API!',
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        message: error?.message || 'Network connectivity error',
+      };
+    }
+  }
 }

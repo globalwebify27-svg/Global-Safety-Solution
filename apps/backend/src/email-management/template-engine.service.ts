@@ -2,6 +2,8 @@ import { Injectable, Logger, NotFoundException, Inject, forwardRef } from '@nest
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService, SendMailOptions } from './mail.service';
 import { EmailQueueService } from './email-queue.service';
+import { WhatsAppNotificationService } from '../notifications/whatsapp-notification.service';
+import { WhatsAppQueueService } from '../notifications/whatsapp-queue.service';
 
 export interface SendTemplatedMailOptions {
   templateCode: string;
@@ -21,6 +23,8 @@ export class TemplateEngineService {
     private readonly mailService: MailService,
     @Inject(forwardRef(() => EmailQueueService))
     private readonly emailQueue: EmailQueueService,
+    private readonly whatsappService: WhatsAppNotificationService,
+    private readonly whatsappQueue: WhatsAppQueueService,
   ) {}
 
   /**
@@ -231,9 +235,38 @@ export class TemplateEngineService {
     };
   }
 
-  /**
-   * High-level method for ERP modules to render and send email asynchronously via EmailQueue.
-   */
+  async resolvePhoneFromEmail(email: string): Promise<string | null> {
+    if (!email) return null;
+    try {
+      const client = await this.prisma.client.findFirst({
+        where: { email },
+        select: { phone: true }
+      });
+      if (client?.phone) return client.phone;
+
+      const contact = await this.prisma.clientContact.findFirst({
+        where: { email },
+        select: { phone: true }
+      });
+      if (contact?.phone) return contact.phone;
+
+      const user = await this.prisma.user.findFirst({
+        where: { email },
+        select: { phone: true }
+      });
+      if (user?.phone) return user.phone;
+
+      const lead = await this.prisma.lead.findFirst({
+        where: { email },
+        select: { phone: true }
+      });
+      if (lead?.phone) return lead.phone;
+    } catch (e) {
+      this.logger.warn(`Could not resolve phone for email ${email}: ${e}`);
+    }
+    return null;
+  }
+
   async sendTemplatedEmail(options: SendTemplatedMailOptions) {
     const rendered = await this.renderTemplate(options.templateCode, options.context);
 
@@ -246,6 +279,23 @@ export class TemplateEngineService {
       templateCode: options.templateCode,
       scheduledFor: options.scheduledFor,
       attachments: options.attachments,
+    });
+
+    // Resolve phone and enqueue WhatsApp message asynchronously
+    setImmediate(async () => {
+      try {
+        const phone = await this.resolvePhoneFromEmail(options.to);
+        if (phone) {
+          await this.whatsappQueue.enqueueNotification({
+            to: phone,
+            templateCode: options.templateCode,
+            context: options.context || {},
+            scheduledFor: options.scheduledFor,
+          });
+        }
+      } catch (err: any) {
+        this.logger.error(`Failed to enqueue WhatsApp notification event '${options.templateCode}': ${err?.message}`);
+      }
     });
 
     return {

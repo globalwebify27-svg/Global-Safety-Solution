@@ -69,6 +69,24 @@ export class ClientsController {
     return this.clientsService.sendCustomEmail(id, body.email, body.subject, body.message);
   }
 
+  @Post(':id/send-whatsapp')
+  @Permissions('UPDATE_CLIENT')
+  sendCustomWhatsApp(
+    @Param('id') id: string,
+    @Body() body: {
+      recipient: string;
+      company_name: string;
+      certificate_name: string;
+      certificate_number: string;
+      expiry_date: string;
+      days_remaining: string;
+      contact_name: string;
+      contact_phone: string;
+    }
+  ) {
+    return this.clientsService.sendCustomWhatsApp(id, body);
+  }
+
   @Delete(':id')
   @Permissions('DELETE_CLIENT')
   remove(@Param('id') id: string) {

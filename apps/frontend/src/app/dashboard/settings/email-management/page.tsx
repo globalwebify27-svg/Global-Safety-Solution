@@ -32,12 +32,15 @@ import {
   RotateCcw,
   Activity,
   AlertTriangle,
+  MessageSquare,
+  Download,
+  Search,
 } from "lucide-react";
 
 export default function EmailManagementPage() {
   const token = useAuthStore((state) => state.token);
   const [activeTab, setActiveTab] = useState<
-    "smtp" | "templates" | "branding" | "rules" | "logs" | "test" | "queue" | "analytics"
+    "smtp" | "templates" | "branding" | "rules" | "logs" | "test" | "queue" | "analytics" | "whatsapp-logs" | "whatsapp-templates"
   >("smtp");
 
   const [loading, setLoading] = useState(true);
@@ -115,16 +118,182 @@ export default function EmailManagementPage() {
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
   const [auditModalOpen, setAuditModalOpen] = useState(false);
 
+  // WhatsApp Logs States
+  const [whatsappLogs, setWhatsappLogs] = useState<any[]>([]);
+  const [waSearch, setWaSearch] = useState("");
+  const [waStatusFilter, setWaStatusFilter] = useState("ALL");
+  const [waPage, setWaPage] = useState(1);
+  const [waTotalPages, setWaTotalPages] = useState(1);
+  const [retryingWaId, setRetryingWaId] = useState<string | null>(null);
+  const [selectedWaLog, setSelectedWaLog] = useState<any | null>(null);
+  const [waLogDetailOpen, setWaLogDetailOpen] = useState(false);
+
+  // WhatsApp Analytics States
+  const [waAnalytics, setWaAnalytics] = useState<any>({
+    total_sent: 0,
+    total_failed: 0,
+    total_pending: 0,
+    today_whatsapp: 0,
+    delivery_rate: "100.0%",
+    read_rate: "0.0%",
+    quota_stats: {
+      quota_limit: 250,
+      quota_used: 0,
+      percentage: "0.0",
+      status: "NORMAL",
+    },
+    daily_metrics: [],
+    template_breakdown: [],
+  });
+
+  // WhatsApp Templates States
+  const [waTemplates, setWaTemplates] = useState<any[]>([]);
+  const [editingWaTemplate, setEditingWaTemplate] = useState<any | null>(null);
+
+  const handleSaveWaTemplate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!token || !editingWaTemplate) return;
+    const isNew = editingWaTemplate.id.startsWith("new-");
+    const method = isNew ? "POST" : "PATCH";
+    const url = isNew
+      ? `${API_BASE_URL}/whatsapp-templates`
+      : `${API_BASE_URL}/whatsapp-templates/${editingWaTemplate.id}`;
+
+    try {
+      JSON.parse(editingWaTemplate.variables_map);
+    } catch {
+      toast.error("Variables mapping must be a valid JSON object string.");
+      return;
+    }
+
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          name: editingWaTemplate.name,
+          code: editingWaTemplate.code,
+          template_name: editingWaTemplate.template_name,
+          variables_map: editingWaTemplate.variables_map,
+          is_active: editingWaTemplate.is_active,
+        }),
+      });
+
+      if (res.ok) {
+        toast.success(isNew ? "WhatsApp template created!" : "WhatsApp template updated!");
+        setEditingWaTemplate(null);
+        fetchAllData();
+      } else {
+        const errorData = await res.json();
+        toast.error(errorData.message || "Failed to save template.");
+      }
+    } catch {
+      toast.error("Network error saving WhatsApp template.");
+    }
+  };
+
+  const handleDeleteWaTemplate = async (tplId: string) => {
+    if (!token || !confirm("Are you sure you want to delete this WhatsApp template?")) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/whatsapp-templates/${tplId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        toast.success("WhatsApp template deleted!");
+        fetchAllData();
+      } else {
+        toast.error("Failed to delete template.");
+      }
+    } catch {
+      toast.error("Network error deleting template.");
+    }
+  };
+
   useEffect(() => {
     fetchAllData();
   }, [token, queueFilterStatus]);
+
+  const fetchWhatsAppLogs = async () => {
+    if (!token) return;
+    try {
+      const res = await fetch(
+        `${API_BASE_URL}/whatsapp-logs?status=${waStatusFilter}&search=${waSearch}&page=${waPage}&limit=15`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        setWhatsappLogs(data.items || []);
+        setWaTotalPages(data.totalPages || 1);
+      }
+    } catch (e) {
+      console.error("Error fetching WhatsApp logs:", e);
+    }
+  };
+
+  useEffect(() => {
+    fetchWhatsAppLogs();
+  }, [token, waStatusFilter, waSearch, waPage]);
+
+  const handleRetryWaLog = async (logId: string) => {
+    if (!token) return;
+    setRetryingWaId(logId);
+    try {
+      const res = await fetch(`${API_BASE_URL}/whatsapp-logs/${logId}/retry`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success(data.message || "Message re-queued successfully!");
+        fetchWhatsAppLogs();
+      } else {
+        toast.error(data.message || "Failed to retry message.");
+      }
+    } catch {
+      toast.error("Network error retrying message.");
+    } finally {
+      setRetryingWaId(null);
+    }
+  };
+
+  const handleExportWaLogsCSV = () => {
+    if (whatsappLogs.length === 0) {
+      toast.error("No log data to export");
+      return;
+    }
+    const headers = ["ID", "Recipient", "Status", "Template", "Provider", "Environment", "Created At", "Failure Reason"];
+    const rows = whatsappLogs.map(log => [
+      log.id,
+      log.recipient,
+      log.status,
+      log.template_code,
+      log.provider,
+      log.environment,
+      new Date(log.created_at).toLocaleString(),
+      log.failure_reason || ""
+    ]);
+    const csvContent = "data:text/csv;charset=utf-8," 
+      + [headers.join(","), ...rows.map(e => e.map(val => `"${val}"`).join(","))].join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `whatsapp_logs_${Date.now()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success("CSV export triggered successfully!");
+  };
 
   const fetchAllData = async () => {
     if (!token) return;
     setLoading(true);
     try {
       const headers = { Authorization: `Bearer ${token}` };
-      const [smtpRes, tplRes, brandRes, ruleRes, logRes, queueRes, queueItemsRes, analyticsRes, auditRes] = await Promise.all([
+      const [smtpRes, tplRes, brandRes, ruleRes, logRes, queueRes, queueItemsRes, analyticsRes, auditRes, waAnalyticsRes, waTemplatesRes] = await Promise.all([
         fetch(`${API_BASE_URL}/email-management/smtp`, { headers }),
         fetch(`${API_BASE_URL}/email-management/templates`, { headers }),
         fetch(`${API_BASE_URL}/email-management/branding`, { headers }),
@@ -134,20 +303,24 @@ export default function EmailManagementPage() {
         fetch(`${API_BASE_URL}/email-management/queue/items?status=${queueFilterStatus}`, { headers }),
         fetch(`${API_BASE_URL}/email-management/analytics/stats`, { headers }),
         fetch(`${API_BASE_URL}/email-management/rules/audit-logs`, { headers }),
+        fetch(`${API_BASE_URL}/whatsapp-logs/analytics/stats`, { headers }),
+        fetch(`${API_BASE_URL}/whatsapp-templates`, { headers }),
       ]);
-
+ 
       if (smtpRes.ok) setSmtpConfig(await smtpRes.json());
       if (tplRes.ok) setTemplates(await tplRes.json());
       if (brandRes.ok) setBranding(await brandRes.json());
       if (ruleRes.ok) setRules(await ruleRes.json());
       if (logRes.ok) setLogs(await logRes.json());
       if (queueRes.ok) setQueueStats(await queueRes.json());
+      if (waTemplatesRes && waTemplatesRes.ok) setWaTemplates(await waTemplatesRes.json());
       if (queueItemsRes.ok) {
         const qData = await queueItemsRes.json();
         setQueueItems(qData.items || []);
       }
       if (analyticsRes.ok) setAnalyticsStats(await analyticsRes.json());
       if (auditRes.ok) setAuditLogs(await auditRes.json());
+      if (waAnalyticsRes.ok) setWaAnalytics(await waAnalyticsRes.json());
     } catch (err) {
       console.error("Error fetching email management data:", err);
     } finally {
@@ -274,28 +447,47 @@ export default function EmailManagementPage() {
     }
   };
 
-  const handleToggleRule = async (ruleId: string, currentVal: boolean) => {
+  const handleToggleRule = async (ruleId: string, currentVal: boolean, channel: 'email' | 'whatsapp') => {
     // Optimistic UI state update
     setRules((prevRules) =>
-      prevRules.map((r) =>
-        r.id === ruleId || r.event_name === ruleId
-          ? { ...r, is_email_enabled: !currentVal }
-          : r
-      )
+      prevRules.map((r) => {
+        if (r.id === ruleId || r.event_name === ruleId) {
+          if (channel === 'email') {
+            return { ...r, is_email_enabled: !currentVal };
+          } else {
+            let adv: Record<string, any> = {};
+            if (r.advanced_config) {
+              try {
+                adv = JSON.parse(r.advanced_config);
+              } catch {}
+            }
+            adv.whatsapp_enabled = !currentVal;
+            return { ...r, advanced_config: JSON.stringify(adv) };
+          }
+        }
+        return r;
+      })
     );
 
     try {
+      const payload: Record<string, any> = {};
+      if (channel === 'email') {
+        payload.is_email_enabled = !currentVal;
+      } else {
+        payload.is_whatsapp_enabled = !currentVal;
+      }
+
       const res = await fetch(`${API_BASE_URL}/email-management/rules/${ruleId}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ is_email_enabled: !currentVal }),
+        body: JSON.stringify(payload),
       });
 
       if (res.ok) {
-        toast.success(`Notification rule ${!currentVal ? "enabled" : "disabled"}`);
+        toast.success(`${channel === 'email' ? 'Email' : 'WhatsApp'} channel ${!currentVal ? "enabled" : "disabled"}`);
         fetchAllData();
       } else {
         toast.error("Failed to update notification rule");
@@ -433,6 +625,8 @@ export default function EmailManagementPage() {
     { id: "branding", label: "Email Branding", icon: Brush },
     { id: "rules", label: "Notification Rules", icon: BellRing },
     { id: "logs", label: "Email Logs", icon: History },
+    { id: "whatsapp-logs", label: "WhatsApp Logs", icon: MessageSquare },
+    { id: "whatsapp-templates", label: "WhatsApp Templates", icon: SlidersHorizontal },
     { id: "test", label: "Test Email", icon: Send },
     { id: "queue", label: "Email Queue", icon: Layers },
     { id: "analytics", label: "Analytics & Health", icon: BarChart3 },
@@ -1022,30 +1216,74 @@ export default function EmailManagementPage() {
                             </p>
                           </div>
 
-                          <div className="flex items-center gap-3">
-                            <span
-                              className={cn(
-                                "text-xs font-bold uppercase tracking-wider",
-                                rule.is_email_enabled ? "text-emerald-500" : "text-muted-foreground"
-                              )}
-                            >
-                              {rule.is_email_enabled ? "ON" : "OFF"}
-                            </span>
-                            <button
-                              onClick={() => handleToggleRule(rule.id, rule.is_email_enabled)}
-                              className={cn(
-                                "w-12 h-6 rounded-full transition-colors relative flex items-center px-0.5 btn-tactile",
-                                rule.is_email_enabled ? "bg-emerald-500" : "bg-muted-foreground/30"
-                              )}
-                            >
-                              <div
-                                className={cn(
-                                  "w-5 h-5 rounded-full bg-white transition-transform shadow-md",
-                                  rule.is_email_enabled ? "translate-x-6" : "translate-x-0"
-                                )}
-                              />
-                            </button>
-                          </div>
+                          {(() => {
+                            let isWAEnabled = false;
+                            if (rule.advanced_config) {
+                              try {
+                                const config = JSON.parse(rule.advanced_config);
+                                isWAEnabled = config.whatsapp_enabled === true;
+                              } catch {}
+                            }
+                            return (
+                              <div className="flex items-center gap-6 shrink-0 bg-background/40 p-2.5 rounded-2xl border border-border/60">
+                                {/* EMAIL TOGGLE */}
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Email</span>
+                                  <span
+                                    className={cn(
+                                      "text-[10px] font-black uppercase tracking-wider w-8 text-right",
+                                      rule.is_email_enabled ? "text-indigo-500" : "text-muted-foreground"
+                                    )}
+                                  >
+                                    {rule.is_email_enabled ? "ON" : "OFF"}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleToggleRule(rule.id, rule.is_email_enabled, 'email')}
+                                    className={cn(
+                                      "w-10 h-5 rounded-full transition-colors relative flex items-center px-0.5 btn-tactile",
+                                      rule.is_email_enabled ? "bg-indigo-600" : "bg-muted-foreground/30"
+                                    )}
+                                  >
+                                    <div
+                                      className={cn(
+                                        "w-4 h-4 rounded-full bg-white transition-transform shadow-sm",
+                                        rule.is_email_enabled ? "translate-x-5" : "translate-x-0"
+                                      )}
+                                    />
+                                  </button>
+                                </div>
+
+                                {/* WHATSAPP TOGGLE */}
+                                <div className="flex items-center gap-2 border-l border-border/60 pl-4">
+                                  <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">WhatsApp</span>
+                                  <span
+                                    className={cn(
+                                      "text-[10px] font-black uppercase tracking-wider w-8 text-right",
+                                      isWAEnabled ? "text-emerald-500" : "text-muted-foreground"
+                                    )}
+                                  >
+                                    {isWAEnabled ? "ON" : "OFF"}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleToggleRule(rule.id, isWAEnabled, 'whatsapp')}
+                                    className={cn(
+                                      "w-10 h-5 rounded-full transition-colors relative flex items-center px-0.5 btn-tactile",
+                                      isWAEnabled ? "bg-emerald-600" : "bg-muted-foreground/30"
+                                    )}
+                                  >
+                                    <div
+                                      className={cn(
+                                        "w-4 h-4 rounded-full bg-white transition-transform shadow-sm",
+                                        isWAEnabled ? "translate-x-5" : "translate-x-0"
+                                      )}
+                                    />
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })()}
                         </div>
                       ))}
                     </div>
@@ -1188,7 +1426,468 @@ export default function EmailManagementPage() {
         </div>
       )}
 
-      {/* TAB 6: TEST EMAIL */}
+      {/* TAB 5.5: WHATSAPP LOGS */}
+      {activeTab === "whatsapp-logs" && (
+        <div className="bg-card border border-border rounded-3xl p-8 shadow-xs space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-6">
+            <div>
+              <h3 className="text-xl font-bold text-foreground">WhatsApp Delivery Audit Log</h3>
+              <p className="text-muted-foreground text-xs font-medium">
+                Complete history of system WhatsApp notifications, delivery status traces, and failures.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              <Button 
+                onClick={handleExportWaLogsCSV}
+                variant="outline"
+                size="sm"
+                className="h-10 px-4 font-bold text-xs rounded-xl border border-border"
+              >
+                <Download className="w-3.5 h-3.5 mr-1.5" /> Export CSV
+              </Button>
+              <Button 
+                onClick={fetchWhatsAppLogs}
+                variant="outline"
+                size="sm"
+                className="h-10 px-4 font-bold text-xs rounded-xl border border-border"
+              >
+                <RefreshCw className="w-3.5 h-3.5 mr-1.5" /> Refresh
+              </Button>
+            </div>
+          </div>
+
+          {/* Search and Filters */}
+          <div className="flex flex-col sm:flex-row gap-4 items-center justify-between bg-muted/30 p-4 rounded-2xl border border-border/60">
+            <div className="relative w-full sm:max-w-xs">
+              <Search className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
+              <Input
+                value={waSearch}
+                onChange={(e) => {
+                  setWaSearch(e.target.value);
+                  setWaPage(1);
+                }}
+                placeholder="Search phone or template..."
+                className="h-10 pl-9 bg-background border-border text-xs"
+              />
+            </div>
+            
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest shrink-0">Status</span>
+              <select
+                value={waStatusFilter}
+                onChange={(e) => {
+                  setWaStatusFilter(e.target.value);
+                  setWaPage(1);
+                }}
+                className="bg-background border border-border rounded-xl h-10 px-3 text-xs focus:outline-none text-foreground font-medium w-full sm:w-36"
+              >
+                <option value="ALL">All States</option>
+                <option value="PENDING">Pending</option>
+                <option value="SENT">Sent</option>
+                <option value="DELIVERED">Delivered</option>
+                <option value="READ">Read</option>
+                <option value="FAILED">Failed</option>
+                <option value="SKIPPED">Skipped</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Logs Table */}
+          <div className="overflow-x-auto border border-border rounded-2xl">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-muted/60 text-muted-foreground text-xs uppercase font-black tracking-wider border-b border-border">
+                <tr>
+                  <th className="p-4 rounded-l-xl">Recipient</th>
+                  <th className="p-4">Notification Type</th>
+                  <th className="p-4">Provider</th>
+                  <th className="p-4">Status</th>
+                  <th className="p-4">Sent Time</th>
+                  <th className="p-4 rounded-r-xl text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {whatsappLogs.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="p-8 text-center text-muted-foreground font-medium">
+                      No WhatsApp delivery logs match the filter criteria.
+                    </td>
+                  </tr>
+                ) : (
+                  whatsappLogs.map((log) => (
+                    <tr key={log.id} className="hover:bg-accent/40 transition-colors">
+                      <td className="p-4 font-bold text-foreground">
+                        <div>{log.recipient}</div>
+                        <div className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">
+                          {log.environment} Mode
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        <div className="font-bold text-foreground text-xs">{log.notification_type}</div>
+                        <div className="text-[10px] text-muted-foreground font-mono">{log.template_code}</div>
+                      </td>
+                      <td className="p-4 font-medium text-foreground text-xs">{log.provider}</td>
+                      <td className="p-4">
+                        <span
+                          className={cn(
+                            "px-2.5 py-1 rounded-full text-[9px] font-black uppercase inline-flex items-center gap-1",
+                            (log.status === "SENT" || log.status === "DELIVERED" || log.status === "READ") && "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+                            log.status === "PENDING" && "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+                            log.status === "FAILED" && "bg-rose-500/10 text-rose-600 dark:text-rose-400",
+                            log.status === "SKIPPED" && "bg-muted text-muted-foreground"
+                          )}
+                        >
+                          {log.status}
+                        </span>
+                      </td>
+                      <td className="p-4 text-xs text-muted-foreground font-mono">
+                        {log.sent_at ? new Date(log.sent_at).toLocaleString() : "Not Sent"}
+                      </td>
+                      <td className="p-4 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <Button
+                            onClick={() => {
+                              setSelectedWaLog(log);
+                              setWaLogDetailOpen(true);
+                            }}
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0 rounded-lg hover:bg-accent"
+                          >
+                            <Eye className="w-4 h-4 text-muted-foreground" />
+                          </Button>
+                          {log.status === "FAILED" && (
+                            <Button
+                              disabled={retryingWaId === log.id}
+                              onClick={() => handleRetryWaLog(log.id)}
+                              variant="outline"
+                              size="sm"
+                              className="h-8 px-2.5 font-bold text-[10px] rounded-lg border border-border"
+                            >
+                              {retryingWaId === log.id ? "Queuing..." : "Retry"}
+                            </Button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination Controls */}
+          {waTotalPages > 1 && (
+            <div className="flex items-center justify-between border-t border-border pt-4">
+              <span className="text-xs text-muted-foreground font-semibold">
+                Page {waPage} of {waTotalPages}
+              </span>
+              <div className="flex items-center gap-2">
+                <Button
+                  disabled={waPage <= 1}
+                  onClick={() => setWaPage(prev => Math.max(1, prev - 1))}
+                  variant="outline"
+                  size="sm"
+                  className="font-bold text-xs rounded-xl"
+                >
+                  Previous
+                </Button>
+                <Button
+                  disabled={waPage >= waTotalPages}
+                  onClick={() => setWaPage(prev => Math.min(waTotalPages, prev + 1))}
+                  variant="outline"
+                  size="sm"
+                  className="font-bold text-xs rounded-xl"
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Log Detail Modal */}
+          <Dialog open={waLogDetailOpen} onOpenChange={setWaLogDetailOpen}>
+            <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto rounded-3xl bg-card border-border p-6 shadow-2xl">
+              <DialogHeader>
+                <DialogTitle className="text-lg font-bold text-foreground flex items-center gap-2">
+                  <MessageSquare className="w-5 h-5 text-emerald-600" /> WhatsApp Message Metadata Details
+                </DialogTitle>
+                <DialogDescription className="text-xs text-muted-foreground">
+                  Complete inspect logs for WhatsApp dispatch parameters, provider payloads, and response receipts.
+                </DialogDescription>
+              </DialogHeader>
+
+              {selectedWaLog && (
+                <div className="space-y-4 my-4">
+                  <div className="grid grid-cols-2 gap-4 bg-muted/20 p-4 rounded-2xl border border-border/60">
+                    <div>
+                      <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest block">Recipient Phone</span>
+                      <span className="text-xs font-bold text-foreground">{selectedWaLog.recipient}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest block">Message ID</span>
+                      <span className="text-xs font-mono text-foreground font-bold">{selectedWaLog.message_id || "N/A"}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest block">Provider Driver</span>
+                      <span className="text-xs font-bold text-foreground">{selectedWaLog.provider} ({selectedWaLog.environment})</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest block">Status Code</span>
+                      <span className="text-xs font-bold text-foreground uppercase">{selectedWaLog.status}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest block">Created Timestamp</span>
+                      <span className="text-xs text-foreground font-mono">{new Date(selectedWaLog.created_at).toLocaleString()}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest block">Retry Statistics</span>
+                      <span className="text-xs text-foreground font-medium">{selectedWaLog.retry_count} / {selectedWaLog.max_retries} Retries</span>
+                    </div>
+                  </div>
+
+                  {selectedWaLog.failure_reason && (
+                    <div className="p-4 rounded-2xl border border-rose-500/20 bg-rose-500/5 space-y-1">
+                      <span className="text-[10px] font-black uppercase text-rose-600 dark:text-rose-400 tracking-widest block">Failure Exception Trace</span>
+                      <p className="text-xs font-mono text-rose-500 font-semibold">{selectedWaLog.failure_reason}</p>
+                    </div>
+                  )}
+
+                  <div className="space-y-1.5">
+                    <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest block">Request Parameter Context Payload</span>
+                    <pre className="p-4 bg-muted/60 border border-border/80 rounded-2xl text-[10px] font-mono text-foreground max-h-36 overflow-y-auto">
+                      {(() => {
+                        try {
+                          return JSON.stringify(JSON.parse(selectedWaLog.request_payload), null, 2);
+                        } catch {
+                          return selectedWaLog.request_payload || "No request data recorded";
+                        }
+                      })()}
+                    </pre>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest block">Provider API Response Receipt</span>
+                    <pre className="p-4 bg-muted/60 border border-border/80 rounded-2xl text-[10px] font-mono text-foreground max-h-36 overflow-y-auto">
+                      {(() => {
+                        try {
+                          return JSON.stringify(JSON.parse(selectedWaLog.provider_response), null, 2);
+                        } catch {
+                          return selectedWaLog.provider_response || "No response data returned";
+                        }
+                      })()}
+                    </pre>
+                  </div>
+                </div>
+              )}
+
+              <DialogFooter className="mt-4">
+                <Button onClick={() => setWaLogDetailOpen(false)} className="font-bold rounded-xl px-6">
+                  Close Inspect Details
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
+      )}
+
+      {/* TAB: WHATSAPP TEMPLATES */}
+      {activeTab === "whatsapp-templates" && (
+        <div className="space-y-6 animate-in fade-in duration-300">
+          <div className="flex justify-between items-center">
+            <div>
+              <h3 className="text-xl font-bold text-foreground">WhatsApp Template Registry</h3>
+              <p className="text-muted-foreground text-xs mt-1">
+                Configure provider templates and map GSS trigger variables dynamically.
+              </p>
+            </div>
+            <Button
+              onClick={() =>
+                setEditingWaTemplate({
+                  id: `new-${Date.now()}`,
+                  name: "New WhatsApp Mapping",
+                  code: "CUSTOM_TRIGGER",
+                  template_name: "custom_template_name",
+                  variables_map: JSON.stringify({
+                    company_name: "company_name",
+                    certificate_name: "certificate_name",
+                    certificate_number: "certificate_number",
+                    expiry_date: "expiry_date",
+                    days_remaining: "days_remaining"
+                  }, null, 2),
+                  is_active: true,
+                })
+              }
+              className="font-bold rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white"
+            >
+              <Plus className="w-4 h-4 mr-2" /> Add Mapping
+            </Button>
+          </div>
+
+          {editingWaTemplate ? (
+            <form onSubmit={handleSaveWaTemplate} className="bg-card border border-border rounded-3xl p-8 space-y-6 shadow-md">
+              <div className="flex items-center justify-between border-b border-border pb-4">
+                <h4 className="text-lg font-bold flex items-center gap-2">
+                  <SlidersHorizontal className="w-5 h-5 text-emerald-500" />
+                  {editingWaTemplate.id.startsWith("new-") ? "Create" : "Modify"} WhatsApp Template Mapping
+                </h4>
+                <Button type="button" variant="ghost" className="rounded-lg" onClick={() => setEditingWaTemplate(null)}>
+                  Cancel
+                </Button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="text-[11px] font-bold text-muted-foreground uppercase">Mapping Label Name</label>
+                  <Input
+                    value={editingWaTemplate.name}
+                    onChange={(e) => setEditingWaTemplate({ ...editingWaTemplate, name: e.target.value })}
+                    required
+                    className="bg-background rounded-xl h-11"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[11px] font-bold text-muted-foreground uppercase">GSS Trigger Code</label>
+                  <Input
+                    value={editingWaTemplate.code}
+                    onChange={(e) => setEditingWaTemplate({ ...editingWaTemplate, code: e.target.value })}
+                    required
+                    className="bg-background rounded-xl h-11"
+                    placeholder="e.g. WELCOME_MESSAGE"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[11px] font-bold text-muted-foreground uppercase">Provider Template Name</label>
+                  <Input
+                    value={editingWaTemplate.template_name}
+                    onChange={(e) => setEditingWaTemplate({ ...editingWaTemplate, template_name: e.target.value })}
+                    required
+                    className="bg-background rounded-xl h-11"
+                    placeholder="e.g. certificate_expiry_notification"
+                  />
+                </div>
+                <div className="space-y-2 flex items-center pt-8">
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={editingWaTemplate.is_active}
+                      onChange={(e) => setEditingWaTemplate({ ...editingWaTemplate, is_active: e.target.checked })}
+                      className="rounded border-border text-emerald-600 focus:ring-emerald-500 w-4 h-4"
+                    />
+                    <span className="text-sm font-bold text-foreground">Mapping Active</span>
+                  </label>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <label className="text-[11px] font-bold text-muted-foreground uppercase">Variables Mapping JSON</label>
+                  <span className="text-[10px] text-muted-foreground bg-accent/20 px-2 py-0.5 rounded-md font-mono">
+                    Format: &quot;ProviderParam&quot;: &quot;GSSVariable&quot;
+                  </span>
+                </div>
+                <textarea
+                  className="w-full bg-background border border-border rounded-2xl p-4 text-xs font-mono min-h-[160px] focus:ring-2 focus:ring-emerald-500 text-foreground"
+                  value={editingWaTemplate.variables_map}
+                  onChange={(e) => setEditingWaTemplate({ ...editingWaTemplate, variables_map: e.target.value })}
+                  placeholder='{\n  "company_name": "company_name",\n  "certificate_name": "certificate_name"\n}'
+                  required
+                />
+                <p className="text-[10px] text-muted-foreground/80 mt-1">
+                  <strong>Available GSS trigger properties:</strong> company_name, certificate_name, certificate_number, expiry_date, days_remaining, contact_name, contact_phone
+                </p>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4 border-t border-border">
+                <Button
+                  type="submit"
+                  className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl h-11 px-6 shadow-md"
+                >
+                  Save Configuration
+                </Button>
+              </div>
+            </form>
+          ) : waTemplates.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-center text-muted-foreground bg-card rounded-3xl border border-dashed border-border shadow-inner">
+              <MessageSquare className="w-16 h-16 mb-4 opacity-15" />
+              <p className="font-bold uppercase tracking-widest text-xs">No WhatsApp Template Mappings Configured</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {waTemplates.map((tpl) => {
+                let parsedVars: Record<string, string> = {};
+                try {
+                  parsedVars = JSON.parse(tpl.variables_map);
+                } catch {}
+
+                return (
+                  <div
+                    key={tpl.id}
+                    className="bg-card border border-border rounded-3xl p-6 space-y-4 hover:border-emerald-500/20 transition-all shadow-sm flex flex-col justify-between"
+                  >
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-start gap-2">
+                        <div>
+                          <h4 className="font-bold text-foreground text-base">{tpl.name}</h4>
+                          <code className="text-[10px] text-muted-foreground bg-muted/40 px-2 py-0.5 rounded font-mono font-bold block mt-1 w-max">
+                            Trigger Code: {tpl.code}
+                          </code>
+                        </div>
+                        <span
+                          className={cn(
+                            "px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider",
+                            tpl.is_active
+                              ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+                              : "bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20"
+                          )}
+                        >
+                          {tpl.is_active ? "Active" : "Disabled"}
+                        </span>
+                      </div>
+
+                      <div className="space-y-1 bg-accent/20 p-3 rounded-2xl border border-border/40 text-xs">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Provider Template:</span>
+                          <span className="font-bold text-foreground font-mono">{tpl.template_name}</span>
+                        </div>
+                        <div className="pt-2 mt-2 border-t border-border/40 space-y-1">
+                          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Parameter Mappings:</span>
+                          <div className="grid grid-cols-1 gap-1 max-h-[80px] overflow-y-auto pr-1">
+                            {Object.entries(parsedVars).map(([pkey, skey]) => (
+                              <div key={pkey} className="flex justify-between font-mono text-[10px] text-muted-foreground">
+                                <span>{pkey}</span>
+                                <span className="text-foreground">➔ {skey}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2 justify-end pt-3 border-t border-border/40">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setEditingWaTemplate(tpl)}
+                        className="rounded-lg h-9 font-bold bg-background text-foreground hover:bg-accent border-border"
+                      >
+                        <Edit className="w-3.5 h-3.5 mr-1 text-emerald-500" /> Configure
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDeleteWaTemplate(tpl.id)}
+                        className="rounded-lg h-9 font-bold bg-background text-rose-600 hover:bg-rose-500/10 border-border"
+                      >
+                        <Trash2 className="w-3.5 h-3.5 mr-1" /> Delete
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
       {activeTab === "test" && (
         <div className="bg-card border border-border rounded-3xl p-8 shadow-xs space-y-6 max-w-2xl">
           <div className="border-b border-border pb-4">
@@ -1473,6 +2172,118 @@ export default function EmailManagementPage() {
                     </div>
                   ))
                 )}
+              </div>
+            </div>
+          </div>
+
+          {/* WhatsApp Quota Monitor & Analytics */}
+          <div className="border-t border-border pt-8 space-y-6">
+            <div>
+              <h3 className="text-xl font-bold text-foreground">WhatsApp Channels Quota Monitor</h3>
+              <p className="text-muted-foreground text-xs font-medium">
+                Daily limits, warnings, and analytics for Zavu and Meta WhatsApp cloud API gateways.
+              </p>
+            </div>
+
+            {/* Quota Progress Alert Panel */}
+            <div className={cn(
+              "p-6 rounded-3xl border flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm",
+              waAnalytics.quota_stats.status === "EXCEEDED" && "bg-rose-500/10 border-rose-500/30 text-rose-800 dark:text-rose-200",
+              (waAnalytics.quota_stats.status === "WARNING_90" || waAnalytics.quota_stats.status === "WARNING_80") && "bg-amber-500/10 border-amber-500/30 text-amber-800 dark:text-amber-200",
+              waAnalytics.quota_stats.status === "NORMAL" && "bg-emerald-500/10 border-emerald-500/30 text-emerald-800 dark:text-emerald-200"
+            )}>
+              <div className="space-y-1 w-full max-w-lg">
+                <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider">
+                  <span>Daily Sandbox Limit Capacity</span>
+                  <span>{waAnalytics.quota_stats.quota_used} / {waAnalytics.quota_stats.quota_limit} Sends</span>
+                </div>
+                <div className="w-full h-3 bg-muted rounded-full overflow-hidden border border-border/40">
+                  <div 
+                    className={cn(
+                      "h-full transition-all duration-500 rounded-full",
+                      waAnalytics.quota_stats.status === "EXCEEDED" && "bg-rose-600",
+                      (waAnalytics.quota_stats.status === "WARNING_90" || waAnalytics.quota_stats.status === "WARNING_80") && "bg-amber-600",
+                      waAnalytics.quota_stats.status === "NORMAL" && "bg-emerald-600"
+                    )}
+                    style={{ width: `${Math.min(100, Number(waAnalytics.quota_stats.percentage))}%` }}
+                  />
+                </div>
+                <p className="text-[10px] opacity-80 font-medium">
+                  {waAnalytics.quota_stats.status === "EXCEEDED" && "CRITICAL: WhatsApp daily sandbox quota is fully exhausted. System alerts will log errors until reset."}
+                  {waAnalytics.quota_stats.status === "WARNING_90" && "WARNING: WhatsApp quota is near limit (90% capacity). Plan sandbox allocation limits."}
+                  {waAnalytics.quota_stats.status === "WARNING_80" && "NOTICE: WhatsApp daily quota usage is at 80%. Approaching provider threshold."}
+                  {waAnalytics.quota_stats.status === "NORMAL" && "SUCCESS: System status is normal. Quota usage is within safe parameters."}
+                </p>
+              </div>
+
+              <div className="shrink-0 font-black text-2xl tracking-tight">
+                {waAnalytics.quota_stats.percentage}% Used
+              </div>
+            </div>
+
+            {/* Metrics cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="p-6 rounded-3xl bg-card border border-border shadow-xs space-y-2">
+                <p className="text-xs font-bold text-muted-foreground uppercase">WhatsApp Sent</p>
+                <h3 className="text-3xl font-black text-foreground">{waAnalytics.total_sent}</h3>
+              </div>
+
+              <div className="p-6 rounded-3xl bg-card border border-border shadow-xs space-y-2">
+                <p className="text-xs font-bold text-muted-foreground uppercase">WhatsApp Failed</p>
+                <h3 className="text-3xl font-black text-rose-500">{waAnalytics.total_failed}</h3>
+              </div>
+
+              <div className="p-6 rounded-3xl bg-card border border-border shadow-xs space-y-2">
+                <p className="text-xs font-bold text-muted-foreground uppercase">Delivery Rate</p>
+                <h3 className="text-3xl font-black text-emerald-500">{waAnalytics.delivery_rate}</h3>
+              </div>
+
+              <div className="p-6 rounded-3xl bg-card border border-border shadow-xs space-y-2">
+                <p className="text-xs font-bold text-muted-foreground uppercase">Read Receipt Rate</p>
+                <h3 className="text-3xl font-black text-indigo-500">{waAnalytics.read_rate}</h3>
+              </div>
+            </div>
+
+            {/* Daily stats log */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="bg-card border border-border rounded-3xl p-6 shadow-xs space-y-4">
+                <h4 className="text-sm font-bold text-foreground uppercase tracking-widest flex items-center gap-2">
+                  <FileCode className="w-5 h-5 text-primary" /> Active WhatsApp Templates
+                </h4>
+                <div className="space-y-3">
+                  {waAnalytics.template_breakdown.length === 0 ? (
+                    <p className="text-xs text-muted-foreground font-medium">No templates dispatched in the last 7 days.</p>
+                  ) : (
+                    waAnalytics.template_breakdown.map((tpl: any, idx: number) => (
+                      <div key={idx} className="flex items-center justify-between p-3 rounded-2xl bg-accent/40 border border-border">
+                        <span className="text-xs font-bold text-foreground font-mono">{tpl.name}</span>
+                        <span className="px-3 py-1 rounded-full text-xs font-black bg-primary/10 text-primary">{tpl.count} dispatches</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              <div className="bg-card border border-border rounded-3xl p-6 shadow-xs space-y-4">
+                <h4 className="text-sm font-bold text-foreground uppercase tracking-widest flex items-center gap-2">
+                  <BarChart3 className="w-5 h-5 text-emerald-500" /> Last 7 Days Timeline Activity
+                </h4>
+                <div className="space-y-3">
+                  {waAnalytics.daily_metrics.length === 0 ? (
+                    <p className="text-xs text-muted-foreground font-medium">No activity log found.</p>
+                  ) : (
+                    waAnalytics.daily_metrics.map((day: any, idx: number) => (
+                      <div key={idx} className="flex items-center justify-between p-3 rounded-2xl bg-accent/40 border border-border">
+                        <span className="text-xs font-bold text-foreground">{day.date}</span>
+                        <div className="flex gap-3 text-[10px] font-black uppercase">
+                          <span className="text-emerald-500">{day.sent} Sent</span>
+                          <span className="text-indigo-500">{day.read} Read</span>
+                          <span className="text-rose-500">{day.failed} Fail</span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
               </div>
             </div>
           </div>

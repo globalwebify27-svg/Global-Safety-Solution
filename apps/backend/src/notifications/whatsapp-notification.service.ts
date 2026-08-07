@@ -1,12 +1,223 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { ZavuProvider } from './providers/zavu.provider';
+import { ProviderFactory } from './providers/provider.factory';
+import { decrypt } from '../common/utils/crypto.util';
+import { WhatsAppTemplatesService } from './whatsapp-templates.service';
 
 @Injectable()
 export class WhatsAppNotificationService {
   private readonly logger = new Logger(WhatsAppNotificationService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  // Failover state registers
+  private consecutiveFailures = 0;
+  private isFailedOver = false;
+  private tempProvider: string | null = null;
+  private failoverExpiresAt: Date | null = null;
+  private readonly fallbackSequence = ['Zavu', 'Meta', 'Twilio'];
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly templatesService: WhatsAppTemplatesService,
+  ) {}
+
+  private async handleDispatchOutcome(success: boolean, providerUsed: string) {
+    const now = new Date();
+
+    // Check if failover has expired
+    if (this.isFailedOver && this.failoverExpiresAt && now >= this.failoverExpiresAt) {
+      this.logger.log(`WhatsApp failover window expired. Resetting active provider back to default.`);
+      this.isFailedOver = false;
+      this.tempProvider = null;
+      this.failoverExpiresAt = null;
+      this.consecutiveFailures = 0;
+    }
+
+    if (success) {
+      // Reset failures on successful send of the default provider
+      if (!this.isFailedOver) {
+        this.consecutiveFailures = 0;
+      }
+      return;
+    }
+
+    // On failure
+    if (this.isFailedOver) {
+      this.logger.warn(`Failed dispatch registered using fallback provider '${providerUsed}'.`);
+      return;
+    }
+
+    this.consecutiveFailures++;
+    this.logger.warn(`WhatsApp dispatch failure registered. Consecutive failures: ${this.consecutiveFailures}/3`);
+
+    if (this.consecutiveFailures >= 3) {
+      // Trigger Failover!
+      const activeIdx = this.fallbackSequence.findIndex(p => p.toUpperCase() === providerUsed.toUpperCase());
+      let fallbackIndex = activeIdx + 1;
+      if (fallbackIndex >= this.fallbackSequence.length || fallbackIndex < 0) {
+        fallbackIndex = 0;
+      }
+      const selectedFallback = this.fallbackSequence[fallbackIndex];
+
+      this.isFailedOver = true;
+      this.tempProvider = selectedFallback;
+      this.failoverExpiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour cooldown
+
+      this.logger.error(
+        `CRITICAL: WhatsApp provider '${providerUsed}' failed 3 times consecutively. Switching to fallback provider '${selectedFallback}' for 1 hour.`,
+      );
+
+      // Write warning log to SystemLog
+      try {
+        await this.prisma.systemLog.create({
+          data: {
+            type: 'WHATSAPP_FAILOVER',
+            name: 'PROVIDER_FALLBACK',
+            message: `CRITICAL: Switching WhatsApp provider from '${providerUsed}' to '${selectedFallback}' due to 3 consecutive failures.`,
+            body: JSON.stringify({
+              consecutiveFailures: this.consecutiveFailures,
+              failedProvider: providerUsed,
+              fallbackProvider: selectedFallback,
+              expiresAt: this.failoverExpiresAt,
+            }),
+          },
+        });
+      } catch {}
+    }
+  }
+
+  async getActiveProviderConfig() {
+    const settingsList = await this.prisma.systemSetting.findMany({
+      where: {
+        key: {
+          startsWith: 'whatsapp_',
+        },
+      },
+    });
+
+    const settings = settingsList.reduce(
+      (acc: Record<string, string>, s) => ({ ...acc, [s.key]: s.value }),
+      {},
+    );
+
+    const isEnabled = settings['whatsapp_enabled'] === 'true';
+    const activeProvider = (settings['whatsapp_active_provider'] || 'Zavu').toUpperCase();
+
+    let apiKey = '';
+    let environment: 'sandbox' | 'live' = 'sandbox';
+    let defaultTemplate = 'certificate_due_reminder';
+    let phoneId = '';
+    let accountId = '';
+
+    if (activeProvider === 'ZAVU') {
+      apiKey = decrypt(settings['whatsapp_zavu_api_key'] || '');
+      environment = (settings['whatsapp_zavu_environment'] || 'sandbox') as 'sandbox' | 'live';
+      defaultTemplate = settings['whatsapp_zavu_default_template'] || 'certificate_due_reminder';
+      phoneId = settings['whatsapp_zavu_phone_number_id'] || '';
+      accountId = settings['whatsapp_zavu_business_account_id'] || '';
+    } else if (activeProvider === 'META') {
+      apiKey = decrypt(settings['whatsapp_meta_access_token'] || '');
+      phoneId = settings['whatsapp_meta_phone_number_id'] || '';
+      accountId = settings['whatsapp_meta_business_account_id'] || '';
+      defaultTemplate = settings['whatsapp_meta_default_template'] || 'certificate_due_reminder';
+    } else if (activeProvider === 'TWILIO') {
+      apiKey = decrypt(settings['whatsapp_twilio_auth_token'] || '');
+      accountId = settings['whatsapp_twilio_account_sid'] || '';
+      phoneId = settings['whatsapp_twilio_sender_number'] || '';
+      defaultTemplate = settings['whatsapp_twilio_default_template'] || 'certificate_due_reminder';
+    }
+
+    return {
+      isEnabled,
+      activeProvider,
+      apiKey,
+      environment,
+      defaultTemplate,
+      phoneId,
+      accountId,
+      zavuApiKey: decrypt(settings['whatsapp_zavu_api_key'] || ''),
+      metaAccessToken: decrypt(settings['whatsapp_meta_access_token'] || ''),
+      twilioAuthToken: decrypt(settings['whatsapp_twilio_auth_token'] || ''),
+    };
+  }
+
+  async testConnection(providerName: string, apiKey: string) {
+    try {
+      const provider = ProviderFactory.getProvider(providerName);
+      return await provider.verifyConnection(apiKey);
+    } catch (error: any) {
+      return { success: false, message: error?.message || 'Failed to instantiate provider.' };
+    }
+  }
+
+  async testSandboxConnection(providerName: string, apiKey: string) {
+    const logs: string[] = [];
+    try {
+      logs.push(`[1/4] Checking Sandbox Token credentials...`);
+      if (providerName.toLowerCase() === 'zavu' && !apiKey.startsWith('zv_test_')) {
+        throw new Error(`Token validation failed: Zavu Sandbox tokens must start with 'zv_test_'`);
+      }
+      logs.push(`Token format matches 'zv_test_' validation rules.`);
+
+      logs.push(`[2/4] Initializing provider driver factory...`);
+      const provider = ProviderFactory.getProvider(providerName);
+      logs.push(`Successfully loaded provider driver: ${providerName}.`);
+
+      logs.push(`[3/4] Testing sandbox server connection ping...`);
+      const verifyResult = await provider.verifyConnection(apiKey);
+      if (!verifyResult.success) {
+        throw new Error(verifyResult.message || 'API connection refused by remote sandbox host.');
+      }
+      logs.push(`Connection established: ${verifyResult.message}`);
+
+      logs.push(`[4/4] Connection verification completed successfully! Sandbox is ready.`);
+      return {
+        success: true,
+        logs,
+      };
+    } catch (err: any) {
+      logs.push(`CRITICAL ERROR: ${err.message}`);
+      return {
+        success: false,
+        message: err.message,
+        logs,
+      };
+    }
+  }
+
+  async sendTestMessage(options: {
+    providerName: string;
+    apiKey: string;
+    environment: 'sandbox' | 'live';
+    to: string;
+    template: string;
+  }) {
+    try {
+      const provider = ProviderFactory.getProvider(options.providerName);
+      const result = await provider.sendTemplate({
+        to: options.to,
+        templateName: options.template,
+        apiKey: options.apiKey,
+        environment: options.environment,
+        variables: {
+          company_name: 'Test Corp Ltd',
+          certificate_name: 'Standard Safety Test',
+          certificate_number: 'TEST-12345',
+          expiry_date: new Date().toLocaleDateString('en-IN'),
+          days_remaining: '15',
+          renewal_contact_name: 'Test Contact Officer',
+          renewal_contact_number: options.to,
+        },
+      });
+
+      return {
+        success: result.success,
+        message: result.success ? 'Test message sent successfully!' : result.errorMessage || 'Unknown error',
+        messageId: result.messageId,
+      };
+    } catch (error: any) {
+      return { success: false, message: error?.message || 'Integration error occurred.' };
+    }
+  }
 
   async sendCertificateReminder(options: {
     to: string;
@@ -18,47 +229,110 @@ export class WhatsAppNotificationService {
     contact_name: string;
     contact_phone: string;
   }) {
+    return this.sendNotification({
+      to: options.to,
+      templateCode: 'CERTIFICATE_EXPIRING',
+      context: {
+        company_name: options.client_name,
+        certificate_name: options.cert_name,
+        certificate_number: options.cert_no,
+        expiry_date: options.expiry_date,
+        days_remaining: options.days_remaining,
+        contact_name: options.contact_name,
+        contact_phone: options.contact_phone,
+      },
+    });
+  }
+
+  async sendNotification(options: {
+    to: string;
+    templateCode: string;
+    context: Record<string, any>;
+    logId?: string;
+  }) {
     try {
-      // 1. Fetch system settings
-      const settingsList = await this.prisma.systemSetting.findMany({
-        where: {
-          key: {
-            in: [
-              'whatsapp_enabled',
-              'whatsapp_provider',
-              'whatsapp_api_key',
-              'whatsapp_environment',
-              'whatsapp_default_template',
-            ],
-          },
-        },
-      });
+      const config = await this.getActiveProviderConfig();
 
-      const settings = settingsList.reduce(
-        (acc: Record<string, string>, s) => ({ ...acc, [s.key]: s.value }),
-        {},
-      );
+      let validationError: string | null = null;
 
-      const isEnabled = settings['whatsapp_enabled'] === 'true';
-      const apiKey = settings['whatsapp_api_key'] || '';
-      const environment = (settings['whatsapp_environment'] || 'sandbox') as 'sandbox' | 'live';
-      const defaultTemplate = settings['whatsapp_default_template'] || 'certificate_due_reminder';
-
-      // 2. Runtime checks: Skip WhatsApp if disabled or credentials missing
-      if (!isEnabled) {
-        this.logger.log(`WhatsApp notifications are disabled. Skipping notification for certificate ${options.cert_no}.`);
-        return { success: true, status: 'SKIPPED_DISABLED' };
+      // 1. Validate WhatsApp is enabled
+      if (!config.isEnabled) {
+        validationError = 'WhatsApp notifications disabled globally.';
+      }
+      // 2. Validate active provider is selected
+      else if (!config.activeProvider) {
+        validationError = 'WhatsApp active provider not selected.';
+      }
+      // 3. Validate API key is configured
+      else if (!config.apiKey) {
+        validationError = 'WhatsApp API key is missing.';
       }
 
-      if (!apiKey) {
-        this.logger.warn(`WhatsApp is enabled but API Key is missing. Skipping notification.`);
-        return { success: true, status: 'SKIPPED_MISSING_CREDENTIALS' };
+      // Resolve provider details with failover checks
+      let providerName = config.activeProvider;
+      let resolvedApiKey = config.apiKey;
+      const now = new Date();
+      if (this.isFailedOver && this.failoverExpiresAt && now < this.failoverExpiresAt) {
+        providerName = (this.tempProvider || config.activeProvider).toUpperCase();
+        if (providerName === 'ZAVU') resolvedApiKey = config.zavuApiKey;
+        else if (providerName === 'META') resolvedApiKey = config.metaAccessToken;
+        else if (providerName === 'TWILIO') resolvedApiKey = config.twilioAuthToken;
       }
 
-      // Format recipient phone number: ensure country code (e.g. +91 or +)
+      // 4. Validate required provider credentials are available
+      if (!validationError && !resolvedApiKey) {
+        validationError = `WhatsApp credentials API key is missing for provider ${providerName}.`;
+      }
+
+      // Resolve mapped variables from templates registry
+      const mapped = await this.templatesService.resolveMappedVariables(options.templateCode, options.context);
+      const templateName = mapped.templateName;
+      const variables = mapped.variables;
+
+      // 5. Validate required template is configured
+      if (!validationError && (!templateName || templateName === options.templateCode.toLowerCase())) {
+        const templateRecord = await this.prisma.whatsAppTemplate.findFirst({
+          where: { code: options.templateCode },
+        });
+        if (!templateRecord || !templateRecord.is_active || !templateRecord.template_name) {
+          validationError = `Required WhatsApp template mapping '${options.templateCode}' is missing or inactive in registry.`;
+        }
+      }
+
+      if (validationError) {
+        this.logger.warn(`WhatsApp validation failed: ${validationError}. Skipping dispatch.`);
+        const logData = {
+          recipient: options.to,
+          template_code: templateName || options.templateCode,
+          notification_type: options.templateCode,
+          provider: providerName || 'UNKNOWN',
+          environment: config.environment,
+          status: 'SKIPPED' as const,
+          failure_reason: 'Missing or invalid provider configuration.',
+          provider_response: JSON.stringify({ error: validationError }),
+          sent_at: null,
+        };
+
+        if (options.logId) {
+          await this.prisma.whatsAppLog.update({
+            where: { id: options.logId },
+            data: logData,
+          });
+        } else {
+          await this.prisma.whatsAppLog.create({
+            data: logData,
+          });
+        }
+
+        return {
+          success: false,
+          status: 'SKIPPED',
+          error: 'Missing or invalid provider configuration.',
+        };
+      }
+
       let recipientPhone = options.to.replace(/\s+/g, '');
       if (!recipientPhone.startsWith('+')) {
-        // Default to India country code if length is 10
         if (recipientPhone.length === 10) {
           recipientPhone = `+91${recipientPhone}`;
         } else {
@@ -66,46 +340,43 @@ export class WhatsAppNotificationService {
         }
       }
 
-      const variables = {
-        company_name: options.client_name,
-        certificate_name: options.cert_name,
-        certificate_number: options.cert_no,
-        expiry_date: options.expiry_date,
-        days_remaining: String(options.days_remaining),
-        renewal_contact_name: options.contact_name,
-        renewal_contact_number: options.contact_phone,
-      };
+      const provider = ProviderFactory.getProvider(providerName);
 
-      // 3. Resolve provider
-      const provider = new ZavuProvider();
-
-      // 4. Send using provider
-      this.logger.log(`Triggering WhatsApp notification to ${recipientPhone} via Zavu...`);
+      this.logger.log(`Triggering WhatsApp notification [${options.templateCode}] using template [${templateName}] to ${recipientPhone} via ${providerName}...`);
       const result = await provider.sendTemplate({
         to: recipientPhone,
-        templateName: defaultTemplate,
+        templateName,
         variables,
-        apiKey,
-        environment,
+        apiKey: resolvedApiKey,
+        environment: config.environment,
       });
 
-      // 5. Log the outcome to SystemLog table
-      await this.prisma.systemLog.create({
-        data: {
-          type: 'WHATSAPP_LOG',
-          name: defaultTemplate,
-          message: `To: ${recipientPhone} | Status: ${result.success ? 'SENT' : 'FAILED'}`,
-          body: JSON.stringify({
-            messageId: result.messageId || null,
-            error: result.errorMessage || null,
-            environment,
-          }),
-          variables: JSON.stringify(variables),
-        },
-      });
+      // Update failover stats based on success/failure outcome
+      await this.handleDispatchOutcome(result.success, providerName);
 
-      if (!result.success) {
-        this.logger.error(`Failed to send WhatsApp message: ${result.errorMessage}`);
+      const logData = {
+        recipient: recipientPhone,
+        message_id: result.messageId || null,
+        template_code: templateName,
+        notification_type: options.templateCode,
+        provider: providerName,
+        environment: config.environment,
+        status: result.success ? ('SENT' as const) : ('FAILED' as const),
+        failure_reason: result.success ? null : (result.errorMessage || 'Provider dispatch failed'),
+        provider_response: JSON.stringify(result),
+        request_payload: JSON.stringify({ to: recipientPhone, template: templateName, variables }),
+        sent_at: result.success ? new Date() : null,
+      };
+
+      if (options.logId) {
+        await this.prisma.whatsAppLog.update({
+          where: { id: options.logId },
+          data: logData,
+        });
+      } else {
+        await this.prisma.whatsAppLog.create({
+          data: logData,
+        });
       }
 
       return {
@@ -115,21 +386,29 @@ export class WhatsAppNotificationService {
         error: result.errorMessage,
       };
     } catch (error: any) {
-      this.logger.error(`Error in sendCertificateReminder: ${error?.message}`);
-      // Failures should never interrupt the primary workflow
-      try {
-        await this.prisma.systemLog.create({
-          data: {
-            type: 'WHATSAPP_LOG',
-            name: 'ERROR_FATAL',
-            message: `Fatal error sending WhatsApp alert`,
-            body: JSON.stringify({ error: error?.message || 'Unknown fatal error' }),
-          },
+      this.logger.error(`Error in sendNotification: ${error?.message}`);
+      const logData = {
+        recipient: options.to || 'UNKNOWN',
+        template_code: options.templateCode,
+        notification_type: options.templateCode,
+        provider: 'UNKNOWN',
+        status: 'FAILED' as const,
+        failure_reason: error?.message || 'Unknown fatal exception',
+        provider_response: JSON.stringify({ exception: error?.message }),
+      };
+
+      if (options.logId) {
+        await this.prisma.whatsAppLog.update({
+          where: { id: options.logId },
+          data: logData,
         });
-      } catch (logErr) {
-        // Prevent recursive errors
+      } else {
+        await this.prisma.whatsAppLog.create({
+          data: logData,
+        });
       }
-      return { success: false, status: 'ERROR', error: error?.message };
+
+      return { success: false, status: 'FAILED', error: error?.message };
     }
   }
 }

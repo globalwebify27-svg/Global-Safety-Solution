@@ -6,9 +6,10 @@ import { TemplateEngineService } from './template-engine.service';
 import { EmailQueueService } from './email-queue.service';
 import { EmailCronService } from './email-cron.service';
 import { PrismaModule } from '../prisma/prisma.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, NotificationsModule],
   controllers: [EmailManagementController],
   providers: [
     EmailManagementService,

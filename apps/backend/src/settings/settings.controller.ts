@@ -1,4 +1,4 @@
-import { Controller, Get, Patch, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Patch, Body, UseGuards, Req } from '@nestjs/common';
 import { SettingsService } from './settings.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../auth/guards/permissions.guard';
@@ -14,9 +14,15 @@ export class SettingsController {
     return this.settingsService.findAll();
   }
 
+  @Get('audit-logs')
+  getAuditLogs() {
+    return this.settingsService.getAuditLogs();
+  }
+
   @Patch()
   @Permissions('UPDATE_SETTING')
-  update(@Body() settings: Record<string, string>) {
-    return this.settingsService.updateBatch(settings);
+  update(@Body() settings: Record<string, string>, @Req() req: any) {
+    const userId = req.user?.userId;
+    return this.settingsService.updateBatch(settings, userId);
   }
 }

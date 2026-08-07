@@ -484,27 +484,60 @@ export class EmailManagementService implements OnModuleInit {
       const oldVal = existing.is_email_enabled ? 1 : 0;
       const newVal = data.is_email_enabled !== undefined ? (Boolean(data.is_email_enabled) ? 1 : 0) : oldVal;
 
+      let advancedConfigObj: Record<string, any> = {};
+      if (existing.advanced_config) {
+        try {
+          advancedConfigObj = JSON.parse(existing.advanced_config);
+        } catch {
+          // ignore parsing error
+        }
+      }
+
+      const oldWA = advancedConfigObj.whatsapp_enabled ? 1 : 0;
+      if (data.is_whatsapp_enabled !== undefined) {
+        advancedConfigObj.whatsapp_enabled = Boolean(data.is_whatsapp_enabled);
+      }
+      const newWA = advancedConfigObj.whatsapp_enabled ? 1 : oldWA;
+
+      const advancedConfigStr = JSON.stringify(advancedConfigObj);
+
       const updated = await this.prisma.notificationRule.update({
         where: { id: existing.id },
         data: {
           is_email_enabled: Boolean(newVal),
           template_id: data.template_id !== undefined ? data.template_id : existing.template_id,
-          advanced_config: data.advanced_config !== undefined ? (typeof data.advanced_config === 'string' ? data.advanced_config : JSON.stringify(data.advanced_config)) : existing.advanced_config,
+          advanced_config: advancedConfigStr,
         },
       });
 
-      // Write Audit Log Entry
+      // Write Audit Log Entry for Email Channel Toggle
       if (oldVal !== newVal) {
         await this.prisma.$executeRawUnsafe(
           `INSERT INTO notification_rule_audit_logs (id, user_id, user_name, role, event_name, old_value, new_value, ip_address, created_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
-          `audit-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          `audit-email-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
           userCtx?.id || 'sys-admin',
           userCtx?.name || userCtx?.email || 'Administrator',
           userCtx?.role || 'SUPER_ADMIN',
-          existing.event_name,
+          `${existing.event_name}_EMAIL`,
           oldVal,
           newVal,
+          ipAddress || '127.0.0.1',
+        );
+      }
+
+      // Write Audit Log Entry for WhatsApp Channel Toggle
+      if (oldWA !== newWA) {
+        await this.prisma.$executeRawUnsafe(
+          `INSERT INTO notification_rule_audit_logs (id, user_id, user_name, role, event_name, old_value, new_value, ip_address, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+          `audit-wa-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          userCtx?.id || 'sys-admin',
+          userCtx?.name || userCtx?.email || 'Administrator',
+          userCtx?.role || 'SUPER_ADMIN',
+          `${existing.event_name}_WHATSAPP`,
+          oldWA,
+          newWA,
           ipAddress || '127.0.0.1',
         );
       }

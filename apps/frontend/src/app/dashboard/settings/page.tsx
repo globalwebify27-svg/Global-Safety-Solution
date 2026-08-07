@@ -17,11 +17,13 @@ import {
   Globe,
   ArrowRight,
   FileText,
-  MessageSquare
+  MessageSquare,
+  SlidersHorizontal
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ProfileForm } from "./ProfileForm";
 import Link from "next/link";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 
 interface ProfileUpdateData {
   name: string;
@@ -61,13 +63,41 @@ export default function SettingsPage() {
 
   const [whatsappForm, setWhatsappForm] = useState({
     enabled: false,
-    provider: "Zavu",
-    apiKey: "",
-    environment: "sandbox",
-    phoneId: "",
-    accountId: "",
-    defaultTemplate: "certificate_due_reminder",
+    activeProvider: "Zavu",
+    
+    // Zavu config
+    zavuApiKey: "",
+    zavuEnvironment: "sandbox",
+    zavuPhoneId: "",
+    zavuAccountId: "",
+    zavuDefaultTemplate: "certificate_due_reminder",
+
+    // Meta config
+    metaAccessToken: "",
+    metaPhoneId: "",
+    metaAccountId: "",
+    metaVerifyToken: "",
+    metaAppSecret: "",
+
+    // Twilio config
+    twilioAccountSid: "",
+    twilioAuthToken: "",
+    twilioSenderNumber: "",
   });
+
+  const [testingConnection, setTestingConnection] = useState(false);
+  const [testModalOpen, setTestModalOpen] = useState(false);
+
+  // Sandbox Diagnostic States
+  const [testingSandbox, setTestingSandbox] = useState(false);
+  const [sandboxLogs, setSandboxLogs] = useState<string[]>([]);
+  const [sandboxLogsModalOpen, setSandboxLogsModalOpen] = useState(false);
+  const [testPhoneNumber, setTestPhoneNumber] = useState("");
+  const [testTemplateName, setTestTemplateName] = useState("");
+  const [sendingTest, setSendingTest] = useState(false);
+
+  // Settings Audit Trail States
+  const [settingsAuditLogs, setSettingsAuditLogs] = useState<any[]>([]);
 
   useEffect(() => {
     let ignore = false;
@@ -89,12 +119,23 @@ export default function SettingsPage() {
           });
           setWhatsappForm({
             enabled: data.whatsapp_enabled === "true",
-            provider: data.whatsapp_provider || "Zavu",
-            apiKey: data.whatsapp_api_key || "",
-            environment: data.whatsapp_environment || "sandbox",
-            phoneId: data.whatsapp_phone_number_id || "",
-            accountId: data.whatsapp_business_account_id || "",
-            defaultTemplate: data.whatsapp_default_template || "certificate_due_reminder",
+            activeProvider: data.whatsapp_active_provider || "Zavu",
+            
+            zavuApiKey: data.whatsapp_zavu_api_key || "",
+            zavuEnvironment: data.whatsapp_zavu_environment || "sandbox",
+            zavuPhoneId: data.whatsapp_zavu_phone_number_id || "",
+            zavuAccountId: data.whatsapp_zavu_business_account_id || "",
+            zavuDefaultTemplate: data.whatsapp_zavu_default_template || "certificate_due_reminder",
+
+            metaAccessToken: data.whatsapp_meta_access_token || "",
+            metaPhoneId: data.whatsapp_meta_phone_number_id || "",
+            metaAccountId: data.whatsapp_meta_business_account_id || "",
+            metaVerifyToken: data.whatsapp_meta_verify_token || "",
+            metaAppSecret: data.whatsapp_meta_app_secret || "",
+
+            twilioAccountSid: data.whatsapp_twilio_account_sid || "",
+            twilioAuthToken: data.whatsapp_twilio_auth_token || "",
+            twilioSenderNumber: data.whatsapp_twilio_sender_number || "",
           });
         }
       } catch (err) {
@@ -103,6 +144,7 @@ export default function SettingsPage() {
     }
 
     init();
+    fetchSettingsAuditLogs();
     return () => { ignore = true; };
   }, [token]);
 
@@ -187,17 +229,29 @@ export default function SettingsPage() {
         },
         body: JSON.stringify({
           whatsapp_enabled: whatsappForm.enabled ? "true" : "false",
-          whatsapp_provider: whatsappForm.provider,
-          whatsapp_api_key: whatsappForm.apiKey,
-          whatsapp_environment: whatsappForm.environment,
-          whatsapp_phone_number_id: whatsappForm.phoneId,
-          whatsapp_business_account_id: whatsappForm.accountId,
-          whatsapp_default_template: whatsappForm.defaultTemplate,
+          whatsapp_active_provider: whatsappForm.activeProvider,
+          
+          whatsapp_zavu_api_key: whatsappForm.zavuApiKey,
+          whatsapp_zavu_environment: whatsappForm.zavuEnvironment,
+          whatsapp_zavu_phone_number_id: whatsappForm.zavuPhoneId,
+          whatsapp_zavu_business_account_id: whatsappForm.zavuAccountId,
+          whatsapp_zavu_default_template: whatsappForm.zavuDefaultTemplate,
+
+          whatsapp_meta_access_token: whatsappForm.metaAccessToken,
+          whatsapp_meta_phone_number_id: whatsappForm.metaPhoneId,
+          whatsapp_meta_business_account_id: whatsappForm.metaAccountId,
+          whatsapp_meta_verify_token: whatsappForm.metaVerifyToken,
+          whatsapp_meta_app_secret: whatsappForm.metaAppSecret,
+
+          whatsapp_twilio_account_sid: whatsappForm.twilioAccountSid,
+          whatsapp_twilio_auth_token: whatsappForm.twilioAuthToken,
+          whatsapp_twilio_sender_number: whatsappForm.twilioSenderNumber,
         })
       });
 
       if (res.ok) {
         toast.success("WhatsApp Configuration saved successfully!");
+        fetchSettingsAuditLogs();
       } else {
         toast.error("Failed to save WhatsApp configuration.");
       }
@@ -205,6 +259,152 @@ export default function SettingsPage() {
       toast.error("Network error occurred.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleTestConnection = async () => {
+    if (!token) return;
+    setTestingConnection(true);
+
+    let apiKey = "";
+    if (whatsappForm.activeProvider === "Zavu") apiKey = whatsappForm.zavuApiKey;
+    else if (whatsappForm.activeProvider === "Meta") apiKey = whatsappForm.metaAccessToken;
+    else if (whatsappForm.activeProvider === "Twilio") apiKey = whatsappForm.twilioAuthToken;
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/notifications/whatsapp/test-connection`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          provider: whatsappForm.activeProvider,
+          apiKey
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success(data.message || "Connection validated successfully!");
+      } else {
+        toast.error(data.message || "Failed to validate connection.");
+      }
+    } catch {
+      toast.error("Network error occurred during connection test.");
+    } finally {
+      setTestingConnection(false);
+    }
+  };
+
+  const handleTestSandboxConnection = async () => {
+    if (!token) return;
+    setTestingSandbox(true);
+    setSandboxLogs([]);
+    setSandboxLogsModalOpen(true);
+
+    let apiKey = "";
+    if (whatsappForm.activeProvider === "Zavu") apiKey = whatsappForm.zavuApiKey;
+    else if (whatsappForm.activeProvider === "Meta") apiKey = whatsappForm.metaAccessToken;
+    else if (whatsappForm.activeProvider === "Twilio") apiKey = whatsappForm.twilioAuthToken;
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/notifications/whatsapp/test-sandbox`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          provider: whatsappForm.activeProvider,
+          apiKey
+        })
+      });
+
+      const data = await res.json();
+      if (data.logs) {
+        setSandboxLogs(data.logs);
+      }
+      if (res.ok && data.success) {
+        toast.success("Sandbox connection verification succeeded!");
+      } else {
+        toast.error(data.message || "Sandbox connection verification failed.");
+      }
+    } catch {
+      toast.error("Network error occurred during sandbox test.");
+    } finally {
+      setTestingSandbox(false);
+    }
+  };
+
+  const fetchSettingsAuditLogs = async () => {
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/settings/audit-logs`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        setSettingsAuditLogs(await res.json());
+      }
+    } catch (e) {
+      console.error("Fetch settings audit logs error:", e);
+    }
+  };
+
+  const handleSendTestMessageSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!token) return;
+    if (!testPhoneNumber) {
+      toast.error("Please provide a target phone number.");
+      return;
+    }
+    setSendingTest(true);
+
+    let apiKey = "";
+    let environment = "sandbox";
+    let template = testTemplateName;
+
+    if (whatsappForm.activeProvider === "Zavu") {
+      apiKey = whatsappForm.zavuApiKey;
+      environment = whatsappForm.zavuEnvironment;
+      if (!template) template = whatsappForm.zavuDefaultTemplate;
+    } else if (whatsappForm.activeProvider === "Meta") {
+      apiKey = whatsappForm.metaAccessToken;
+      if (!template) template = "certificate_due_reminder";
+    } else if (whatsappForm.activeProvider === "Twilio") {
+      apiKey = whatsappForm.twilioAuthToken;
+      if (!template) template = "certificate_due_reminder";
+    }
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/notifications/whatsapp/send-test`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          provider: whatsappForm.activeProvider,
+          apiKey,
+          environment,
+          to: testPhoneNumber,
+          template
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success("Test message dispatched successfully!");
+        setTestModalOpen(false);
+        setTestPhoneNumber("");
+        setTestTemplateName("");
+      } else {
+        toast.error(data.message || "Failed to dispatch test message.");
+      }
+    } catch {
+      toast.error("Network error occurred.");
+    } finally {
+      setSendingTest(false);
     }
   };
 
@@ -513,104 +713,422 @@ export default function SettingsPage() {
             </div>
           )}
           {activeTab === "whatsapp" && (
-            <form onSubmit={handleUpdateWhatsApp} className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <div className="space-y-1">
-                <h3 className="text-lg font-bold flex items-center gap-2 text-foreground uppercase tracking-tight">
-                  <MessageSquare className="w-5 h-5 text-emerald-600 dark:text-emerald-400" /> WhatsApp Notification Gateway
-                </h3>
-                <p className="text-sm text-muted-foreground font-medium">Configure API credentials and settings for Zavu WhatsApp integration.</p>
-              </div>
-
-              <div className="space-y-6">
-                <div className="flex items-center justify-between p-4 rounded-2xl bg-accent/5 border border-border hover:bg-accent/10 transition-all shadow-sm">
-                  <div>
-                    <div className="text-sm font-bold text-foreground">Enable WhatsApp Notifications</div>
-                    <div className="text-[10px] text-muted-foreground font-medium tracking-wide">Send automated certificate renewal alerts to clients via WhatsApp</div>
+            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <form onSubmit={handleUpdateWhatsApp} className="space-y-8">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/60 pb-6">
+                  <div className="space-y-1">
+                    <h3 className="text-lg font-bold flex items-center gap-2 text-foreground uppercase tracking-tight">
+                      <MessageSquare className="w-5 h-5 text-emerald-600 dark:text-emerald-400" /> WhatsApp Notification Gateway
+                    </h3>
+                    <p className="text-sm text-muted-foreground font-medium">Configure credentials and routing parameters for GSS WhatsApp integrations.</p>
                   </div>
-                  <div 
-                    onClick={() => setWhatsappForm(prev => ({ ...prev, enabled: !prev.enabled }))}
-                    className={cn(
-                      "w-12 h-6 rounded-full p-1 cursor-pointer transition-colors shadow-inner flex items-center", 
-                      whatsappForm.enabled ? "bg-emerald-600 justify-end" : "bg-muted justify-start"
+                  
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                      Active: {whatsappForm.activeProvider}
+                    </span>
+                    <span className={cn(
+                      "text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full",
+                      whatsappForm.enabled ? "bg-emerald-500/10 text-emerald-600" : "bg-muted text-muted-foreground"
+                    )}>
+                      {whatsappForm.enabled ? "Enabled" : "Disabled"}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between p-4 rounded-2xl bg-accent/5 border border-border hover:bg-accent/10 transition-all shadow-sm">
+                    <div>
+                      <div className="text-sm font-bold text-foreground">Enable WhatsApp Notifications</div>
+                      <div className="text-[10px] text-muted-foreground font-medium tracking-wide">Route automated expiring certificate reminder alerts to clients via WhatsApp</div>
+                    </div>
+                    <div 
+                      onClick={() => setWhatsappForm(prev => ({ ...prev, enabled: !prev.enabled }))}
+                      className={cn(
+                        "w-12 h-6 rounded-full p-1 cursor-pointer transition-colors shadow-inner flex items-center", 
+                        whatsappForm.enabled ? "bg-emerald-600 justify-end" : "bg-muted justify-start"
+                      )}
+                    >
+                      <div className="w-4 h-4 rounded-full bg-white transition-all shadow-md" />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <Label className="text-muted-foreground font-bold">Active API Provider</Label>
+                      <select 
+                        value={whatsappForm.activeProvider}
+                        onChange={(e) => setWhatsappForm({...whatsappForm, activeProvider: e.target.value})}
+                        className="w-full bg-background border border-border rounded-xl h-11 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 text-foreground font-medium"
+                      >
+                        <option value="Zavu">Zavu WhatsApp Business API</option>
+                        <option value="Meta">Meta Cloud API (Coming Soon)</option>
+                        <option value="Twilio">Twilio WhatsApp (Coming Soon)</option>
+                      </select>
+                    </div>
+
+                    {whatsappForm.activeProvider === "Zavu" && (
+                      <>
+                        <div className="space-y-2">
+                          <Label className="text-muted-foreground font-bold">Environment</Label>
+                          <select 
+                            value={whatsappForm.zavuEnvironment} 
+                            onChange={(e) => setWhatsappForm({...whatsappForm, zavuEnvironment: e.target.value})}
+                            className="w-full bg-background border border-border rounded-xl h-11 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 text-foreground font-medium"
+                          >
+                            <option value="sandbox">Sandbox</option>
+                            <option value="live">Live / Production</option>
+                          </select>
+                        </div>
+
+                        <div className="md:col-span-2 space-y-2">
+                          <Label className="text-muted-foreground font-bold">Zavu Authorization Token (Key)</Label>
+                          <Input 
+                            type="password"
+                            value={whatsappForm.zavuApiKey} 
+                            onChange={(e) => setWhatsappForm({...whatsappForm, zavuApiKey: e.target.value})} 
+                            placeholder="zavu_live_..."
+                            className="bg-background border-border h-11 text-foreground" 
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label className="text-muted-foreground font-bold">Phone Number ID (Optional)</Label>
+                          <Input 
+                            value={whatsappForm.zavuPhoneId} 
+                            onChange={(e) => setWhatsappForm({...whatsappForm, zavuPhoneId: e.target.value})} 
+                            placeholder="e.g. 10928374829374"
+                            className="bg-background border-border h-11 text-foreground" 
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label className="text-muted-foreground font-bold">Business Account ID (Optional)</Label>
+                          <Input 
+                            value={whatsappForm.zavuAccountId} 
+                            onChange={(e) => setWhatsappForm({...whatsappForm, zavuAccountId: e.target.value})} 
+                            placeholder="e.g. 8374829374829"
+                            className="bg-background border-border h-11 text-foreground" 
+                          />
+                        </div>
+
+                        <div className="md:col-span-2 space-y-2">
+                          <Label className="text-muted-foreground font-bold">Default Message Template ID</Label>
+                          <Input 
+                            value={whatsappForm.zavuDefaultTemplate} 
+                            onChange={(e) => setWhatsappForm({...whatsappForm, zavuDefaultTemplate: e.target.value})} 
+                            placeholder="certificate_due_reminder"
+                            className="bg-background border-border h-11 text-foreground" 
+                          />
+                        </div>
+                      </>
                     )}
-                  >
-                    <div className="w-4 h-4 rounded-full bg-white transition-all shadow-md" />
+
+                    {whatsappForm.activeProvider === "Meta" && (
+                      <>
+                        <div className="md:col-span-2 space-y-2">
+                          <Label className="text-muted-foreground font-bold">Meta Access Token</Label>
+                          <Input 
+                            type="password"
+                            value={whatsappForm.metaAccessToken} 
+                            onChange={(e) => setWhatsappForm({...whatsappForm, metaAccessToken: e.target.value})} 
+                            placeholder="EAA..."
+                            className="bg-background border-border h-11 text-foreground" 
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label className="text-muted-foreground font-bold">Phone Number ID</Label>
+                          <Input 
+                            value={whatsappForm.metaPhoneId} 
+                            onChange={(e) => setWhatsappForm({...whatsappForm, metaPhoneId: e.target.value})} 
+                            placeholder="e.g. 1029384756"
+                            className="bg-background border-border h-11 text-foreground" 
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label className="text-muted-foreground font-bold">Business Account ID</Label>
+                          <Input 
+                            value={whatsappForm.metaAccountId} 
+                            onChange={(e) => setWhatsappForm({...whatsappForm, metaAccountId: e.target.value})} 
+                            placeholder="e.g. 987654321"
+                            className="bg-background border-border h-11 text-foreground" 
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label className="text-muted-foreground font-bold">Verify Token (for Webhook Validation)</Label>
+                          <Input 
+                            value={whatsappForm.metaVerifyToken} 
+                            onChange={(e) => setWhatsappForm({...whatsappForm, metaVerifyToken: e.target.value})} 
+                            placeholder="Verify token"
+                            className="bg-background border-border h-11 text-foreground" 
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label className="text-muted-foreground font-bold">App Secret</Label>
+                          <Input 
+                            type="password"
+                            value={whatsappForm.metaAppSecret} 
+                            onChange={(e) => setWhatsappForm({...whatsappForm, metaAppSecret: e.target.value})} 
+                            placeholder="App secret"
+                            className="bg-background border-border h-11 text-foreground" 
+                          />
+                        </div>
+                      </>
+                    )}
+
+                    {whatsappForm.activeProvider === "Twilio" && (
+                      <>
+                        <div className="space-y-2">
+                          <Label className="text-muted-foreground font-bold">Twilio Account SID</Label>
+                          <Input 
+                            value={whatsappForm.twilioAccountSid} 
+                            onChange={(e) => setWhatsappForm({...whatsappForm, twilioAccountSid: e.target.value})} 
+                            placeholder="AC..."
+                            className="bg-background border-border h-11 text-foreground" 
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label className="text-muted-foreground font-bold">Twilio Auth Token</Label>
+                          <Input 
+                            type="password"
+                            value={whatsappForm.twilioAuthToken} 
+                            onChange={(e) => setWhatsappForm({...whatsappForm, twilioAuthToken: e.target.value})} 
+                            placeholder="Twilio Token"
+                            className="bg-background border-border h-11 text-foreground" 
+                          />
+                        </div>
+
+                        <div className="md:col-span-2 space-y-2">
+                          <Label className="text-muted-foreground font-bold">WhatsApp Sender Number</Label>
+                          <Input 
+                            value={whatsappForm.twilioSenderNumber} 
+                            onChange={(e) => setWhatsappForm({...whatsappForm, twilioSenderNumber: e.target.value})} 
+                            placeholder="whatsapp:+14155552671"
+                            className="bg-background border-border h-11 text-foreground" 
+                          />
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label className="text-muted-foreground font-bold">API Provider</Label>
-                    <select 
-                      disabled
-                      value={whatsappForm.provider}
-                      className="w-full bg-background border border-border rounded-xl h-11 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 text-foreground font-medium opacity-60 cursor-not-allowed"
+                <div className="pt-6 border-t border-border/60 flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div className="flex items-center gap-2">
+                    <Button 
+                      type="button"
+                      disabled={loading || testingConnection}
+                      onClick={handleTestConnection}
+                      variant="outline"
+                      className="h-11 px-5 text-foreground font-bold rounded-xl border border-border bg-card hover:bg-accent/10"
                     >
-                      <option value="Zavu">Zavu WhatsApp Business API</option>
-                    </select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-muted-foreground font-bold">Environment</Label>
-                    <select 
-                      value={whatsappForm.environment} 
-                      onChange={(e) => setWhatsappForm({...whatsappForm, environment: e.target.value})}
-                      className="w-full bg-background border border-border rounded-xl h-11 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 text-foreground font-medium"
+                      {testingConnection ? "Pinging..." : "Test Connection"}
+                    </Button>
+                    <Button 
+                      type="button"
+                      disabled={loading || testingSandbox}
+                      onClick={handleTestSandboxConnection}
+                      variant="outline"
+                      className="h-11 px-5 text-emerald-600 dark:text-emerald-400 font-bold rounded-xl border border-emerald-500/20 bg-emerald-500/5 hover:bg-emerald-500/10"
                     >
-                      <option value="sandbox">Sandbox</option>
-                      <option value="live">Live / Production</option>
-                    </select>
+                      {testingSandbox ? "Checking..." : "Verify Sandbox"}
+                    </Button>
+                    <Button 
+                      type="button"
+                      disabled={loading}
+                      onClick={() => setTestModalOpen(true)}
+                      variant="outline"
+                      className="h-11 px-5 text-foreground font-bold rounded-xl border border-border bg-card hover:bg-accent/10"
+                    >
+                      Send Test Message
+                    </Button>
                   </div>
+                  <Button disabled={loading} type="submit" className="bg-emerald-600 hover:bg-emerald-500 text-white px-8 font-bold h-11 rounded-xl border-0 shadow-lg shadow-emerald-500/20 w-full sm:w-auto">
+                    {loading ? "Saving Settings..." : "Save Configuration"} <Save className="w-4 h-4 ml-2" />
+                  </Button>
+                </div>
+              </form>
 
-                  <div className="md:col-span-2 space-y-2">
-                    <Label className="text-muted-foreground font-bold">API Authorization Token (Key)</Label>
-                    <Input 
-                      type="password"
-                      value={whatsappForm.apiKey} 
-                      onChange={(e) => setWhatsappForm({...whatsappForm, apiKey: e.target.value})} 
-                      placeholder="zavu_live_..."
-                      className="bg-background border-border h-11 text-foreground" 
-                    />
-                  </div>
+              {/* Settings Configuration Change History Log */}
+              <div className="bg-card border border-border rounded-3xl p-6 shadow-xs space-y-4">
+                <div>
+                  <h4 className="text-sm font-bold text-foreground uppercase tracking-widest flex items-center gap-2">
+                    <SlidersHorizontal className="w-5 h-5 text-emerald-600" /> Settings Modification History
+                  </h4>
+                  <p className="text-xs text-muted-foreground font-medium">Audit logs tracking configuration adjustment events, operator IDs, and payload changes.</p>
+                </div>
 
-                  <div className="space-y-2">
-                    <Label className="text-muted-foreground font-bold">Phone Number ID (Optional)</Label>
-                    <Input 
-                      value={whatsappForm.phoneId} 
-                      onChange={(e) => setWhatsappForm({...whatsappForm, phoneId: e.target.value})} 
-                      placeholder="e.g. 10928374829374"
-                      className="bg-background border-border h-11 text-foreground" 
-                    />
-                  </div>
+                <div className="border border-border/80 rounded-2xl overflow-hidden bg-muted/20">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr className="bg-accent/40 border-b border-border/80 text-muted-foreground uppercase font-black tracking-wider text-[10px]">
+                          <th className="p-4">Timestamp</th>
+                          <th className="p-4">Action</th>
+                          <th className="p-4">Operator</th>
+                          <th className="p-4">Adjustment Changes</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border/60">
+                        {settingsAuditLogs.length === 0 ? (
+                          <tr>
+                            <td colSpan={4} className="p-8 text-center text-muted-foreground font-medium">
+                              No settings adjustment events logged.
+                            </td>
+                          </tr>
+                        ) : (
+                          settingsAuditLogs.map((logItem, idx) => {
+                            let oldDataObj: Record<string, string> = {};
+                            let newDataObj: Record<string, string> = {};
+                            try {
+                              oldDataObj = JSON.parse(logItem.old_data || "{}");
+                              newDataObj = JSON.parse(logItem.new_data || "{}");
+                            } catch {}
 
-                  <div className="space-y-2">
-                    <Label className="text-muted-foreground font-bold">Business Account ID (Optional)</Label>
-                    <Input 
-                      value={whatsappForm.accountId} 
-                      onChange={(e) => setWhatsappForm({...whatsappForm, accountId: e.target.value})} 
-                      placeholder="e.g. 8374829374829"
-                      className="bg-background border-border h-11 text-foreground" 
-                    />
-                  </div>
+                            // Extract modified keys
+                            const changedKeys = Object.keys(newDataObj).filter(k => oldDataObj[k] !== newDataObj[k]);
 
-                  <div className="md:col-span-2 space-y-2">
-                    <Label className="text-muted-foreground font-bold">Approved Default Message Template ID</Label>
-                    <Input 
-                      value={whatsappForm.defaultTemplate} 
-                      onChange={(e) => setWhatsappForm({...whatsappForm, defaultTemplate: e.target.value})} 
-                      placeholder="certificate_due_reminder"
-                      className="bg-background border-border h-11 text-foreground" 
-                    />
+                            return (
+                              <tr key={idx} className="hover:bg-accent/20 transition-all">
+                                <td className="p-4 font-medium text-foreground whitespace-nowrap">
+                                  {new Date(logItem.created_at).toLocaleString('en-IN')}
+                                </td>
+                                <td className="p-4">
+                                  <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-500/10 text-emerald-600">
+                                    {logItem.action}
+                                  </span>
+                                </td>
+                                <td className="p-4 font-mono font-medium text-muted-foreground">
+                                  {logItem.user_id || "SYSTEM"}
+                                </td>
+                                <td className="p-4 space-y-1 w-full max-w-sm">
+                                  {changedKeys.length === 0 ? (
+                                    <span className="text-muted-foreground italic font-medium text-[11px]">No values changed</span>
+                                  ) : (
+                                    changedKeys.map((keyStr, kidx) => {
+                                      const oldVal = oldDataObj[keyStr] || "N/A";
+                                      const newVal = newDataObj[keyStr] || "N/A";
+                                      const isSecret = keyStr.includes("key") || keyStr.includes("token") || keyStr.includes("secret") || keyStr.includes("auth");
+                                      return (
+                                        <div key={kidx} className="bg-accent/30 p-2 rounded-xl border border-border/40 font-mono text-[10px] space-y-0.5">
+                                          <div className="font-bold text-foreground">{keyStr}</div>
+                                          <div className="flex items-center gap-1 text-[9px] text-muted-foreground">
+                                            <span className="line-through">{isSecret ? "••••••••••••" : oldVal}</span>
+                                            <span>➔</span>
+                                            <span className="text-emerald-600 font-bold">{isSecret ? "••••••••••••" : newVal}</span>
+                                          </div>
+                                        </div>
+                                      );
+                                    })
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
               </div>
 
-              <div className="pt-4 flex justify-end">
-                <Button disabled={loading} type="submit" className="bg-emerald-600 hover:bg-emerald-500 text-white px-8 font-bold h-11 rounded-xl border-0 shadow-lg shadow-emerald-500/20">
-                  {loading ? "Saving Settings..." : "Save Configuration"} <Save className="w-4 h-4 ml-2" />
-                </Button>
-              </div>
-            </form>
+              {/* Test Message Modal */}
+              <Dialog open={testModalOpen} onOpenChange={setTestModalOpen}>
+                <DialogContent className="max-w-md bg-card border border-border rounded-3xl p-6">
+                  <form onSubmit={handleSendTestMessageSubmit}>
+                    <DialogHeader className="space-y-1">
+                      <DialogTitle className="text-lg font-bold text-foreground">Send Test WhatsApp</DialogTitle>
+                      <DialogDescription className="text-xs text-muted-foreground">
+                        Dispatches a mock certificate due warning message to the whitelist phone number using your active credentials.
+                      </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-4 my-6">
+                      <div className="space-y-1.5">
+                        <Label className="text-muted-foreground font-bold">Recipient Phone Number</Label>
+                        <Input 
+                          required
+                          value={testPhoneNumber}
+                          onChange={(e) => setTestPhoneNumber(e.target.value)}
+                          placeholder="e.g. +919999999999"
+                          className="bg-background border-border h-11 text-foreground"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-muted-foreground font-bold">Template ID (Optional, defaults to setting)</Label>
+                        <Input 
+                          value={testTemplateName}
+                          onChange={(e) => setTestTemplateName(e.target.value)}
+                          placeholder="e.g. certificate_due_reminder"
+                          className="bg-background border-border h-11 text-foreground"
+                        />
+                      </div>
+                    </div>
+
+                    <DialogFooter className="gap-2">
+                      <Button 
+                        type="button" 
+                        variant="ghost" 
+                        onClick={() => setTestModalOpen(false)}
+                        className="h-11 rounded-xl font-bold border-0"
+                      >
+                        Cancel
+                      </Button>
+                      <Button 
+                        type="submit" 
+                        disabled={sendingTest}
+                        className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold h-11 px-6 rounded-xl border-0"
+                      >
+                        {sendingTest ? "Sending..." : "Dispatch Message"}
+                      </Button>
+                    </DialogFooter>
+                  </form>
+                </DialogContent>
+              </Dialog>
+
+              {/* Sandbox Diagnostics Log Modal */}
+              <Dialog open={sandboxLogsModalOpen} onOpenChange={setSandboxLogsModalOpen}>
+                <DialogContent className="max-w-md bg-card border border-border rounded-3xl p-6 shadow-2xl">
+                  <DialogHeader>
+                    <DialogTitle className="text-lg font-bold text-foreground flex items-center gap-2">
+                      <SlidersHorizontal className="w-5 h-5 text-emerald-600" /> Sandbox Connection Logs
+                    </DialogTitle>
+                    <DialogDescription className="text-xs text-muted-foreground">
+                      Diagnostics verification logs for the developer sandbox connection.
+                    </DialogDescription>
+                  </DialogHeader>
+
+                  <div className="my-4 space-y-2.5 max-h-60 overflow-y-auto bg-muted/40 p-4 border border-border/60 rounded-2xl">
+                    {sandboxLogs.length === 0 ? (
+                      <div className="flex items-center justify-center h-20 text-xs text-muted-foreground font-medium">
+                        Initializing diagnostics connection...
+                      </div>
+                    ) : (
+                      sandboxLogs.map((logStr, idx) => (
+                        <div key={idx} className={cn(
+                          "text-xs font-mono font-medium leading-relaxed",
+                          logStr.startsWith("CRITICAL ERROR") && "text-rose-500 font-bold",
+                          logStr.startsWith("[4/4]") && "text-emerald-500 font-bold",
+                          !logStr.startsWith("CRITICAL ERROR") && !logStr.startsWith("[4/4]") && "text-foreground"
+                        )}>
+                          {logStr}
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  <DialogFooter className="mt-4">
+                    <Button onClick={() => setSandboxLogsModalOpen(false)} className="font-bold rounded-xl px-6">
+                      Close Logs
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
           )}
         </div>
       </div>
