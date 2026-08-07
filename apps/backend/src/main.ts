@@ -3,6 +3,18 @@ try {
 } catch (e) {
   // Hostinger handles environment variables natively
 }
+
+// Sanitize DATABASE_URL: Hostinger may wrap env var values in quotes
+if (process.env.DATABASE_URL) {
+  const raw = process.env.DATABASE_URL;
+  // Strip surrounding double quotes if present
+  process.env.DATABASE_URL = raw.replace(/^["']|["']$/g, '');
+  // Strip DATABASE_URL= prefix if accidentally included
+  if (process.env.DATABASE_URL.startsWith('DATABASE_URL=')) {
+    process.env.DATABASE_URL = process.env.DATABASE_URL.replace(/^DATABASE_URL=["']?/, '').replace(/["']$/, '');
+  }
+  console.log(`[DB] DATABASE_URL length=${process.env.DATABASE_URL.length}, starts=${process.env.DATABASE_URL.substring(0, 10)}, ends=${process.env.DATABASE_URL.substring(process.env.DATABASE_URL.length - 10)}`);
+}
 import { NestFactory, HttpAdapterHost } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { execSync } from 'child_process';
