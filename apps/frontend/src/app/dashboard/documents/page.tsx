@@ -566,6 +566,11 @@ export default function DocumentVaultPage() {
     }
   };
 
+  const stripHtml = (html?: string | null) => {
+    if (!html) return "";
+    return html.replace(/<[^>]*>/g, "");
+  };
+
   const resolveFileUrl = (url: string) => {
     if (!url) return "";
     if (url.startsWith("data:") || url.startsWith("http://") || url.startsWith("https://")) {
@@ -586,6 +591,15 @@ export default function DocumentVaultPage() {
         return;
       }
 
+      // If it is a generated certificate PDF, view it directly with token query param
+      // to bypass popup blocker and download enforcement.
+      if (fileUrl.includes('/pdf')) {
+        const separator = resolvedUrl.includes('?') ? '&' : '?';
+        const viewUrl = `${resolvedUrl}${separator}view=true${token ? `&token=${token}` : ''}`;
+        window.open(viewUrl, '_blank');
+        return;
+      }
+
       const headers: Record<string, string> = {};
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
@@ -598,7 +612,8 @@ export default function DocumentVaultPage() {
       window.open(blobUrl, '_blank');
     } catch (error) {
       console.error("Failed to view document:", error);
-      window.open(fileUrl, '_blank');
+      const fallbackUrl = resolveFileUrl(fileUrl);
+      window.open(fallbackUrl, '_blank');
     }
   };
 
@@ -1280,8 +1295,8 @@ export default function DocumentVaultPage() {
                           <div>
                             <div className="text-foreground font-bold max-w-[200px] truncate">{doc.name}</div>
                             {doc.notes && (
-                              <div className="text-muted-foreground text-[10px] italic mt-0.5 line-clamp-1 max-w-[220px]" title={doc.notes}>
-                                "{doc.notes}"
+                              <div className="text-muted-foreground text-[10px] italic mt-0.5 line-clamp-1 max-w-[220px]" title={stripHtml(doc.notes)}>
+                                "{stripHtml(doc.notes)}"
                               </div>
                             )}
                             <div className="text-muted-foreground text-[10px] font-black uppercase tracking-widest flex items-center gap-2">

@@ -123,6 +123,10 @@ interface AuditLog {
 
 export default function ClientProfilePage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
+  const stripHtml = (html?: string | null) => {
+    if (!html) return "";
+    return html.replace(/<[^>]*>/g, "");
+  };
   const { id } = use(params);
 
   const token = useAuthStore((state) => state.token);
@@ -1168,7 +1172,7 @@ export default function ClientProfilePage({ params }: { params: Promise<{ id: st
                                 </span>
                               </div>
                               {p.description && (
-                                <p className="text-muted-foreground text-xs line-clamp-1">{p.description}</p>
+                                <p className="text-muted-foreground text-xs line-clamp-1" title={stripHtml(p.description)}>{stripHtml(p.description)}</p>
                               )}
 
                               {/* Horizontal mini progress bar for tasks */}
@@ -1217,7 +1221,7 @@ export default function ClientProfilePage({ params }: { params: Promise<{ id: st
                                             {t.title}
                                           </p>
                                           {t.description && (
-                                            <p className="text-muted-foreground text-[11px] mt-0.5 line-clamp-1">{t.description}</p>
+                                            <p className="text-muted-foreground text-[11px] mt-0.5 line-clamp-1" title={stripHtml(t.description)}>{stripHtml(t.description)}</p>
                                           )}
 
                                           {/* Task Meta details */}
@@ -1297,7 +1301,7 @@ export default function ClientProfilePage({ params }: { params: Promise<{ id: st
                               </span>
                             </div>
                             {w.description && (
-                              <p className="text-muted-foreground text-xs line-clamp-1">{w.description}</p>
+                              <p className="text-muted-foreground text-xs line-clamp-1" title={stripHtml(w.description)}>{stripHtml(w.description)}</p>
                             )}
                             {w.scheduled_date && (
                               <p className="text-[10px] text-muted-foreground/80 font-medium">

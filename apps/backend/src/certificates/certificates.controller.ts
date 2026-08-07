@@ -8,6 +8,7 @@ import {
   Delete,
   UseGuards,
   Res,
+  Query,
 } from '@nestjs/common';
 import { CertificatesService } from './certificates.service';
 import {
@@ -46,12 +47,19 @@ export class CertificatesController {
   }
 
   @Get(':id/pdf')
-  async downloadPdf(@Param('id') id: string, @Res() res: any) {
+  async downloadPdf(
+    @Param('id') id: string,
+    @Query('view') view: string,
+    @Res() res: any,
+  ) {
     try {
       const buffer = await this.certificatesService.generatePdfForCertificate(id);
+      const isInline = view === 'true';
       res.set({
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename=safety-certificate-${id.substring(0, 8)}.pdf`,
+        'Content-Disposition': isInline
+          ? `inline; filename=safety-certificate-${id.substring(0, 8)}.pdf`
+          : `attachment; filename=safety-certificate-${id.substring(0, 8)}.pdf`,
         'Content-Length': buffer.length,
       });
       res.end(buffer);

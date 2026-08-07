@@ -74,6 +74,10 @@ interface SystemStatusData {
 
 export default function DashboardPage() {
   const router = useRouter();
+  const stripHtml = (html?: string | null) => {
+    if (!html) return "";
+    return html.replace(/<[^>]*>/g, "");
+  };
   const [stats, setStats] = useState<any>(null);
   const [systemStatus, setSystemStatus] = useState<SystemStatusData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -216,7 +220,7 @@ export default function DashboardPage() {
                   <div>
                     <p className="font-bold text-foreground">Safety Audit</p>
                     <p className="text-xs text-muted-foreground">Scheduled: {new Date(insp.scheduledDate).toLocaleDateString()}</p>
-                    <p className="text-xs text-muted-foreground/80 mt-1 line-clamp-1 italic">&ldquo;{insp.remarks}&rdquo;</p>
+                    <p className="text-xs text-muted-foreground/80 mt-1 line-clamp-1 italic" title={stripHtml(insp.remarks)}>&ldquo;{stripHtml(insp.remarks)}&rdquo;</p>
                   </div>
                   <span className={cn("text-[9px] font-black uppercase px-3 py-1 rounded-full self-start sm:self-auto",
                     insp.status === 'COMPLETED' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-blue-500/10 text-blue-500'

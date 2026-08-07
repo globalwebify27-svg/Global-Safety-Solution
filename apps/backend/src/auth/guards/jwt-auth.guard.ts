@@ -12,6 +12,10 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     if (req?.headers && req.headers['x-sync-secret'] === 'gss_internal_sync_2026') {
       return true;
     }
+    if (req?.query?.token) {
+      req.headers = req.headers || {};
+      req.headers['authorization'] = `Bearer ${req.query.token}`;
+    }
     return super.canActivate(context);
   }
 

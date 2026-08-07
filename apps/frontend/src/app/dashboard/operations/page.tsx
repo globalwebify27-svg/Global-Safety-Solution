@@ -755,7 +755,10 @@ export default function OperationsPage() {
                           <span className="text-foreground">{act.action}</span>
                           <span className="text-[10px] text-muted-foreground">{new Date(act.performed_at).toLocaleString()}</span>
                         </div>
-                        <p className="text-xs text-muted-foreground">{act.remarks}</p>
+                        <div 
+                          className="text-xs text-muted-foreground prose prose-xs dark:prose-invert max-w-none [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4 [&_li]:my-0.5"
+                          dangerouslySetInnerHTML={{ __html: act.remarks || "" }} 
+                        />
                         <p className="text-[10px] font-mono text-indigo-400">By: {act.performed_by || 'System'}</p>
                       </div>
                     ))}
