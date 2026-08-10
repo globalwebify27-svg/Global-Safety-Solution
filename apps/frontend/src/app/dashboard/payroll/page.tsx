@@ -22,6 +22,9 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 interface PayrollRecord {
   id: string;
@@ -48,6 +51,12 @@ export default function PayrollPage() {
   const [month, setMonth] = useState(new Date().getMonth() + 1);
   const [year, setYear] = useState(new Date().getFullYear());
   const token = useAuthStore((state) => state.token);
+
+  // Payment Modal States
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [selectedRecord, setSelectedRecord] = useState<PayrollRecord | null>(null);
+  const [bonusInput, setBonusInput] = useState<number>(0);
+  const [deductionsInput, setDeductionsInput] = useState<number>(0);
 
   useEffect(() => {
     fetchPayroll();
@@ -88,7 +97,7 @@ export default function PayrollPage() {
     }
   };
 
-  const handleUpdateStatus = async (id: string, status: string) => {
+  const handleUpdateStatus = async (id: string, status: string, bonus?: number, deductions?: number) => {
     if (!token) return;
     try {
       const res = await fetch(`${API_BASE_URL}/hr/payroll/${id}/status`, {
@@ -97,12 +106,41 @@ export default function PayrollPage() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({ status, paid_at: status === 'PAID' ? new Date().toISOString() : null })
+        body: JSON.stringify({
+          status,
+          paid_at: status === 'PAID' ? new Date().toISOString() : null,
+          bonus,
+          deductions
+        })
       });
       if (res.ok) fetchPayroll();
     } catch (e) {
       console.error(e);
     }
+  };
+
+  const openPaymentModal = (record: PayrollRecord) => {
+    setSelectedRecord(record);
+    setBonusInput(0);
+    setDeductionsInput(0);
+    setPaymentModalOpen(true);
+  };
+
+  const handleConfirmPayment = async () => {
+    if (!selectedRecord) return;
+    const finalBonus = Number(bonusInput || 0);
+    const finalDeductions = Number(deductionsInput || 0);
+    
+    // Live validation
+    const computedNetPay = Number(selectedRecord.base_salary) + finalBonus - Number(selectedRecord.pf_deduction) - Number(selectedRecord.esi_deduction) - finalDeductions;
+    if (computedNetPay < 0) {
+      alert("Error: Total deductions exceed earnings, resulting in negative net payout. Please review the values.");
+      return;
+    }
+    
+    await handleUpdateStatus(selectedRecord.id, 'PAID', finalBonus, finalDeductions);
+    setPaymentModalOpen(false);
+    setSelectedRecord(null);
   };
 
   const getMonthName = (m: number) => {
@@ -349,7 +387,7 @@ export default function PayrollPage() {
                           <Button 
                             size="sm" 
                             className="bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest h-9 px-4"
-                            onClick={() => handleUpdateStatus(record.id, 'PAID')}
+                            onClick={() => openPaymentModal(record)}
                           >
                             Mark Paid
                           </Button>
@@ -372,6 +410,93 @@ export default function PayrollPage() {
           </table>
         </div>
       </div>
+
+      {/* Payment Dialog Modal */}
+      {selectedRecord && (
+        <Dialog open={paymentModalOpen} onOpenChange={setPaymentModalOpen}>
+          <DialogContent className="max-w-md bg-background border border-border rounded-2xl shadow-xl p-6">
+            <DialogHeader>
+              <DialogTitle className="text-xl font-bold tracking-tight text-foreground">Confirm Payroll Payment</DialogTitle>
+              <DialogDescription className="text-xs text-muted-foreground mt-1">
+                Enter any adjustments (bonus/deductions) for {selectedRecord.user.name} before finalizing payment.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 my-4">
+              <div className="grid grid-cols-2 gap-4 border border-border rounded-xl p-4 bg-muted/20 text-xs">
+                <div>
+                  <span className="text-muted-foreground block">Base Salary</span>
+                  <span className="font-bold text-foreground">₹{Number(selectedRecord.base_salary).toLocaleString()}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground block">Provident Fund (PF)</span>
+                  <span className="font-bold text-rose-500">- ₹{Number(selectedRecord.pf_deduction || 0).toLocaleString()}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground block">Employee State Insurance (ESI)</span>
+                  <span className="font-bold text-rose-500">- ₹{Number(selectedRecord.esi_deduction || 0).toLocaleString()}</span>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="bonus" className="text-xs font-bold text-foreground">Bonus Payout (INR)</Label>
+                <Input 
+                  id="bonus"
+                  type="number"
+                  placeholder="0.00"
+                  className="rounded-xl border-border bg-background focus-visible:ring-primary h-10 text-sm"
+                  value={bonusInput || ''}
+                  onChange={(e) => setBonusInput(Number(e.target.value))}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="deductions" className="text-xs font-bold text-foreground">Other Deductions (INR)</Label>
+                <Input 
+                  id="deductions"
+                  type="number"
+                  placeholder="0.00"
+                  className="rounded-xl border-border bg-background focus-visible:ring-primary h-10 text-sm"
+                  value={deductionsInput || ''}
+                  onChange={(e) => setDeductionsInput(Number(e.target.value))}
+                />
+              </div>
+
+              <div className="border-t border-border pt-4 flex items-center justify-between">
+                <span className="text-sm font-bold text-foreground">Final Net Payable:</span>
+                <span className="text-lg font-black text-emerald-600">
+                  ₹{(
+                    Number(selectedRecord.base_salary) + 
+                    Number(bonusInput || 0) - 
+                    Number(selectedRecord.pf_deduction || 0) - 
+                    Number(selectedRecord.esi_deduction || 0) - 
+                    Number(deductionsInput || 0)
+                  ).toLocaleString()}
+                </span>
+              </div>
+            </div>
+
+            <DialogFooter className="flex gap-2 justify-end mt-4">
+              <Button 
+                variant="outline" 
+                className="rounded-xl h-10 px-5 text-xs font-black uppercase tracking-wider border-border"
+                onClick={() => {
+                  setPaymentModalOpen(false);
+                  setSelectedRecord(null);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button 
+                className="bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl h-10 px-5 text-xs font-black uppercase tracking-wider"
+                onClick={handleConfirmPayment}
+              >
+                Confirm & Pay
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

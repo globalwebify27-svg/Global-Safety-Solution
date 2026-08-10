@@ -45,8 +45,14 @@ export class HRController {
   @Put('payroll/:id/status')
   updateStatus(
     @Param('id') id: string,
-    @Body() data: { status: string; paid_at?: string },
+    @Body() data: { status: string; paid_at?: string; bonus?: number; deductions?: number },
   ) {
-    return this.hrService.updatePayrollStatus(id, data.status, data.paid_at);
+    return this.hrService.updatePayrollStatus(
+      id,
+      data.status,
+      data.paid_at,
+      data.bonus,
+      data.deductions,
+    );
   }
 }

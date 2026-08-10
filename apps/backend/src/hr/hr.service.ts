@@ -164,11 +164,38 @@ export class HRService {
     });
   }
 
-  async updatePayrollStatus(id: string, status: string, paidAt?: string) {
+  async updatePayrollStatus(
+    id: string,
+    status: string,
+    paidAt?: string,
+    bonus?: number,
+    deductions?: number,
+  ) {
+    const record = await this.prisma.payrollRecord.findUnique({
+      where: { id },
+    });
+
+    if (!record) {
+      throw new NotFoundException(`Payroll record with ID ${id} not found`);
+    }
+
+    let net_pay = Number(record.net_pay);
+    let finalBonus = Number(record.bonus);
+    let finalDeductions = Number(record.deductions);
+
+    if (status === 'PAID') {
+      finalBonus = bonus !== undefined ? bonus : Number(record.bonus);
+      finalDeductions = deductions !== undefined ? deductions : Number(record.deductions);
+      net_pay = Number(record.base_salary) + finalBonus - Number(record.pf_deduction) - Number(record.esi_deduction) - finalDeductions;
+    }
+
     return this.prisma.payrollRecord.update({
       where: { id },
       data: {
         status,
+        bonus: finalBonus,
+        deductions: finalDeductions,
+        net_pay,
         ...(paidAt && { paid_at: new Date(paidAt) }),
       },
     });
