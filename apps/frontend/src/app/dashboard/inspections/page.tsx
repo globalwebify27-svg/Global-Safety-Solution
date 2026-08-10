@@ -250,6 +250,7 @@ export default function InspectionsPage() {
   
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [uploadedPhotoUrls, setUploadedPhotoUrls] = useState<string[]>([]);
+  const [uploadingItems, setUploadingItems] = useState<Record<string, boolean>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const parseRemarksData = (remarks?: string | null): {
@@ -843,11 +844,36 @@ export default function InspectionsPage() {
 
   const handleItemPhotoUpload = async (itemId: string, files: FileList) => {
     if (files.length === 0 || !token) return;
+    
+    // Convert FileList to a static Array immediately to avoid losing files on input reset
+    const filesArray = Array.from(files);
+    
+    // Set item uploading state to true to show loading and prevent double submission
+    setUploadingItems(prev => ({ ...prev, [itemId]: true }));
+
     try {
       const uploadedUrls: string[] = [];
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
+      let skippedCount = 0;
+
+      for (let i = 0; i < filesArray.length; i++) {
+        const file = filesArray[i];
         
+        // 1. Size check: Max 10MB per file
+        const maxSize = 10 * 1024 * 1024;
+        if (file.size > maxSize) {
+          toast.error(`File "${file.name}" exceeds maximum allowed limit of 10MB.`);
+          skippedCount++;
+          continue;
+        }
+
+        // 2. Format check: Only images
+        const ext = file.name.split('.').pop()?.toLowerCase();
+        if (!['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext || '')) {
+          toast.error(`File "${file.name}" has an invalid format. Only image files (JPG, PNG, GIF, WEBP) are allowed.`);
+          skippedCount++;
+          continue;
+        }
+
         let compressedFile: File | Blob = file;
         try {
           // Compress the image down to under 150KB
@@ -864,6 +890,7 @@ export default function InspectionsPage() {
         if (selectedInspection?.client_id) {
           formData.append('client_id', selectedInspection.client_id);
         }
+        
         const res = await fetch(`${API_BASE_URL}/documents`, {
           method: 'POST',
           headers: { Authorization: `Bearer ${token}` },
@@ -872,17 +899,30 @@ export default function InspectionsPage() {
         if (res.ok) {
           const data = await res.json();
           uploadedUrls.push(data.file_url);
+        } else {
+          toast.error(`Failed to upload image "${file.name}".`);
+          skippedCount++;
         }
       }
+
       if (uploadedUrls.length > 0) {
         const currentItem = selectedInspection?.items?.find(it => it.id === itemId);
         const existingUrls = currentItem?.photo_url ? parseItemPhotos(currentItem.photo_url) : [];
         const newUrls = [...existingUrls, ...uploadedUrls];
         await handleUpdateItem(itemId, currentItem?.status || 'PENDING', currentItem?.notes || '', undefined, JSON.stringify(newUrls));
-        toast.success("Photo uploaded successfully!");
+        
+        if (skippedCount > 0) {
+          toast.success(`Uploaded ${uploadedUrls.length} photo(s). ${skippedCount} file(s) failed or skipped.`);
+        } else {
+          toast.success("All photos uploaded successfully!");
+        }
+      } else if (skippedCount > 0) {
+        toast.error("No valid photos were uploaded.");
       }
     } catch (err) {
       toast.error("Failed to upload photo");
+    } finally {
+      setUploadingItems(prev => ({ ...prev, [itemId]: false }));
     }
   };
 
@@ -2368,10 +2408,15 @@ export default function InspectionsPage() {
                                   type="button"
                                   variant="outline" 
                                   size="sm"
+                                  disabled={uploadingItems[item.id]}
                                   onClick={() => document.getElementById(`item-file-${item.id}`)?.click()}
-                                  className="rounded-xl h-9 border-blue-500/20 text-blue-600 hover:bg-blue-500/10 font-bold text-xs"
+                                  className="rounded-xl h-9 border-blue-500/20 text-blue-600 hover:bg-blue-500/10 font-bold text-xs disabled:opacity-50"
                                 >
-                                  <Camera className="w-3.5 h-3.5 mr-1" /> Upload Item Photo
+                                  {uploadingItems[item.id] ? (
+                                    <><Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> Uploading...</>
+                                  ) : (
+                                    <><Camera className="w-3.5 h-3.5 mr-1" /> Upload Item Photo</>
+                                  )}
                                 </Button>
 
                                 <Button
