@@ -12,12 +12,6 @@ export function getPersistentUploadsDir(): string {
   }
 
   const mainCwd = process.cwd();
-  const hostingerAccountDir = '/home/u745630191';
-
-  // 2. Hostinger production account detection (only on Linux to prevent relative drive resolution on Windows)
-  if (process.platform === 'linux' && fs.existsSync(hostingerAccountDir)) {
-    return path.join(hostingerAccountDir, 'persistent_uploads');
-  }
 
   // 3. Local Monorepo directory structure detection
   if (mainCwd.endsWith('apps/backend') || mainCwd.endsWith('apps\\backend')) {
