@@ -53,7 +53,7 @@ export class CertificatesController {
     @Res() res: any,
   ) {
     try {
-      const buffer = await this.certificatesService.generatePdfForCertificate(id);
+      const buffer = await this.certificatesService.getOrGeneratePdf(id);
       const isInline = view === 'true';
       res.set({
         'Content-Type': 'application/pdf',
@@ -64,8 +64,10 @@ export class CertificatesController {
       });
       res.end(buffer);
     } catch (err) {
-      console.error('[PDF Error] certificates/:id/pdf failed:', err?.message, err?.stack);
-      res.status(500).json({ error: err?.message || 'PDF generation failed', detail: err?.stack });
+      console.error('[PDF Error] certificates/:id/pdf failed:', err?.message);
+      const status = err?.status || 500;
+      const message = err?.message || 'PDF generation failed';
+      res.status(status).json({ error: message });
     }
   }
 

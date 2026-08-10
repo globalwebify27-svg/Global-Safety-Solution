@@ -904,7 +904,7 @@ export class InspectionsService {
       });
     }
 
-    return this.certificatesService.generatePdfForCertificate(cert.id);
+    return this.certificatesService.getOrGeneratePdf(cert.id);
   }
 
   async generateCertificate(id: string): Promise<Buffer> {
@@ -922,7 +922,7 @@ export class InspectionsService {
     if (!inspection) return Buffer.alloc(0);
 
     if (inspection.certificates && inspection.certificates.length > 0) {
-      return this.certificatesService.generatePdfForCertificate(inspection.certificates[0].id);
+      return this.certificatesService.getOrGeneratePdf(inspection.certificates[0].id);
     }
 
     const itemWithCert = inspection.items.find(i => i.cert_template_id || i.cert_ref_no);

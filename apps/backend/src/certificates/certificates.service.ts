@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, InternalServerErrorException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   CreateCertificateDto,
@@ -10,10 +10,170 @@ import {
 } from './dto/create-template.dto';
 
 import { computeExpiryDate } from '../common/utils/date-utils';
+import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
 
 @Injectable()
 export class CertificatesService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly certStorageDirs: string[];
+
+  constructor(private readonly prisma: PrismaService) {
+    // Resolve persistent storage directories (same pattern as LocalStorageService/main.ts)
+    const cwd = process.cwd();
+    const homeDir = os.homedir();
+    const hostingerAccountDir = '/home/u745630191';
+
+    const candidates = [
+      path.join(hostingerAccountDir, 'persistent_uploads', 'certificates'),
+      path.join(homeDir, 'persistent_uploads', 'certificates'),
+      path.join(cwd, '..', 'persistent_uploads', 'certificates'),
+      path.join(cwd, '..', '..', 'persistent_uploads', 'certificates'),
+      path.join(cwd, 'persistent_uploads', 'certificates'),
+    ];
+
+    // Deduplicate via path.resolve
+    this.certStorageDirs = Array.from(new Set(candidates.map(d => path.resolve(d))));
+
+    // Ensure directories exist
+    for (const dir of this.certStorageDirs) {
+      try {
+        if (!fs.existsSync(dir)) {
+          fs.mkdirSync(dir, { recursive: true });
+        }
+      } catch (e) {
+        // Ignore permission errors (e.g. Hostinger path on local dev)
+      }
+    }
+  }
+
+  // =====================================================================
+  // PERSISTENT PDF STORAGE HELPERS
+  // =====================================================================
+
+  /**
+   * Returns the absolute path where a certificate PDF should be stored.
+   * Tries each storage directory and returns the first one that is writable.
+   */
+  private getWritableStoragePath(certId: string): string | null {
+    const fileName = `${certId}.pdf`;
+    for (const dir of this.certStorageDirs) {
+      try {
+        if (!fs.existsSync(dir)) {
+          fs.mkdirSync(dir, { recursive: true });
+        }
+        // Test writability
+        const testFile = path.join(dir, `.write-test-${Date.now()}`);
+        fs.writeFileSync(testFile, '');
+        fs.unlinkSync(testFile);
+        return path.join(dir, fileName);
+      } catch (e) {
+        // This directory is not writable, try next
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Searches all storage directories for an existing certificate PDF.
+   * Returns the absolute path if found, null otherwise.
+   */
+  private findExistingPdf(certId: string): string | null {
+    const fileName = `${certId}.pdf`;
+    for (const dir of this.certStorageDirs) {
+      const filePath = path.join(dir, fileName);
+      try {
+        if (fs.existsSync(filePath) && fs.statSync(filePath).size > 0) {
+          return filePath;
+        }
+      } catch (e) {
+        // Ignore read errors
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Saves a PDF buffer to persistent storage and updates the certificate's pdf_url.
+   */
+  private async persistPdfBuffer(certId: string, buffer: Buffer): Promise<void> {
+    const storagePath = this.getWritableStoragePath(certId);
+    if (!storagePath) {
+      console.warn(`[CertStorage] No writable storage directory found for certificate ${certId}`);
+      return;
+    }
+
+    try {
+      await fs.promises.writeFile(storagePath, buffer);
+      console.log(`[CertStorage] Certificate PDF persisted: ${storagePath} (${buffer.length} bytes)`);
+
+      // Update pdf_url in the database for future reference
+      const relativePdfUrl = `/certificates/${certId}/pdf`;
+      await this.prisma.certificate.update({
+        where: { id: certId },
+        data: { pdf_url: relativePdfUrl },
+      }).catch((e: any) => {
+        console.warn(`[CertStorage] Could not update pdf_url for ${certId}:`, e?.message);
+      });
+    } catch (e: any) {
+      console.error(`[CertStorage] Failed to persist PDF for ${certId}:`, e?.message);
+    }
+  }
+
+  // =====================================================================
+  // GET OR GENERATE PDF (primary entry point for View/Download)
+  // =====================================================================
+
+  /**
+   * Returns a certificate PDF buffer. Serves from persistent storage if available,
+   * otherwise regenerates and persists the PDF.
+   * 
+   * This is the method that controllers should call for View/Download.
+   */
+  async getOrGeneratePdf(id: string): Promise<Buffer> {
+    // 1. Validate the certificate ID exists in the database
+    const certRecord = await this.prisma.certificate.findUnique({
+      where: { id },
+      select: { id: true, pdf_url: true },
+    });
+
+    if (!certRecord) {
+      throw new NotFoundException(`Certificate record with ID ${id} does not exist in the database`);
+    }
+
+    // 2. Check for existing persistent PDF on disk
+    const existingPath = this.findExistingPdf(id);
+    if (existingPath) {
+      try {
+        const buffer = await fs.promises.readFile(existingPath);
+        if (buffer.length > 0) {
+          console.log(`[CertStorage] Serving persisted PDF: ${existingPath}`);
+          return buffer;
+        }
+      } catch (e: any) {
+        console.warn(`[CertStorage] Persistent PDF exists but cannot be read: ${existingPath}`, e?.message);
+      }
+    }
+
+    // 3. PDF not on disk — regenerate from certificate data
+    console.log(`[CertStorage] No persistent PDF found for ${id}, regenerating...`);
+    try {
+      const buffer = await this.generatePdfForCertificate(id);
+
+      // 4. Persist the newly generated PDF
+      await this.persistPdfBuffer(id, buffer);
+
+      return buffer;
+    } catch (e: any) {
+      if (e instanceof NotFoundException) {
+        throw e;
+      }
+      console.error(`[CertStorage] PDF regeneration failed for ${id}:`, e?.message);
+      throw new InternalServerErrorException(
+        `Certificate record exists but PDF generation failed. Please try again or contact support.`,
+      );
+    }
+  }
 
   async create(createCertificateDto: CreateCertificateDto) {
     const { issue_date, validity_period, metadata, ...rest } = createCertificateDto;

@@ -1031,7 +1031,7 @@ export class DocumentsService {
 
       if (certRecord) {
         try {
-          const pdfBuffer = await this.certificatesService.generatePdfForCertificate(certRecord.id);
+          const pdfBuffer = await this.certificatesService.getOrGeneratePdf(certRecord.id);
           attachments.push({ filename, content: pdfBuffer.toString('base64'), encoding: 'base64' });
         } catch (e) {
           console.error('Error generating official certificate PDF from CertificatesService:', e);
@@ -1087,7 +1087,7 @@ export class DocumentsService {
 
       if (certRecord) {
         try {
-          const pdfBuffer = await this.certificatesService.generatePdfForCertificate(certRecord.id);
+          const pdfBuffer = await this.certificatesService.getOrGeneratePdf(certRecord.id);
           attachments.push({ filename, content: pdfBuffer.toString('base64'), encoding: 'base64' });
         } catch (e) {
           console.error('Error generating official certificate PDF from CertificatesService:', e);

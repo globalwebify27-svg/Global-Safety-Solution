@@ -55,4 +55,5 @@ apps/backend/backend.zip
 
 # Uploaded assets
 apps/backend/public/uploads/
+persistent_uploads/
 
