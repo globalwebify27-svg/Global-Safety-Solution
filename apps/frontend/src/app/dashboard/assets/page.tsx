@@ -69,13 +69,7 @@ export default function AssetsPage() {
   const [newAssigneeId, setNewAssigneeId] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
 
-  // File upload states
-  const [calibFile, setCalibFile] = useState<File | null>(null);
-  const [invoiceFile, setInvoiceFile] = useState<File | null>(null);
-  const [calibUploading, setCalibUploading] = useState(false);
-  const [invoiceUploading, setInvoiceUploading] = useState(false);
-  const [calibUrl, setCalibUrl] = useState("");
-  const [invoiceUrl, setInvoiceUrl] = useState("");
+
   
   const token = useAuthStore((state) => state.token);
 
@@ -118,63 +112,8 @@ export default function AssetsPage() {
     }
   };
 
-  const uploadFile = async (
-    file: File,
-    category: string,
-    setUploading: (v: boolean) => void,
-    setUrl: (v: string) => void
-  ) => {
-    if (!token) return;
-    setUploading(true);
-    try {
-      const fd = new FormData();
-      fd.append("file", file);
-      fd.append("name", file.name);
-      fd.append("category", category);
-      fd.append("file_type", "PDF");
-      fd.append("file_size", String(file.size));
-      const res = await fetch(`${API_BASE_URL}/documents`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-        body: fd,
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setUrl(data.file_url || data.url || "");
-        toast.success("File uploaded successfully!");
-      } else {
-        const errText = await res.text();
-        console.error("Upload error response:", errText);
-        toast.error("File upload failed.");
-      }
-    } catch (e) {
-      console.error(e);
-      toast.error("Upload error.");
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const handleCalibFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setCalibFile(file);
-    uploadFile(file, "CALIBRATION_CERT", setCalibUploading, setCalibUrl);
-  };
-
-  const handleInvoiceFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setInvoiceFile(file);
-    uploadFile(file, "ASSET_INVOICE", setInvoiceUploading, setInvoiceUrl);
-  };
-
   const resetForm = () => {
     setFormData({ asset_tag: "", name: "", serial_number: "", model_number: "", purchase_date: "", purchase_value: 0, status: "AVAILABLE", assigned_to: "" });
-    setCalibFile(null);
-    setInvoiceFile(null);
-    setCalibUrl("");
-    setInvoiceUrl("");
   };
 
   const handleCreateAsset = async (e: React.FormEvent) => {
@@ -191,8 +130,6 @@ export default function AssetsPage() {
         },
         body: JSON.stringify({
           ...formData,
-          calibration_cert_url: calibUrl || undefined,
-          invoice_url: invoiceUrl || undefined,
         })
       });
       if (res.ok) {
@@ -526,18 +463,17 @@ export default function AssetsPage() {
                 <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-widest">Assignment</th>
                 <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-widest">Status</th>
                 <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-widest">Purchase Date</th>
-                <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-widest">Documents</th>
                 <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-widest text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center text-muted-foreground italic font-medium">Syncing with hardware registry...</td>
+                  <td colSpan={6} className="px-6 py-12 text-center text-muted-foreground italic font-medium">Syncing with hardware registry...</td>
                 </tr>
               ) : assets.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center text-muted-foreground italic text-[10px] uppercase font-bold tracking-widest">No assets currently registered.</td>
+                  <td colSpan={6} className="px-6 py-12 text-center text-muted-foreground italic text-[10px] uppercase font-bold tracking-widest">No assets currently registered.</td>
                 </tr>
               ) : assets.map((asset) => (
                 <tr key={asset.id} className="hover:bg-accent/5 transition-colors group">
@@ -580,40 +516,7 @@ export default function AssetsPage() {
                   <td className="px-6 py-5 text-sm font-medium text-foreground">
                     {asset.purchase_date ? new Date(asset.purchase_date).toLocaleDateString() : 'N/A'}
                   </td>
-                  <td className="px-6 py-5">
-                    <div className="flex items-center gap-2">
-                      {asset.calibration_cert_url ? (
-                        <a
-                          href={asset.calibration_cert_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          title="View Calibration Certificate"
-                          className="flex items-center gap-1 px-2 py-1 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 text-[10px] font-black uppercase tracking-wider transition-colors"
-                        >
-                          <Eye className="w-3 h-3" /> Calib.
-                        </a>
-                      ) : (
-                        <span className="flex items-center gap-1 px-2 py-1 rounded-lg bg-muted text-muted-foreground text-[10px] font-black uppercase tracking-wider">
-                          <XCircle className="w-3 h-3" /> Calib.
-                        </span>
-                      )}
-                      {asset.invoice_url ? (
-                        <a
-                          href={asset.invoice_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          title="View Invoice"
-                          className="flex items-center gap-1 px-2 py-1 rounded-lg bg-violet-500/10 hover:bg-violet-500/20 text-violet-600 dark:text-violet-400 text-[10px] font-black uppercase tracking-wider transition-colors"
-                        >
-                          <Eye className="w-3 h-3" /> Invoice
-                        </a>
-                      ) : (
-                        <span className="flex items-center gap-1 px-2 py-1 rounded-lg bg-muted text-muted-foreground text-[10px] font-black uppercase tracking-wider">
-                          <XCircle className="w-3 h-3" /> Invoice
-                        </span>
-                      )}
-                    </div>
-                  </td>
+
                   <td className="px-6 py-5 text-right">
                     <div className="flex items-center justify-end gap-2">
                       <DropdownMenu>

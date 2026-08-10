@@ -37,8 +37,6 @@ export class AssetsService {
         purchase_value: data.purchase_value,
         status: data.status || 'AVAILABLE',
         assigned_to: data.assigned_to || null,
-        calibration_cert_url: data.calibration_cert_url || null,
-        invoice_url: data.invoice_url || null,
       },
     });
   }
