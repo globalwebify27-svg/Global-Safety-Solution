@@ -6,6 +6,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { TemplateEngineService } from '../email-management/template-engine.service';
+import { LocalStorageService } from '../common/services/local-storage.service';
 
 @Injectable()
 export class QuotationsService {
@@ -13,6 +14,7 @@ export class QuotationsService {
     private prisma: PrismaService,
     private notificationsService: NotificationsService,
     private templateEngine: TemplateEngineService,
+    private localStorageService: LocalStorageService,
   ) { }
 
   async findAll(userPayload?: any) {
@@ -708,10 +710,27 @@ export class QuotationsService {
       acceptance_link: `http://localhost:3000/verify/proposal/${quotation.id}`,
     };
 
+    // 1. Get/Generate the Quotation PDF
+    let pdfBuffer: Buffer;
+    let pdfFilename: string;
+    try {
+      const pdfData = await this.getOrCreateQuotationPdf(quotation.id);
+      pdfBuffer = pdfData.buffer;
+      pdfFilename = pdfData.filename;
+    } catch (pdfErr: any) {
+      throw new BadRequestException(`Failed to generate quotation PDF: ${pdfErr.message || pdfErr}`);
+    }
+
+    const attachments = [{
+      filename: pdfFilename,
+      content: pdfBuffer,
+    }];
+
     const result = await this.templateEngine.sendTemplatedEmail({
       templateCode: 'QUOTATION_PROPOSAL',
       to: emailTo,
       context,
+      attachments,
       module: 'QUOTATIONS',
     });
 
@@ -730,5 +749,287 @@ export class QuotationsService {
         : `Quotation proposal email sent successfully to ${emailTo}`,
       result,
     };
+  }
+
+  async getOrCreateQuotationPdf(quotationId: string): Promise<{ buffer: Buffer, filename: string }> {
+    const quotation = await this.prisma.quotation.findUnique({
+      where: { id: quotationId },
+      include: { client: true, lead: true, items: { orderBy: { sort_order: 'asc' } } },
+    });
+
+    if (!quotation) {
+      throw new NotFoundException('Quotation not found.');
+    }
+
+    const filename = `Quotation-${quotation.quote_number}.pdf`;
+
+    // 1. Check if the document already exists in DB
+    const existingDoc = await this.prisma.document.findFirst({
+      where: {
+        name: filename,
+        OR: [
+          { client_id: quotation.client_id || undefined },
+          { lead_id: quotation.lead_id || undefined },
+        ].filter(Boolean) as any,
+      },
+    });
+
+    if (existingDoc) {
+      // Find filename from URL
+      const parts = existingDoc.file_url.split('/');
+      const uniqueFileName = parts[parts.length - 1];
+      
+      // Try to read it from targetDirs
+      const fs = require('fs');
+      const path = require('path');
+      const os = require('os');
+      const targetDirs = [
+        path.join('/home/u745630191', 'persistent_uploads'),
+        path.join(os.homedir(), 'persistent_uploads'),
+        path.join(process.cwd(), '..', 'persistent_uploads'),
+        path.join(process.cwd(), 'public', 'uploads'),
+      ];
+      
+      for (const dir of targetDirs) {
+        const filePath = path.join(dir, uniqueFileName);
+        if (fs.existsSync(filePath)) {
+          try {
+            const buffer = fs.readFileSync(filePath);
+            return { buffer, filename };
+          } catch (e) {
+            // Ignore and try next
+          }
+        }
+      }
+    }
+
+    // 2. Generate a new PDF using PDFKit
+    const buffer = await this.generateQuotationPdfBuffer(quotation);
+
+    // Save file via LocalStorageService
+    const fileUrl = await this.localStorageService.saveFile(buffer, filename, 'application/pdf');
+
+    // Create a Document record in DB for tracking/Vault
+    await this.prisma.document.create({
+      data: {
+        name: filename,
+        file_url: fileUrl,
+        file_type: 'PDF',
+        file_size: buffer.length,
+        category: 'QUOTATION',
+        client_id: quotation.client_id || null,
+        lead_id: quotation.lead_id || null,
+      },
+    });
+
+    return { buffer, filename };
+  }
+
+  async generateQuotationPdfBuffer(quotation: any): Promise<Buffer> {
+    const fs = require('fs');
+    const path = require('path');
+    
+    // Logo loading
+    let logoBuffer: Buffer | null = null;
+    try {
+      const possiblePaths = [
+        path.join(__dirname, '..', 'assets', 'gss-logo.png'),
+        path.join(__dirname, 'assets', 'gss-logo.png'),
+        path.join(process.cwd(), 'assets', 'gss-logo.png'),
+        path.join(process.cwd(), 'dist', 'assets', 'gss-logo.png'),
+        path.join(process.cwd(), 'apps/backend/src/assets/gss-logo.png'),
+        path.join(process.cwd(), 'src/assets/gss-logo.png'),
+      ];
+      for (const logoPath of possiblePaths) {
+        if (fs.existsSync(logoPath)) {
+          logoBuffer = fs.readFileSync(logoPath);
+          break;
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load logo:', err);
+    }
+
+    const _PDFDocument = require('pdfkit');
+    const PDFDocument = _PDFDocument.default || _PDFDocument;
+
+    return new Promise((resolve, reject) => {
+      const docOptions: any = { margin: 40, size: 'A4' };
+      const doc = new PDFDocument(docOptions);
+      const buffers: Buffer[] = [];
+
+      doc.on('data', buffers.push.bind(buffers));
+      doc.on('end', () => resolve(Buffer.concat(buffers)));
+      doc.on('error', (err: Error) => {
+        console.error('[PDFKit] Document error in generateQuotationPdfBuffer:', err);
+        reject(err);
+      });
+
+      // Colors
+      const primaryColor = '#0f172a';
+      const goldColor = '#b8860b';
+      const lightGrey = '#f8fafc';
+      const borderGrey = '#e2e8f0';
+
+      // Outer border
+      doc.rect(20, 20, 555, 802).lineWidth(0.5).stroke(primaryColor);
+
+      // Enterprise header
+      doc.fillColor('#000000').fontSize(7.5).font('Helvetica-Bold');
+      doc.text('GSTIN: 20BILPA8494E1ZE', 40, 26, { align: 'right', width: 510 });
+      doc.text('ISO:9001:2015', 40, 36, { align: 'right', width: 510 });
+
+      // Logo
+      if (logoBuffer) {
+        doc.image(logoBuffer, 35, 28, { width: 50, height: 50 });
+      }
+
+      // Company name
+      doc.fontSize(18).font('Helvetica-Bold').fillColor(primaryColor);
+      doc.text('M/s Global Safety Solution', 95, 34);
+      doc.fontSize(7).font('Helvetica').fillColor('#334155');
+      doc.text('Shop No. 51, 2nd Floor, AC Market, Gel Church Complex, Main Road, Ranchi-834001 (Jharkhand)', 95, 54);
+      doc.text('Phone: 6201186550   Email: id-globalsafety56@gmail.com', 95, 64);
+
+      // Divider
+      doc.moveTo(30, 85).lineTo(565, 85).lineWidth(1).stroke(primaryColor);
+
+      // Title
+      doc.fillColor(primaryColor).fontSize(14).font('Helvetica-Bold').text('QUOTATION PROPOSAL', 40, 100, { align: 'center' });
+      doc.moveDown(0.5);
+
+      // Metadata layout (two columns)
+      const currentY = doc.y;
+      doc.fontSize(9).font('Helvetica-Bold').text('Quotation Details:', 40, currentY);
+      doc.font('Helvetica').text(`Quote No: ${quotation.quote_number}`, 40, currentY + 15);
+      doc.text(`Date: ${new Date(quotation.date).toLocaleDateString('en-IN')}`, 40, currentY + 30);
+      if (quotation.valid_until) {
+        doc.text(`Valid Upto: ${new Date(quotation.valid_until).toLocaleDateString('en-IN')}`, 40, currentY + 45);
+      }
+
+      // Client info
+      const clientName = quotation.client?.name || quotation.lead?.company_name || 'N/A';
+      const contactPerson = quotation.client?.contact_person || quotation.lead?.contact_person || 'N/A';
+      const email = quotation.client?.email || quotation.lead?.email || 'N/A';
+      const phone = quotation.client?.phone || quotation.lead?.phone || 'N/A';
+      const address = quotation.billing_address || quotation.client?.billing_address || 'N/A';
+
+      doc.font('Helvetica-Bold').text('Bill To (Client / Lead):', 300, currentY);
+      doc.font('Helvetica-Bold').text(clientName, 300, currentY + 15);
+      doc.font('Helvetica').text(`Attn: ${contactPerson}`, 300, currentY + 30);
+      doc.text(`Email: ${email}`, 300, currentY + 45);
+      doc.text(`Phone: ${phone}`, 300, currentY + 60);
+      doc.text(`Address: ${address}`, 300, currentY + 75, { width: 250 });
+
+      // Table section
+      doc.moveDown(2);
+      const tableStartY = Math.max(doc.y, currentY + 130);
+      
+      // Draw Table Header
+      doc.rect(40, tableStartY, 515, 20).fill(primaryColor);
+      doc.fillColor('#ffffff').fontSize(8.5).font('Helvetica-Bold');
+      doc.text('S.No', 45, tableStartY + 6, { width: 30 });
+      doc.text('Description of Safety Audit / Service', 80, tableStartY + 6, { width: 230 });
+      doc.text('Qty', 320, tableStartY + 6, { width: 30, align: 'center' });
+      doc.text('UOM', 360, tableStartY + 6, { width: 40, align: 'center' });
+      doc.text('Unit Price (INR)', 410, tableStartY + 6, { width: 70, align: 'right' });
+      doc.text('Total (INR)', 490, tableStartY + 6, { width: 60, align: 'right' });
+
+      // Table items
+      let itemY = tableStartY + 20;
+      doc.fillColor('#000000').font('Helvetica').fontSize(8.5);
+      
+      const items = quotation.items || [];
+      items.forEach((item: any, idx: number) => {
+        // Draw row background on alternate rows
+        if (idx % 2 === 1) {
+          doc.rect(40, itemY, 515, 20).fill(lightGrey);
+        }
+        
+        doc.fillColor('#000000');
+        doc.text(String(idx + 1), 45, itemY + 6, { width: 30 });
+        doc.text(item.description || '', 80, itemY + 6, { width: 230 });
+        doc.text(String(item.quantity || 1), 320, itemY + 6, { width: 30, align: 'center' });
+        doc.text(item.uom || 'Nos', 360, itemY + 6, { width: 40, align: 'center' });
+        doc.text(Number(item.unit_price || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 }), 410, itemY + 6, { width: 70, align: 'right' });
+        doc.text(Number(item.total || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 }), 490, itemY + 6, { width: 60, align: 'right' });
+        
+        // Draw line separator
+        doc.moveTo(40, itemY + 20).lineTo(555, itemY + 20).lineWidth(0.3).stroke(borderGrey);
+        itemY += 20;
+      });
+
+      // Draw summary block (Subtotal, GST, Grand Total)
+      const summaryY = itemY + 10;
+      doc.fontSize(8.5);
+      
+      let currentSummaryY = summaryY;
+      
+      const subtotal = Number(quotation.subtotal || 0);
+      const discount = Number(quotation.discount || 0);
+      const cgst = Number(quotation.cgst || 0);
+      const sgst = Number(quotation.sgst || 0);
+      const igst = Number(quotation.igst || 0);
+      const totalAmount = Number(quotation.total_amount || 0);
+
+      // Subtotal line
+      doc.font('Helvetica-Bold').text('Subtotal:', 380, currentSummaryY, { width: 100, align: 'right' });
+      doc.font('Helvetica').text(`INR ${subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 490, currentSummaryY, { width: 65, align: 'right' });
+      currentSummaryY += 15;
+
+      // Discount line (if any)
+      if (discount > 0) {
+        doc.font('Helvetica-Bold').text('Discount:', 380, currentSummaryY, { width: 100, align: 'right' });
+        doc.font('Helvetica').text(`- INR ${discount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 490, currentSummaryY, { width: 65, align: 'right' });
+        currentSummaryY += 15;
+      }
+
+      // CGST line
+      if (cgst > 0) {
+        doc.font('Helvetica-Bold').text('CGST:', 380, currentSummaryY, { width: 100, align: 'right' });
+        doc.font('Helvetica').text(`INR ${cgst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 490, currentSummaryY, { width: 65, align: 'right' });
+        currentSummaryY += 15;
+      }
+
+      // SGST line
+      if (sgst > 0) {
+        doc.font('Helvetica-Bold').text('SGST:', 380, currentSummaryY, { width: 100, align: 'right' });
+        doc.font('Helvetica').text(`INR ${sgst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 490, currentSummaryY, { width: 65, align: 'right' });
+        currentSummaryY += 15;
+      }
+
+      // IGST line
+      if (igst > 0) {
+        doc.font('Helvetica-Bold').text('IGST:', 380, currentSummaryY, { width: 100, align: 'right' });
+        doc.font('Helvetica').text(`INR ${igst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 490, currentSummaryY, { width: 65, align: 'right' });
+        currentSummaryY += 15;
+      }
+
+      // Grand Total line
+      doc.font('Helvetica-Bold').fillColor(goldColor).fontSize(10).text('Grand Total:', 380, currentSummaryY, { width: 100, align: 'right' });
+      doc.font('Helvetica-Bold').fillColor(primaryColor).fontSize(10).text(`INR ${totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 490, currentSummaryY, { width: 65, align: 'right' });
+      currentSummaryY += 20;
+
+      // Special Notes / Terms & Conditions
+      const notesY = Math.max(currentSummaryY + 20, summaryY + 80);
+      if (quotation.notes) {
+        doc.font('Helvetica-Bold').fontSize(9).fillColor(primaryColor).text('Terms & Special Notes:', 40, notesY);
+        doc.font('Helvetica').fontSize(8).fillColor('#334155').text(quotation.notes, 40, notesY + 15, { width: 300 });
+      }
+
+      // Signatures
+      const sigY = notesY + 100;
+      doc.font('Helvetica-Bold').fontSize(8.5).fillColor(primaryColor).text('Prepared By:', 400, sigY);
+      
+      const repName = quotation.authorized_rep_name || 'Er. Rahul Sharma';
+      const repDesg = quotation.authorized_rep_designation || 'Competent Person (Chief Inspector)';
+      
+      doc.font('Helvetica-Bold').fillColor(goldColor).text(repName, 400, sigY + 15);
+      doc.font('Helvetica').fontSize(7.5).fillColor('#64748b').text(repDesg, 400, sigY + 25);
+      doc.text('Global Safety Solution', 400, sigY + 35);
+
+      // Finish PDF doc
+      doc.end();
+    });
   }
 }
