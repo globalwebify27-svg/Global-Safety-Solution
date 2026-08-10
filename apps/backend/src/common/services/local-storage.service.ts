@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { v4 as uuidv4 } from 'uuid';
+import { getPersistentUploadsDir } from '../utils/storage-utils';
 
 // ----- File Validation Constants -----
 const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024; // 25 MB
@@ -35,20 +36,9 @@ export class LocalStorageService {
     private readonly targetDirs: string[];
 
     constructor() {
-        const cwd = process.cwd();
-        const homeDir = os.homedir();
-        const hostingerAccountDir = '/home/u745630191';
-
-        // Target all possible Hostinger storage paths simultaneously
-        this.targetDirs = [
-            path.join(hostingerAccountDir, 'persistent_uploads'),
-            path.join(homeDir, 'persistent_uploads'),
-            path.join(cwd, '..', 'persistent_uploads'),
-            path.join(cwd, 'public', 'uploads'),
-        ];
-
-        // Deduplicate paths
-        this.targetDirs = Array.from(new Set(this.targetDirs));
+        // Target the single centralized persistent uploads path
+        const uploadDir = getPersistentUploadsDir();
+        this.targetDirs = [uploadDir];
 
         this.targetDirs.forEach((dir) => {
             try {

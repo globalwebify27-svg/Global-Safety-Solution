@@ -7,6 +7,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { TemplateEngineService } from '../email-management/template-engine.service';
 import { LocalStorageService } from '../common/services/local-storage.service';
+import { getPersistentUploadsDir } from '../common/utils/storage-utils';
 
 @Injectable()
 export class QuotationsService {
@@ -779,26 +780,18 @@ export class QuotationsService {
       const parts = existingDoc.file_url.split('/');
       const uniqueFileName = parts[parts.length - 1];
       
-      // Try to read it from targetDirs
+      // Try to read it from persistent_uploads
       const fs = require('fs');
       const path = require('path');
-      const os = require('os');
-      const targetDirs = [
-        path.join('/home/u745630191', 'persistent_uploads'),
-        path.join(os.homedir(), 'persistent_uploads'),
-        path.join(process.cwd(), '..', 'persistent_uploads'),
-        path.join(process.cwd(), 'public', 'uploads'),
-      ];
-      
-      for (const dir of targetDirs) {
-        const filePath = path.join(dir, uniqueFileName);
-        if (fs.existsSync(filePath)) {
-          try {
-            const buffer = fs.readFileSync(filePath);
-            return { buffer, filename };
-          } catch (e) {
-            // Ignore and try next
-          }
+      const uploadDir = getPersistentUploadsDir();
+      const filePath = path.join(uploadDir, uniqueFileName);
+
+      if (fs.existsSync(filePath)) {
+        try {
+          const buffer = fs.readFileSync(filePath);
+          return { buffer, filename };
+        } catch (e) {
+          // Ignore and fall back to regeneration
         }
       }
     }

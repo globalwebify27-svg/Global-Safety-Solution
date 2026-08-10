@@ -13,27 +13,17 @@ import { computeExpiryDate } from '../common/utils/date-utils';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import { getPersistentUploadsDir } from '../common/utils/storage-utils';
 
 @Injectable()
 export class CertificatesService {
   private readonly certStorageDirs: string[];
 
   constructor(private readonly prisma: PrismaService) {
-    // Resolve persistent storage directories (same pattern as LocalStorageService/main.ts)
-    const cwd = process.cwd();
-    const homeDir = os.homedir();
-    const hostingerAccountDir = '/home/u745630191';
+    const uploadDir = getPersistentUploadsDir();
+    const certDir = path.join(uploadDir, 'certificates');
 
-    const candidates = [
-      path.join(hostingerAccountDir, 'persistent_uploads', 'certificates'),
-      path.join(homeDir, 'persistent_uploads', 'certificates'),
-      path.join(cwd, '..', 'persistent_uploads', 'certificates'),
-      path.join(cwd, '..', '..', 'persistent_uploads', 'certificates'),
-      path.join(cwd, 'persistent_uploads', 'certificates'),
-    ];
-
-    // Deduplicate via path.resolve
-    this.certStorageDirs = Array.from(new Set(candidates.map(d => path.resolve(d))));
+    this.certStorageDirs = [certDir];
 
     // Ensure directories exist
     for (const dir of this.certStorageDirs) {
