@@ -74,7 +74,7 @@ export class ZavuProvider implements NotificationProvider {
   }
 
   async verifyConnection(apiKey: string): Promise<{ success: boolean; message: string }> {
-    const url = 'https://api.zavu.dev/v1/sender-profiles';
+    const url = 'https://api.zavu.dev/v1/templates';
     try {
       const response = await fetch(url, {
         method: 'GET',
@@ -84,6 +84,12 @@ export class ZavuProvider implements NotificationProvider {
       });
 
       if (!response.ok) {
+        if (response.status === 401 || response.status === 403) {
+          return {
+            success: false,
+            message: 'Zavu Sandbox API authentication failed.',
+          };
+        }
         return {
           success: false,
           message: `API validation failed (HTTP ${response.status})`,
@@ -92,7 +98,7 @@ export class ZavuProvider implements NotificationProvider {
 
       return {
         success: true,
-        message: 'Successfully authenticated with Zavu API!',
+        message: 'Zavu Sandbox API connection successful.',
       };
     } catch (error: any) {
       return {
