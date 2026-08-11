@@ -37,14 +37,30 @@ export function decrypt(encryptedText: string): string {
     const tag = Buffer.from(parts[2], 'hex');
     const encrypted = parts[3];
     
-    const key = crypto.pbkdf2Sync(SECRET, salt, ITERATIONS, KEY_LENGTH, 'sha512');
-    const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
-    decipher.setAuthTag(tag);
-    
-    let decrypted = decipher.update(encrypted, 'hex', 'utf8');
-    decrypted += decipher.final('utf8');
-    
-    return decrypted;
+    try {
+      const key = crypto.pbkdf2Sync(SECRET, salt, ITERATIONS, KEY_LENGTH, 'sha512');
+      const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
+      decipher.setAuthTag(tag);
+      
+      let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+      decrypted += decipher.final('utf8');
+      
+      return decrypted;
+    } catch (e) {
+      // Fallback decryption using default static secret key
+      const defaultSecret = 'gss-enterprise-whatsapp-gateway-key-secret-9988';
+      if (SECRET !== defaultSecret) {
+        const key = crypto.pbkdf2Sync(defaultSecret, salt, ITERATIONS, KEY_LENGTH, 'sha512');
+        const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
+        decipher.setAuthTag(tag);
+        
+        let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+        decrypted += decipher.final('utf8');
+        
+        return decrypted;
+      }
+      throw e;
+    }
   } catch (error) {
     // If decryption fails, return plain text (handles pre-migration values)
     return encryptedText;

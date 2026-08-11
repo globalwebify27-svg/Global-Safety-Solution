@@ -99,51 +99,50 @@ export default function SettingsPage() {
   // Settings Audit Trail States
   const [settingsAuditLogs, setSettingsAuditLogs] = useState<any[]>([]);
 
+  const fetchSettings = async (ignore = false) => {
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/settings`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (!ignore && data) {
+        setOrgForm({
+          companyName: data.company_name || "",
+          gstNumber: data.gst_number || "",
+          address: data.address || "",
+          website: data.website || "",
+          defaultLicenseNo: data.default_license_no || ""
+        });
+        setWhatsappForm({
+          enabled: data.whatsapp_enabled === "true",
+          activeProvider: data.whatsapp_active_provider || "Zavu",
+          
+          zavuApiKey: data.whatsapp_zavu_api_key || "",
+          zavuEnvironment: data.whatsapp_zavu_environment || "sandbox",
+          zavuPhoneId: data.whatsapp_zavu_phone_number_id || "",
+          zavuAccountId: data.whatsapp_zavu_business_account_id || "",
+          zavuDefaultTemplate: data.whatsapp_zavu_default_template || "certificate_due_reminder",
+
+          metaAccessToken: data.whatsapp_meta_access_token || "",
+          metaPhoneId: data.whatsapp_meta_phone_number_id || "",
+          metaAccountId: data.whatsapp_meta_business_account_id || "",
+          metaVerifyToken: data.whatsapp_meta_verify_token || "",
+          metaAppSecret: data.whatsapp_meta_app_secret || "",
+
+          twilioAccountSid: data.whatsapp_twilio_account_sid || "",
+          twilioAuthToken: data.whatsapp_twilio_auth_token || "",
+          twilioSenderNumber: data.whatsapp_twilio_sender_number || "",
+        });
+      }
+    } catch (err) {
+      console.error("Fetch settings error:", err);
+    }
+  };
+
   useEffect(() => {
     let ignore = false;
-    
-    async function init() {
-      if (!token) return;
-      try {
-        const res = await fetch(`${API_BASE_URL}/settings`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        const data = await res.json();
-        if (!ignore && data) {
-          setOrgForm({
-            companyName: data.company_name || "",
-            gstNumber: data.gst_number || "",
-            address: data.address || "",
-            website: data.website || "",
-            defaultLicenseNo: data.default_license_no || ""
-          });
-          setWhatsappForm({
-            enabled: data.whatsapp_enabled === "true",
-            activeProvider: data.whatsapp_active_provider || "Zavu",
-            
-            zavuApiKey: data.whatsapp_zavu_api_key || "",
-            zavuEnvironment: data.whatsapp_zavu_environment || "sandbox",
-            zavuPhoneId: data.whatsapp_zavu_phone_number_id || "",
-            zavuAccountId: data.whatsapp_zavu_business_account_id || "",
-            zavuDefaultTemplate: data.whatsapp_zavu_default_template || "certificate_due_reminder",
-
-            metaAccessToken: data.whatsapp_meta_access_token || "",
-            metaPhoneId: data.whatsapp_meta_phone_number_id || "",
-            metaAccountId: data.whatsapp_meta_business_account_id || "",
-            metaVerifyToken: data.whatsapp_meta_verify_token || "",
-            metaAppSecret: data.whatsapp_meta_app_secret || "",
-
-            twilioAccountSid: data.whatsapp_twilio_account_sid || "",
-            twilioAuthToken: data.whatsapp_twilio_auth_token || "",
-            twilioSenderNumber: data.whatsapp_twilio_sender_number || "",
-          });
-        }
-      } catch (err) {
-        console.error("Fetch settings error:", err);
-      }
-    }
-
-    init();
+    fetchSettings(ignore);
     fetchSettingsAuditLogs();
     return () => { ignore = true; };
   }, [token]);
@@ -221,37 +220,41 @@ export default function SettingsPage() {
     setLoading(true);
 
     try {
+      const payload: any = {
+        whatsapp_enabled: whatsappForm.enabled ? "true" : "false",
+        whatsapp_active_provider: whatsappForm.activeProvider,
+        
+        whatsapp_zavu_environment: whatsappForm.zavuEnvironment,
+        whatsapp_zavu_phone_number_id: whatsappForm.zavuPhoneId,
+        whatsapp_zavu_business_account_id: whatsappForm.zavuAccountId,
+        whatsapp_zavu_default_template: whatsappForm.zavuDefaultTemplate,
+
+        whatsapp_meta_access_token: whatsappForm.metaAccessToken,
+        whatsapp_meta_phone_number_id: whatsappForm.metaPhoneId,
+        whatsapp_meta_business_account_id: whatsappForm.metaAccountId,
+        whatsapp_meta_verify_token: whatsappForm.metaVerifyToken,
+        whatsapp_meta_app_secret: whatsappForm.metaAppSecret,
+
+        whatsapp_twilio_account_sid: whatsappForm.twilioAccountSid,
+        whatsapp_twilio_auth_token: whatsappForm.twilioAuthToken,
+        whatsapp_twilio_sender_number: whatsappForm.twilioSenderNumber,
+      };
+
+      // Zavu API Key is managed securely on Hostinger environment variables (ZAVU_SANDBOX_API_KEY/ZAVU_LIVE_API_KEY) and not persisted from frontend.
+
       const res = await fetch(`${API_BASE_URL}/settings`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({
-          whatsapp_enabled: whatsappForm.enabled ? "true" : "false",
-          whatsapp_active_provider: whatsappForm.activeProvider,
-          
-          whatsapp_zavu_api_key: whatsappForm.zavuApiKey,
-          whatsapp_zavu_environment: whatsappForm.zavuEnvironment,
-          whatsapp_zavu_phone_number_id: whatsappForm.zavuPhoneId,
-          whatsapp_zavu_business_account_id: whatsappForm.zavuAccountId,
-          whatsapp_zavu_default_template: whatsappForm.zavuDefaultTemplate,
-
-          whatsapp_meta_access_token: whatsappForm.metaAccessToken,
-          whatsapp_meta_phone_number_id: whatsappForm.metaPhoneId,
-          whatsapp_meta_business_account_id: whatsappForm.metaAccountId,
-          whatsapp_meta_verify_token: whatsappForm.metaVerifyToken,
-          whatsapp_meta_app_secret: whatsappForm.metaAppSecret,
-
-          whatsapp_twilio_account_sid: whatsappForm.twilioAccountSid,
-          whatsapp_twilio_auth_token: whatsappForm.twilioAuthToken,
-          whatsapp_twilio_sender_number: whatsappForm.twilioSenderNumber,
-        })
+        body: JSON.stringify(payload)
       });
 
       if (res.ok) {
         toast.success("WhatsApp Configuration saved successfully!");
         fetchSettingsAuditLogs();
+        fetchSettings();
       } else {
         toast.error("Failed to save WhatsApp configuration.");
       }
@@ -715,6 +718,9 @@ export default function SettingsPage() {
           {activeTab === "whatsapp" && (
             <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
               <form onSubmit={handleUpdateWhatsApp} className="space-y-8">
+                {/* Dummy inputs to intercept browser/password manager autofill */}
+                <input type="text" style={{ display: 'none' }} autoComplete="username" tabIndex={-1} />
+                <input type="password" style={{ display: 'none' }} autoComplete="current-password" tabIndex={-1} />
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/60 pb-6">
                   <div className="space-y-1">
                     <h3 className="text-lg font-bold flex items-center gap-2 text-foreground uppercase tracking-tight">
@@ -782,14 +788,15 @@ export default function SettingsPage() {
                         </div>
 
                         <div className="md:col-span-2 space-y-2">
-                          <Label className="text-muted-foreground font-bold">Zavu Authorization Token (Key)</Label>
-                          <Input 
-                            type="password"
-                            value={whatsappForm.zavuApiKey} 
-                            onChange={(e) => setWhatsappForm({...whatsappForm, zavuApiKey: e.target.value})} 
-                            placeholder="zavu_live_..."
-                            className="bg-background border-border h-11 text-foreground" 
-                          />
+                          <Label className="text-muted-foreground font-bold">Zavu Authorization Token</Label>
+                          <div className={cn(
+                            "flex-1 bg-background border border-border rounded-xl h-11 px-4 flex items-center justify-between font-medium select-none text-sm shadow-sm",
+                            whatsappForm.zavuApiKey.includes('Managed')
+                              ? "text-emerald-600 dark:text-emerald-400 bg-emerald-500/5 border-emerald-500/10"
+                              : "text-rose-600 dark:text-rose-400 bg-rose-500/5 border-rose-500/10"
+                          )}>
+                            <span>● {whatsappForm.zavuApiKey}</span>
+                          </div>
                         </div>
 
                         <div className="space-y-2">

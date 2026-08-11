@@ -109,8 +109,10 @@ export class WhatsAppNotificationService {
     let accountId = '';
 
     if (activeProvider === 'ZAVU') {
-      apiKey = decrypt(settings['whatsapp_zavu_api_key'] || '');
       environment = (settings['whatsapp_zavu_environment'] || 'sandbox') as 'sandbox' | 'live';
+      apiKey = environment === 'live'
+        ? (process.env.ZAVU_LIVE_API_KEY || '')
+        : (process.env.ZAVU_SANDBOX_API_KEY || '');
       defaultTemplate = settings['whatsapp_zavu_default_template'] || 'certificate_due_reminder';
       phoneId = settings['whatsapp_zavu_phone_number_id'] || '';
       accountId = settings['whatsapp_zavu_business_account_id'] || '';
@@ -134,7 +136,9 @@ export class WhatsAppNotificationService {
       defaultTemplate,
       phoneId,
       accountId,
-      zavuApiKey: decrypt(settings['whatsapp_zavu_api_key'] || ''),
+      zavuApiKey: (settings['whatsapp_zavu_environment'] || 'sandbox') === 'live'
+        ? (process.env.ZAVU_LIVE_API_KEY ? 'Managed securely by server environment' : 'Not configured (missing server environment variable)')
+        : (process.env.ZAVU_SANDBOX_API_KEY ? 'Managed securely by server environment' : 'Not configured (missing server environment variable)'),
       metaAccessToken: decrypt(settings['whatsapp_meta_access_token'] || ''),
       twilioAuthToken: decrypt(settings['whatsapp_twilio_auth_token'] || ''),
     };
@@ -142,8 +146,26 @@ export class WhatsAppNotificationService {
 
   async testConnection(providerName: string, apiKey: string) {
     try {
+      let resolvedApiKey = apiKey;
+      if (providerName.toLowerCase() === 'zavu') {
+        const settingsList = await this.prisma.systemSetting.findMany({
+          where: { key: 'whatsapp_zavu_environment' }
+        });
+        const environment = settingsList[0]?.value || 'sandbox';
+        resolvedApiKey = environment === 'live'
+          ? (process.env.ZAVU_LIVE_API_KEY || '')
+          : (process.env.ZAVU_SANDBOX_API_KEY || '');
+        if (!resolvedApiKey) {
+          return {
+            success: false,
+            message: environment === 'live'
+              ? 'Zavu Production API key is not configured on the server.'
+              : 'Zavu Sandbox API key is not configured on the server.',
+          };
+        }
+      }
       const provider = ProviderFactory.getProvider(providerName);
-      return await provider.verifyConnection(apiKey);
+      return await provider.verifyConnection(resolvedApiKey);
     } catch (error: any) {
       return { success: false, message: error?.message || 'Failed to instantiate provider.' };
     }
@@ -153,7 +175,16 @@ export class WhatsAppNotificationService {
     const logs: string[] = [];
     try {
       logs.push(`[1/4] Checking Sandbox Token credentials...`);
-      if (providerName.toLowerCase() === 'zavu' && !apiKey.startsWith('zv_test_')) {
+      
+      let resolvedApiKey = apiKey;
+      if (providerName.toLowerCase() === 'zavu') {
+        resolvedApiKey = process.env.ZAVU_SANDBOX_API_KEY || '';
+        if (!resolvedApiKey) {
+          throw new Error('Zavu Sandbox API key is not configured on the server.');
+        }
+      }
+      
+      if (providerName.toLowerCase() === 'zavu' && !resolvedApiKey.startsWith('zv_test_')) {
         throw new Error(`Token validation failed: Zavu Sandbox tokens must start with 'zv_test_'`);
       }
       logs.push(`Token format matches 'zv_test_' validation rules.`);
@@ -163,7 +194,7 @@ export class WhatsAppNotificationService {
       logs.push(`Successfully loaded provider driver: ${providerName}.`);
 
       logs.push(`[3/4] Testing sandbox server connection ping...`);
-      const verifyResult = await provider.verifyConnection(apiKey);
+      const verifyResult = await provider.verifyConnection(resolvedApiKey);
       if (!verifyResult.success) {
         throw new Error(verifyResult.message || 'API connection refused by remote sandbox host.');
       }
@@ -192,11 +223,25 @@ export class WhatsAppNotificationService {
     template: string;
   }) {
     try {
+      let resolvedApiKey = options.apiKey;
+      if (options.providerName.toLowerCase() === 'zavu') {
+        resolvedApiKey = options.environment === 'live'
+          ? (process.env.ZAVU_LIVE_API_KEY || '')
+          : (process.env.ZAVU_SANDBOX_API_KEY || '');
+        if (!resolvedApiKey) {
+          return {
+            success: false,
+            message: options.environment === 'live'
+              ? 'Zavu Production API key is not configured on the server.'
+              : 'Zavu Sandbox API key is not configured on the server.',
+          };
+        }
+      }
       const provider = ProviderFactory.getProvider(options.providerName);
       const result = await provider.sendTemplate({
         to: options.to,
         templateName: options.template,
-        apiKey: options.apiKey,
+        apiKey: resolvedApiKey,
         environment: options.environment,
         variables: {
           company_name: 'Test Corp Ltd',

@@ -15,10 +15,18 @@ export class SettingsService {
 
   async findAll() {
     const settings = await this.prisma.systemSetting.findMany();
-    // Return as a key-value object, masking encrypted secrets
-    return settings.reduce(
+    const settingsMap = settings.reduce(
+      (acc: any, s: any) => ({ ...acc, [s.key]: s.value }),
+      {}
+    );
+
+    const result = settings.reduce(
       (acc: any, s: any) => {
         let val = s.value;
+        if (s.key === 'whatsapp_zavu_api_key') {
+          // Handled separately below to ensure environment variable status is resolved
+          return acc;
+        }
         if (SECRET_KEYS.includes(s.key) && val) {
           val = '••••••••••••';
         }
@@ -26,9 +34,24 @@ export class SettingsService {
       },
       {},
     );
+
+    const env = settingsMap['whatsapp_zavu_environment'] || 'sandbox';
+    const hasKey = env === 'live' 
+      ? !!process.env.ZAVU_LIVE_API_KEY 
+      : !!process.env.ZAVU_SANDBOX_API_KEY;
+    result['whatsapp_zavu_api_key'] = hasKey
+      ? 'Managed securely by server environment'
+      : 'Not configured (missing server environment variable)';
+
+    return result;
   }
 
   async update(key: string, value: string, category: string = 'GENERAL') {
+    if (key === 'whatsapp_zavu_api_key') {
+      const existing = await this.prisma.systemSetting.findUnique({ where: { key } });
+      return existing || { id: 'whatsapp_zavu_api_key_mock', key, value: '', category };
+    }
+
     let finalValue = value;
 
     if (SECRET_KEYS.includes(key)) {
