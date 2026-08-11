@@ -158,9 +158,9 @@ export class CertificatesService {
       if (e instanceof NotFoundException) {
         throw e;
       }
-      console.error(`[CertStorage] PDF regeneration failed for ${id}:`, e?.message);
+      console.error(`[CertStorage] PDF regeneration failed for ${id}:`, e?.stack || e?.message);
       throw new InternalServerErrorException(
-        `Certificate record exists but PDF generation failed. Please try again or contact support.`,
+        `Certificate record exists but PDF generation failed: ${e.message}`,
       );
     }
   }
@@ -587,8 +587,8 @@ export class CertificatesService {
       doc.fontSize(20).font('Helvetica-Bold').fillColor(primaryColor);
       doc.text('M/s Global Safety Solution', 100, 34);
       doc.fontSize(7).font('Helvetica').fillColor('#334155');
-      doc.text('\u2609 Shop No. 51, 2nd Floor, AC Market, Gel Church Complex, Main Road, Ranchi-834001 (Jharkhand)', 100, 58);
-      doc.text('\u260E 6201186550   \u2709 id-globalsafety56@gmail.com', 100, 68);
+      doc.text('Address: Shop No. 51, 2nd Floor, AC Market, Gel Church Complex, Main Road, Ranchi-834001 (Jharkhand)', 100, 58);
+      doc.text('Phone: 6201186550   |   Email: id-globalsafety56@gmail.com', 100, 68);
 
       // Divider
       doc.moveTo(28, 92).lineTo(567, 92).lineWidth(1.2).stroke(primaryColor);
@@ -791,7 +791,7 @@ export class CertificatesService {
       doc.font('Helvetica-Bold').fontSize(7.5).fillColor(primaryColor);
       doc.text(`Test Date: ${issueDateStr}`, 38, sigY);
       doc.text(`Due Date: ${expiryDateStr}`, 38, sigY + 12);
-      doc.font('Helvetica').text(`Competency No – ${competencyNoVal}`, 38, sigY + 24);
+      doc.font('Helvetica').text(`Competency No - ${competencyNoVal}`, 38, sigY + 24);
 
       // QR Code
       if (qrCodeBuffer) {
@@ -811,7 +811,7 @@ export class CertificatesService {
         doc.fontSize(7).font('Helvetica-Bold').fillColor(primaryColor);
         doc.text('Global Safety Solution', 160, startY, { align: 'center', width: 280 });
         doc.text('Competent Person under the Factories Act. 1948', 160, startY + 9, { align: 'center', width: 280 });
-        doc.text(`Competency No. from Govt. – Memo. No.: ${competencyNo}`, 160, startY + 18, { align: 'center', width: 280 });
+        doc.text(`Competency No. from Govt. - Memo. No.: ${competencyNo}`, 160, startY + 18, { align: 'center', width: 280 });
       };
       drawCompetencyFooter(sigY + 60, competencyNoVal);
 
