@@ -1304,36 +1304,35 @@ export default function FieldTasksPage() {
           </div>
           <div className="space-y-4">
             <h3 className="text-sm font-black uppercase tracking-widest text-muted-foreground px-2">Checklist Items</h3>
-            {(selectedTask?.items || []).map((item, index) => (
-              <div key={item.id} className="p-5 bg-card border border-border rounded-2xl space-y-3">
+            {(selectedTask?.items || []).map((item, index) => {
+              const certs = selectedTask?.certificates || [];
+              const isItemCertGenerated = certs.some((c: any) => {
+                if (!c) return false;
+                if (c.inspection_item_id && c.inspection_item_id === item.id) return true;
+                if (item.cert_ref_no && c.certificate_no) {
+                  const cleanRef = item.cert_ref_no.trim().toLowerCase();
+                  const cleanCertNo = c.certificate_no.trim().toLowerCase();
+                  if (cleanRef && cleanCertNo && (cleanRef === cleanCertNo || cleanCertNo.includes(cleanRef) || cleanRef.includes(cleanCertNo))) {
+                    return true;
+                  }
+                }
+                return false;
+              });
+
+              return (
+                <div key={item.id} className="p-5 bg-card border border-border rounded-2xl space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <span className="font-bold text-foreground">Equipment {index + 1}</span>
-                    {(() => {
-                      const certs = selectedTask?.certificates || [];
-                      const isGenerated = certs.some((c: any) => {
-                        if (!c) return false;
-                        if (c.inspection_item_id && c.inspection_item_id === item.id) return true;
-                        if (item.cert_ref_no && c.certificate_no) {
-                          const cleanRef = item.cert_ref_no.trim().toLowerCase();
-                          const cleanCertNo = c.certificate_no.trim().toLowerCase();
-                          if (cleanRef && cleanCertNo && (cleanRef === cleanCertNo || cleanCertNo.includes(cleanRef) || cleanRef.includes(cleanCertNo))) {
-                            return true;
-                          }
-                        }
-                        return false;
-                      });
-
-                      return isGenerated ? (
-                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center gap-1 shadow-sm">
-                          <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" /> Certificate Issued & Saved in Vault
-                        </span>
-                      ) : (
-                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-medium text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20">
-                          Pending Generation
-                        </span>
-                      );
-                    })()}
+                    {isItemCertGenerated ? (
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center gap-1 shadow-sm">
+                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" /> Certificate Issued & Saved in Vault
+                      </span>
+                    ) : (
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-medium text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20">
+                        Pending Generation
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     <Button 
@@ -1627,15 +1626,22 @@ export default function FieldTasksPage() {
                             toast.error(err.message || "Failed to generate certificate");
                           }
                         }}
-                        className="bg-blue-600 hover:bg-blue-500 text-white font-bold h-9 text-xs rounded-xl flex items-center justify-center gap-2 px-4 shadow-sm"
+                        disabled={isItemCertGenerated}
+                        className={cn(
+                          "font-bold h-9 text-xs rounded-xl flex items-center justify-center gap-2 px-4 shadow-sm transition-all",
+                          isItemCertGenerated
+                            ? "bg-muted text-muted-foreground border border-border cursor-not-allowed"
+                            : "bg-blue-600 hover:bg-blue-500 text-white"
+                        )}
                       >
-                        Generate Certificate
+                        {isItemCertGenerated ? "Certificate Generated" : "Generate Certificate"}
                       </Button>
                     </div>
                   </div>
                 </div>
               </div>
-            ))}
+            );
+          })}
 
             {/* Manual Button to Add Observation & Combined preview */}
             <div className="flex gap-4 items-center pt-2">

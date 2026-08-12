@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, NotFoundException, InternalServerErrorException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   CreateCertificateDto,
@@ -193,36 +193,26 @@ export class CertificatesService {
 
     const metadataStr = JSON.stringify(metaObj);
 
-    const existing = await this.prisma.certificate.findFirst({
-      where: {
-        OR: [
-          ...(rest.inspection_item_id ? [{ inspection_item_id: rest.inspection_item_id }] : []),
-          ...(rest.certificate_no ? [{ certificate_no: rest.certificate_no }] : []),
-        ],
-      },
-    });
+    if (rest.inspection_item_id) {
+      const existingItemCert = await this.prisma.certificate.findUnique({
+        where: { inspection_item_id: rest.inspection_item_id },
+      });
+      if (existingItemCert) {
+        throw new BadRequestException('A certificate has already been generated for this equipment item.');
+      }
+    }
+
+    if (rest.certificate_no) {
+      const existingNoCert = await this.prisma.certificate.findUnique({
+        where: { certificate_no: rest.certificate_no },
+      });
+      if (existingNoCert) {
+        throw new BadRequestException('A certificate with this reference number already exists.');
+      }
+    }
 
     let cert: any;
-    if (existing) {
-      cert = await this.prisma.certificate.update({
-        where: { id: existing.id },
-        data: {
-          ...rest,
-          issue_date: issueDate,
-          expiry_date: expiryDate,
-          validity_period,
-          metadata: metadataStr,
-        },
-        include: {
-          inspection: {
-            include: {
-              client: true,
-              work_order: true,
-            },
-          },
-        },
-      });
-    } else {
+    try {
       cert = await this.prisma.certificate.create({
         data: {
           ...rest,
@@ -240,6 +230,11 @@ export class CertificatesService {
           },
         },
       });
+    } catch (e: any) {
+      if (e?.code === 'P2002') {
+        throw new BadRequestException('A certificate has already been generated for this equipment item.');
+      }
+      throw e;
     }
 
     await this.syncCertificateToVault(cert);
