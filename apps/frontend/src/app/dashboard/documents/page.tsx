@@ -388,6 +388,7 @@ export default function DocumentVaultPage() {
   };
 
   const [emailingCertId, setEmailingCertId] = useState<string | null>(null);
+  const [emailingProjectId, setEmailingProjectId] = useState<string | null>(null);
 
   const handleEmailCertificate = async (docId: string) => {
     if (!token) return;
@@ -407,6 +408,31 @@ export default function DocumentVaultPage() {
       toast.error("Network error emailing certificate.");
     } finally {
       setEmailingCertId(null);
+    }
+  };
+
+  const handleSendProjectEmail = async (clientId: string, projectId: string, projKey: string, certCount: number) => {
+    if (!token) return;
+    if (certCount === 0) {
+      toast.error("This project has no generated certificates to send.");
+      return;
+    }
+    setEmailingProjectId(projKey);
+    try {
+      const res = await fetch(`${API_BASE_URL}/documents/send-email/client/${clientId}/project/${projectId}`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success(data.message || "Project certificates emailed successfully!");
+      } else {
+        toast.error(data.message || "Failed to email project certificates.");
+      }
+    } catch {
+      toast.error("Network error emailing project certificates.");
+    } finally {
+      setEmailingProjectId(null);
     }
   };
 
@@ -1085,7 +1111,26 @@ export default function DocumentVaultPage() {
                                     </div>
                                   </div>
 
-                                  <div className="flex items-center gap-2 text-muted-foreground">
+                                  <div className="flex items-center gap-3 text-muted-foreground">
+                                    {!isClient && (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        disabled={emailingProjectId === projKey}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleSendProjectEmail(clientNode.client_id, projectNode.project_id, projKey, projectNode.certificates.length);
+                                        }}
+                                        className="h-8 px-3 text-xs font-bold border-blue-500/30 text-blue-600 dark:text-blue-400 hover:bg-blue-500/10"
+                                      >
+                                        {emailingProjectId === projKey ? (
+                                          <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+                                        ) : (
+                                          <Mail className="w-3.5 h-3.5 mr-1" />
+                                        )}
+                                        Send Email
+                                      </Button>
+                                    )}
                                     {isProjExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                                   </div>
                                 </div>

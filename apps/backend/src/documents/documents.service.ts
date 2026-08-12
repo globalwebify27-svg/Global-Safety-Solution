@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, Inject, forwardRef } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, InternalServerErrorException, Inject, forwardRef } from '@nestjs/common';
 import * as path from 'path';
 import * as fs from 'fs';
 import { PrismaService } from '../prisma/prisma.service';
@@ -1063,6 +1063,145 @@ export class DocumentsService {
     });
 
     return { success: true, message: `Certificate email delivered to ${targetEmail}`, result };
+  }
+
+  async deliverProjectCertificatesEmail(clientId: string, projectId: string, userPayload: any) {
+    // 1. Fetch authorized hierarchy for this user to perform scoping/security checks
+    const hierarchyResult = await this.getVaultHierarchy(userPayload);
+    const clientNode = hierarchyResult.hierarchy.find(c => c.client_id === clientId);
+    
+    if (!clientNode) {
+      // Validate client scoping security
+      let userClientId: string | undefined;
+      const userId = userPayload?.userId || userPayload?.id || userPayload?.sub;
+      if (userId) {
+        const user = await this.prisma.user.findUnique({
+          where: { id: userId },
+          include: { roles: { include: { role: true } } },
+        });
+        const isClient = user?.roles?.some((ur: any) => ur.role.name === 'CLIENT' || ur.role.name === 'CLIENTS') || (user?.designation || '').toUpperCase().includes('CLIENT');
+        if (isClient && user?.email) {
+          const clientRecord = await this.prisma.client.findFirst({ where: { email: user.email } });
+          userClientId = clientRecord?.id;
+        }
+      }
+      if (userClientId && userClientId !== clientId) {
+        throw new NotFoundException('Client not found or you do not have permission to access it.');
+      }
+
+      // Check if client/project exist in DB to throw descriptive BadRequestException
+      if (clientId !== 'general_unassigned') {
+        const clientExists = await this.prisma.client.findUnique({ where: { id: clientId } });
+        if (!clientExists) throw new NotFoundException('Client not found.');
+      }
+      if (projectId !== 'general') {
+        const projectExists = await this.prisma.project.findUnique({ where: { id: projectId } });
+        if (!projectExists) throw new NotFoundException('Project folder not found.');
+      }
+
+      throw new BadRequestException('The project has no generated certificates to send.');
+    }
+
+    const projectNode = clientNode.projects.find(p => p.project_id === projectId);
+    if (!projectNode) {
+      if (projectId !== 'general') {
+        const projectExists = await this.prisma.project.findUnique({ where: { id: projectId } });
+        if (!projectExists) throw new NotFoundException('Project folder not found.');
+      }
+      throw new BadRequestException('The project has no generated certificates to send.');
+    }
+
+    const certificates = projectNode.certificates;
+    if (!certificates || certificates.length === 0) {
+      throw new BadRequestException('The project has no generated certificates to send.');
+    }
+
+    // 2. Fetch the client's email address
+    let targetEmail: string | undefined;
+    let clientName = clientNode.client_name;
+    if (clientId !== 'general_unassigned') {
+      const client = await this.prisma.client.findUnique({
+        where: { id: clientId },
+      });
+      targetEmail = client?.email || undefined;
+      if (client?.name) {
+        clientName = client.name;
+      }
+    }
+
+    if (!targetEmail) {
+      throw new BadRequestException('Client email address is missing for this project.');
+    }
+
+    // 3. Collect and generate/resolve PDF attachments for all certificates in the project
+    const attachments: any[] = [];
+    for (const cert of certificates) {
+      const doc = await this.prisma.document.findUnique({
+        where: { id: cert.id },
+        include: { client: true, project: true },
+      });
+
+      if (!doc) {
+        throw new NotFoundException(`Certificate document "${cert.name}" not found.`);
+      }
+
+      const validAttachment = this.resolveValidAttachment(doc.file_url, doc.name);
+      const filename = doc.name.toLowerCase().endsWith('.pdf') ? doc.name : `${doc.name}.pdf`;
+
+      if (validAttachment) {
+        attachments.push(validAttachment);
+      } else {
+        // Match Certificate record in DB to generate the official Factories Act PDF
+        const certRecord = await this.findMatchingCertificateRecord(doc);
+        let pdfBuffer: Buffer | null = null;
+
+        if (certRecord) {
+          try {
+            pdfBuffer = await this.certificatesService.getOrGeneratePdf(certRecord.id);
+          } catch (e: any) {
+            console.error(`Error generating official certificate PDF from CertificatesService for doc ${doc.id}:`, e);
+            throw new InternalServerErrorException(`Failed to generate PDF for certificate: ${doc.name}. Error: ${e.message}`);
+          }
+        }
+
+        // Fallback if no matching Certificate record found
+        if (!pdfBuffer) {
+          try {
+            pdfBuffer = await this.createCertificatePdfBuffer(doc);
+          } catch (e: any) {
+            console.error(`Error generating fallback certificate PDF for doc ${doc.id}:`, e);
+            throw new InternalServerErrorException(`Failed to generate fallback PDF for certificate: ${doc.name}. Error: ${e.message}`);
+          }
+        }
+
+        if (pdfBuffer) {
+          attachments.push({ filename, content: pdfBuffer.toString('base64'), encoding: 'base64' });
+        } else {
+          throw new InternalServerErrorException(`Failed to generate or attach PDF for certificate: ${doc.name}`);
+        }
+      }
+    }
+
+    // 4. Send all attachments in ONE email
+    const result = await this.templateEngine.sendTemplatedEmail({
+      templateCode: 'CERTIFICATE_DELIVERY',
+      to: targetEmail,
+      context: {
+        client_name: clientName,
+        certificate_name: projectNode.project_name || 'Project Certificates',
+        expiry_date: 'As per attached files',
+        inspection_summary: `<p style="margin: 4px 0 0 0; font-size: 14px;">Total Certificates Attached: <strong>${certificates.length}</strong></p>
+        <p style="margin: 8px 0 0 0; font-size: 14px; font-weight: bold; color: #475569;">Certificates included:</p>
+        <ul style="margin: 4px 0 0 0; padding-left: 20px; font-size: 13px; color: #475569;">
+          ${certificates.map((c: any) => `<li>${c.name} (${c.certificate_number})</li>`).join('')}
+        </ul>`,
+        company_name: 'Global Safety Solution ERP',
+      },
+      attachments,
+      module: 'COMPLIANCE',
+    });
+
+    return { success: true, message: `Project certificates email delivered to ${targetEmail}`, result };
   }
 
   async sendRenewalReminder(id: string, recipientEmail?: string) {

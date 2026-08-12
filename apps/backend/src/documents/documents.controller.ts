@@ -186,6 +186,16 @@ export class DocumentsController {
     return this.documentsService.deliverCertificateEmail(id, email);
   }
 
+  @Post('send-email/client/:clientId/project/:projectId')
+  @Permissions('UPDATE_DOCUMENT')
+  deliverProjectCertificatesEmail(
+    @Param('clientId') clientId: string,
+    @Param('projectId') projectId: string,
+    @Req() req: any,
+  ) {
+    return this.documentsService.deliverProjectCertificatesEmail(clientId, projectId, req.user);
+  }
+
   @Post(':id/send-reminder')
   @Permissions('UPDATE_DOCUMENT')
   sendRenewalReminder(@Param('id') id: string, @Body('email') email?: string) {
