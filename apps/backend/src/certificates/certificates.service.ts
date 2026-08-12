@@ -525,43 +525,40 @@ export class CertificatesService {
     const fs = require('fs');
     let logoBuffer: Buffer | null = null;
     try {
-      const possiblePaths = [
-        path.join(__dirname, '..', 'assets', 'gss-logo.png'),
-        path.join(__dirname, 'assets', 'gss-logo.png'),
-        path.join(process.cwd(), 'assets', 'gss-logo.png'),
-        path.join(process.cwd(), 'dist', 'assets', 'gss-logo.png'),
-        path.join(process.cwd(), 'apps/backend/src/assets/gss-logo.png'),
-        path.join(process.cwd(), 'src/assets/gss-logo.png'),
-      ];
-      for (const logoPath of possiblePaths) {
-        if (fs.existsSync(logoPath)) {
-          logoBuffer = fs.readFileSync(logoPath);
-          break;
+      const logoPath = path.join(__dirname, 'assets', 'gss-logo.png');
+      if (fs.existsSync(logoPath)) {
+        logoBuffer = fs.readFileSync(logoPath);
+      } else {
+        const devFallback = path.join(__dirname, '..', 'assets', 'gss-logo.png');
+        if (fs.existsSync(devFallback)) {
+          logoBuffer = fs.readFileSync(devFallback);
+        } else {
+          console.warn(`[Certificate] Logo asset not found. Checked:\n  - ${logoPath}\n  - ${devFallback}`);
         }
       }
     } catch (err) {
-      console.error('Failed to load logo:', err);
+      console.error('[Certificate] Failed to load logo:', err);
     }
 
     // Stamp and signature loading
     let stampSigBuffer: Buffer | null = null;
     try {
-      const possiblePaths = [
-        path.join(__dirname, '..', 'assets', 'gss-stamp-signature.png'),
-        path.join(__dirname, 'assets', 'gss-stamp-signature.png'),
-        path.join(process.cwd(), 'assets', 'gss-stamp-signature.png'),
-        path.join(process.cwd(), 'dist', 'assets', 'gss-stamp-signature.png'),
-        path.join(process.cwd(), 'apps/backend/src/assets/gss-stamp-signature.png'),
-        path.join(process.cwd(), 'src/assets/gss-stamp-signature.png'),
-      ];
-      for (const sigPath of possiblePaths) {
-        if (fs.existsSync(sigPath)) {
-          stampSigBuffer = fs.readFileSync(sigPath);
-          break;
+      // Primary path: __dirname resolves to dist/ in production and src/ in dev.
+      // With nest-cli.json assets config, the file is copied to dist/assets/ during build.
+      const stampPath = path.join(__dirname, 'assets', 'gss-stamp-signature.png');
+      if (fs.existsSync(stampPath)) {
+        stampSigBuffer = fs.readFileSync(stampPath);
+      } else {
+        // Fallback for development when __dirname is src/certificates/
+        const devFallback = path.join(__dirname, '..', 'assets', 'gss-stamp-signature.png');
+        if (fs.existsSync(devFallback)) {
+          stampSigBuffer = fs.readFileSync(devFallback);
+        } else {
+          console.warn(`[Certificate] Stamp/signature asset not found. Checked:\n  - ${stampPath}\n  - ${devFallback}`);
         }
       }
     } catch (err) {
-      console.error('Failed to load stamp and signature:', err);
+      console.error('[Certificate] Failed to load stamp and signature:', err);
     }
 
     const _PDFDocument = require('pdfkit');

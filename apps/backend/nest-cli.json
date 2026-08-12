@@ -6,6 +6,6 @@
     "deleteOutDir": true,
     "webpack": true,
     "webpackConfigPath": "webpack.config.js",
-    "assets": ["prisma/**/*"]
+    "assets": ["prisma/**/*", "assets/**/*"]
   }
 }
