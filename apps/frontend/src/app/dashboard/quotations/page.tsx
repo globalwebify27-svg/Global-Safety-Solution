@@ -90,7 +90,7 @@ function QuotationsContent() {
     discount_value: 0,
     quote_number: "",
     date: "",
-    items: [{ description: "", quantity: 1, unit_price: 0, uom: "PCS" }] as QuoteItem[]
+    items: [{ description: "", quantity: 1, unit_price: 0, uom: "NOS" }] as QuoteItem[]
   });
 
   const calculateDiscountAmount = () => {
@@ -133,7 +133,8 @@ function QuotationsContent() {
       items: quote.items.map((item: any) => ({
         description: item.description,
         quantity: item.quantity,
-        unit_price: Number(item.unit_price)
+        unit_price: Number(item.unit_price),
+        uom: item.uom
       }))
     });
     setOpen(true);
@@ -174,7 +175,7 @@ function QuotationsContent() {
   const addItem = () => {
     setFormData({
       ...formData,
-      items: [...formData.items, { description: "", quantity: 1, unit_price: 0, uom: "PCS" }]
+      items: [...formData.items, { description: "", quantity: 1, unit_price: 0, uom: "NOS" }]
     });
   };
 
@@ -403,7 +404,7 @@ function QuotationsContent() {
       });
       if (res.ok) {
         setOpen(false);
-        setFormData({ lead_id: "", client_id: "", notes: "", billing_address: "", apply_gst: true, discount_type: "flat", discount_value: 0, quote_number: "", date: "", items: [{ description: "", quantity: 1, unit_price: 0 }] });
+        setFormData({ lead_id: "", client_id: "", notes: "", billing_address: "", apply_gst: true, discount_type: "flat", discount_value: 0, quote_number: "", date: "", items: [{ description: "", quantity: 1, unit_price: 0, uom: "NOS" }] });
         setEditMode(false);
         setEditQuoteId(null);
         toast.success(editMode ? "Proposal updated successfully!" : "Quotation generated successfully!");
@@ -447,7 +448,7 @@ function QuotationsContent() {
           <Dialog open={open} onOpenChange={(isOpen) => {
             setOpen(isOpen);
             if (!isOpen) {
-              setFormData({ lead_id: "", client_id: "", notes: "", billing_address: "", apply_gst: true, discount_type: "flat", discount_value: 0, quote_number: "", date: "", items: [{ description: "", quantity: 1, unit_price: 0 }] });
+              setFormData({ lead_id: "", client_id: "", notes: "", billing_address: "", apply_gst: true, discount_type: "flat", discount_value: 0, quote_number: "", date: "", items: [{ description: "", quantity: 1, unit_price: 0, uom: "NOS" }] });
               setEditMode(false);
               setEditQuoteId(null);
             }
