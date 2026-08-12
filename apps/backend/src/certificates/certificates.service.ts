@@ -543,6 +543,27 @@ export class CertificatesService {
       console.error('Failed to load logo:', err);
     }
 
+    // Stamp and signature loading
+    let stampSigBuffer: Buffer | null = null;
+    try {
+      const possiblePaths = [
+        path.join(__dirname, '..', 'assets', 'gss-stamp-signature.png'),
+        path.join(__dirname, 'assets', 'gss-stamp-signature.png'),
+        path.join(process.cwd(), 'assets', 'gss-stamp-signature.png'),
+        path.join(process.cwd(), 'dist', 'assets', 'gss-stamp-signature.png'),
+        path.join(process.cwd(), 'apps/backend/src/assets/gss-stamp-signature.png'),
+        path.join(process.cwd(), 'src/assets/gss-stamp-signature.png'),
+      ];
+      for (const sigPath of possiblePaths) {
+        if (fs.existsSync(sigPath)) {
+          stampSigBuffer = fs.readFileSync(sigPath);
+          break;
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load stamp and signature:', err);
+    }
+
     const _PDFDocument = require('pdfkit');
     const PDFDocument = _PDFDocument.default || _PDFDocument;
 
@@ -792,6 +813,11 @@ export class CertificatesService {
       if (qrCodeBuffer) {
         doc.image(qrCodeBuffer, 460, sigY, { width: 50, height: 50 });
         doc.fontSize(5.5).fillColor('#475569').text('SCAN TO VERIFY', 460, sigY + 52, { align: 'center', width: 50 });
+      }
+
+      // Stamp and Signature
+      if (stampSigBuffer) {
+        doc.image(stampSigBuffer, 260, sigY - 20, { width: 120, height: 50 });
       }
 
       // Signature line
