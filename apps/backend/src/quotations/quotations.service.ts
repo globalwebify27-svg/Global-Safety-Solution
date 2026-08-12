@@ -843,11 +843,33 @@ export class QuotationsService {
       console.error('Failed to load logo:', err);
     }
 
+    // Stamp and signature loading
+    let stampSigBuffer: Buffer | null = null;
+    try {
+      const possiblePaths = [
+        path.join(__dirname, '..', 'assets', 'gss-stamp-signature.png'),
+        path.join(__dirname, 'assets', 'gss-stamp-signature.png'),
+        path.join(process.cwd(), 'assets', 'gss-stamp-signature.png'),
+        path.join(process.cwd(), 'dist', 'assets', 'gss-stamp-signature.png'),
+        path.join(process.cwd(), 'apps/backend/src/assets/gss-stamp-signature.png'),
+        path.join(process.cwd(), 'src/assets/gss-stamp-signature.png'),
+      ];
+      for (const sigPath of possiblePaths) {
+        if (fs.existsSync(sigPath)) {
+          stampSigBuffer = fs.readFileSync(sigPath);
+          break;
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load stamp and signature:', err);
+    }
+
     const _PDFDocument = require('pdfkit');
     const PDFDocument = _PDFDocument.default || _PDFDocument;
 
     return new Promise((resolve, reject) => {
-      const docOptions: any = { margin: 40, size: 'A4' };
+      // Set bufferPages: true to allow footer drawing with correct page count at the end
+      const docOptions: any = { margin: 40, size: 'A4', bufferPages: true };
       const doc = new PDFDocument(docOptions);
       const buffers: Buffer[] = [];
 
@@ -859,15 +881,12 @@ export class QuotationsService {
       });
 
       // Colors
-      const primaryColor = '#0f172a';
-      const goldColor = '#b8860b';
-      const lightGrey = '#f8fafc';
-      const borderGrey = '#e2e8f0';
+      const primaryColor = '#0f172a'; // Slate-900
+      const goldColor = '#b8860b'; // Gold
+      const lightGrey = '#f8fafc'; // Slate-50
+      const borderGrey = '#e2e8f0'; // Slate-200
 
-      // Outer border
-      doc.rect(20, 20, 555, 802).lineWidth(0.5).stroke(primaryColor);
-
-      // Enterprise header
+      // Enterprise Header (Top information)
       doc.fillColor('#000000').fontSize(7.5).font('Helvetica-Bold');
       doc.text('GSTIN: 20BILPA8494E1ZE', 40, 26, { align: 'right', width: 510 });
       doc.text('ISO:9001:2015', 40, 36, { align: 'right', width: 510 });
@@ -877,87 +896,107 @@ export class QuotationsService {
         doc.image(logoBuffer, 35, 28, { width: 50, height: 50 });
       }
 
-      // Company name
+      // Company details
       doc.fontSize(18).font('Helvetica-Bold').fillColor(primaryColor);
       doc.text('M/s Global Safety Solution', 95, 34);
       doc.fontSize(7).font('Helvetica').fillColor('#334155');
       doc.text('Shop No. 51, 2nd Floor, AC Market, Gel Church Complex, Main Road, Ranchi-834001 (Jharkhand)', 95, 54);
       doc.text('Phone: 6201186550   Email: id-globalsafety56@gmail.com', 95, 64);
 
-      // Divider
-      doc.moveTo(30, 85).lineTo(565, 85).lineWidth(1).stroke(primaryColor);
+      // Gold accent divider line
+      doc.moveTo(35, 85).lineTo(560, 85).lineWidth(1.5).stroke(goldColor);
 
-      // Title
-      doc.fillColor(primaryColor).fontSize(14).font('Helvetica-Bold').text('QUOTATION PROPOSAL', 40, 100, { align: 'center' });
-      doc.moveDown(0.5);
+      // Quotation Title Banner
+      doc.rect(35, 95, 525, 25).fill(primaryColor);
+      doc.fillColor('#ffffff').fontSize(11).font('Helvetica-Bold').text('QUOTATION PROPOSAL', 35, 103, { align: 'center', width: 525 });
 
-      // Metadata layout (two columns)
-      const currentY = doc.y;
-      doc.fontSize(9).font('Helvetica-Bold').text('Quotation Details:', 40, currentY);
-      doc.font('Helvetica').text(`Quote No: ${quotation.quote_number}`, 40, currentY + 15);
-      doc.text(`Date: ${new Date(quotation.date).toLocaleDateString('en-IN')}`, 40, currentY + 30);
-      if (quotation.valid_until) {
-        doc.text(`Valid Upto: ${new Date(quotation.valid_until).toLocaleDateString('en-IN')}`, 40, currentY + 45);
-      }
-
-      // Client info
+      // Metadata Layout (Side-by-side Columns)
       const clientName = quotation.client?.name || quotation.lead?.company_name || 'N/A';
       const contactPerson = quotation.client?.contact_person || quotation.lead?.contact_person || 'N/A';
       const email = quotation.client?.email || quotation.lead?.email || 'N/A';
       const phone = quotation.client?.phone || quotation.lead?.phone || 'N/A';
       const address = quotation.billing_address || quotation.client?.billing_address || 'N/A';
 
-      doc.font('Helvetica-Bold').text('Bill To (Client / Lead):', 300, currentY);
-      doc.font('Helvetica-Bold').text(clientName, 300, currentY + 15);
-      doc.font('Helvetica').text(`Attn: ${contactPerson}`, 300, currentY + 30);
-      doc.text(`Email: ${email}`, 300, currentY + 45);
-      doc.text(`Phone: ${phone}`, 300, currentY + 60);
-      doc.text(`Address: ${address}`, 300, currentY + 75, { width: 250 });
-
-      // Table section
-      doc.moveDown(2);
-      const tableStartY = Math.max(doc.y, currentY + 130);
+      const metadataY = 135;
       
-      // Draw Table Header
-      doc.rect(40, tableStartY, 515, 20).fill(primaryColor);
-      doc.fillColor('#ffffff').fontSize(8.5).font('Helvetica-Bold');
-      doc.text('S.No', 45, tableStartY + 6, { width: 30 });
-      doc.text('Description of Safety Audit / Service', 80, tableStartY + 6, { width: 230 });
-      doc.text('Qty', 320, tableStartY + 6, { width: 30, align: 'center' });
-      doc.text('UOM', 360, tableStartY + 6, { width: 40, align: 'center' });
-      doc.text('Unit Price (INR)', 410, tableStartY + 6, { width: 70, align: 'right' });
-      doc.text('Total (INR)', 490, tableStartY + 6, { width: 60, align: 'right' });
+      // Left Column: Quotation Details
+      doc.fontSize(9.5).font('Helvetica-Bold').fillColor(primaryColor).text('Quotation Details:', 40, metadataY);
+      doc.fontSize(8.5).font('Helvetica-Bold').fillColor('#334155').text('Quote No:', 40, metadataY + 15);
+      doc.font('Helvetica').text(quotation.quote_number, 100, metadataY + 15);
+      doc.font('Helvetica-Bold').text('Date:', 40, metadataY + 28);
+      doc.font('Helvetica').text(new Date(quotation.date).toLocaleDateString('en-IN'), 100, metadataY + 28);
+      let leftEndY = metadataY + 41;
+      if (quotation.valid_until) {
+        doc.font('Helvetica-Bold').text('Valid Upto:', 40, metadataY + 41);
+        doc.font('Helvetica').text(new Date(quotation.valid_until).toLocaleDateString('en-IN'), 100, metadataY + 41);
+        leftEndY += 13;
+      }
 
-      // Table items
-      let itemY = tableStartY + 20;
-      doc.fillColor('#000000').font('Helvetica').fontSize(8.5);
-      
+      // Right Column: Client / Lead Details
+      doc.fontSize(9.5).font('Helvetica-Bold').fillColor(primaryColor).text('Bill To (Client / Lead):', 300, metadataY);
+      doc.fontSize(9).font('Helvetica-Bold').fillColor(goldColor).text(clientName, 300, metadataY + 15);
+      doc.fontSize(8.5).font('Helvetica').fillColor('#334155');
+      doc.text(`Attn: ${contactPerson}`, 300, metadataY + 28);
+      doc.text(`Email: ${email}`, 300, metadataY + 40);
+      doc.text(`Phone: ${phone}`, 300, metadataY + 52);
+      doc.text(`Address: ${address}`, 300, metadataY + 64, { width: 250 });
+      const addressHeight = doc.heightOfString(`Address: ${address}`, { width: 250 });
+      const rightEndY = metadataY + 64 + addressHeight;
+
+      const tableStartY = Math.max(leftEndY, rightEndY) + 25;
+
+      // Table Draw Header Helper
+      const drawTableHeader = (y: number) => {
+        doc.rect(40, y, 515, 22).fill(primaryColor);
+        doc.fillColor('#ffffff').fontSize(8.5).font('Helvetica-Bold');
+        doc.text('S.No', 40, y + 7, { width: 35, align: 'center' });
+        doc.text('Description of Safety Audit / Service', 80, y + 7, { width: 230 });
+        doc.text('Qty', 315, y + 7, { width: 35, align: 'center' });
+        doc.text('UOM', 350, y + 7, { width: 40, align: 'center' });
+        doc.text('Unit Price (INR)', 390, y + 7, { width: 80, align: 'right' });
+        doc.text('Total (INR)', 470, y + 7, { width: 75, align: 'right' });
+      };
+
+      // Table items loop
+      let currentY = tableStartY;
+      const maxY = 740; // Safe height boundary before adding a new page
+
+      drawTableHeader(currentY);
+      currentY += 22;
+
       const items = quotation.items || [];
       items.forEach((item: any, idx: number) => {
-        // Draw row background on alternate rows
-        if (idx % 2 === 1) {
-          doc.rect(40, itemY, 515, 20).fill(lightGrey);
+        doc.font('Helvetica').fontSize(8.5);
+        const descHeight = doc.heightOfString(item.description || '', { width: 230 });
+        const rowHeight = Math.max(22, descHeight + 10);
+
+        // Page break if row goes beyond boundary
+        if (currentY + rowHeight > maxY) {
+          doc.addPage();
+          currentY = 50;
+          drawTableHeader(currentY);
+          currentY += 22;
         }
-        
+
+        // Zebra striping
+        if (idx % 2 === 1) {
+          doc.rect(40, currentY, 515, rowHeight).fill(lightGrey);
+        }
+
         doc.fillColor('#000000');
-        doc.text(String(idx + 1), 45, itemY + 6, { width: 30 });
-        doc.text(item.description || '', 80, itemY + 6, { width: 230 });
-        doc.text(String(item.quantity || 1), 320, itemY + 6, { width: 30, align: 'center' });
-        doc.text(item.uom || 'Nos', 360, itemY + 6, { width: 40, align: 'center' });
-        doc.text(Number(item.unit_price || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 }), 410, itemY + 6, { width: 70, align: 'right' });
-        doc.text(Number(item.total || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 }), 490, itemY + 6, { width: 60, align: 'right' });
-        
-        // Draw line separator
-        doc.moveTo(40, itemY + 20).lineTo(555, itemY + 20).lineWidth(0.3).stroke(borderGrey);
-        itemY += 20;
+        doc.text(String(idx + 1), 40, currentY + 7, { width: 35, align: 'center' });
+        doc.text(item.description || '', 80, currentY + 7, { width: 230 });
+        doc.text(String(item.quantity || 1), 315, currentY + 7, { width: 35, align: 'center' });
+        doc.text(item.uom || 'Nos', 350, currentY + 7, { width: 40, align: 'center' });
+        doc.text(Number(item.unit_price || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 }), 390, currentY + 7, { width: 80, align: 'right' });
+        doc.text(Number(item.total || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 }), 470, currentY + 7, { width: 75, align: 'right' });
+
+        // Draw light grey row border
+        doc.moveTo(40, currentY + rowHeight).lineTo(555, currentY + rowHeight).lineWidth(0.5).stroke(borderGrey);
+        currentY += rowHeight;
       });
 
-      // Draw summary block (Subtotal, GST, Grand Total)
-      const summaryY = itemY + 10;
-      doc.fontSize(8.5);
-      
-      let currentSummaryY = summaryY;
-      
+      // Summary block calculations
       const subtotal = Number(quotation.subtotal || 0);
       const discount = Number(quotation.discount || 0);
       const cgst = Number(quotation.cgst || 0);
@@ -965,61 +1004,114 @@ export class QuotationsService {
       const igst = Number(quotation.igst || 0);
       const totalAmount = Number(quotation.total_amount || 0);
 
-      // Subtotal line
-      doc.font('Helvetica-Bold').text('Subtotal:', 380, currentSummaryY, { width: 100, align: 'right' });
-      doc.font('Helvetica').text(`INR ${subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 490, currentSummaryY, { width: 65, align: 'right' });
-      currentSummaryY += 15;
+      let summaryLines = 2; // Subtotal and Grand Total
+      if (discount > 0) summaryLines++;
+      if (cgst > 0) summaryLines++;
+      if (sgst > 0) summaryLines++;
+      if (igst > 0) summaryLines++;
 
-      // Discount line (if any)
+      const summaryBlockHeight = (summaryLines * 16) + 10;
+
+      if (currentY + summaryBlockHeight > maxY) {
+        doc.addPage();
+        currentY = 50;
+      }
+
+      let currentSummaryY = currentY + 10;
+      doc.fontSize(8.5);
+
+      // Subtotal line
+      doc.font('Helvetica-Bold').fillColor(primaryColor).text('Subtotal:', 370, currentSummaryY, { width: 100, align: 'right' });
+      doc.font('Helvetica').text(`INR ${subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 480, currentSummaryY, { width: 75, align: 'right' });
+      currentSummaryY += 16;
+
+      // Discount line
       if (discount > 0) {
-        doc.font('Helvetica-Bold').text('Discount:', 380, currentSummaryY, { width: 100, align: 'right' });
-        doc.font('Helvetica').text(`- INR ${discount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 490, currentSummaryY, { width: 65, align: 'right' });
-        currentSummaryY += 15;
+        doc.font('Helvetica-Bold').text('Discount:', 370, currentSummaryY, { width: 100, align: 'right' });
+        doc.font('Helvetica').text(`- INR ${discount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 480, currentSummaryY, { width: 75, align: 'right' });
+        currentSummaryY += 16;
       }
 
       // CGST line
       if (cgst > 0) {
-        doc.font('Helvetica-Bold').text('CGST:', 380, currentSummaryY, { width: 100, align: 'right' });
-        doc.font('Helvetica').text(`INR ${cgst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 490, currentSummaryY, { width: 65, align: 'right' });
-        currentSummaryY += 15;
+        doc.font('Helvetica-Bold').text('CGST:', 370, currentSummaryY, { width: 100, align: 'right' });
+        doc.font('Helvetica').text(`INR ${cgst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 480, currentSummaryY, { width: 75, align: 'right' });
+        currentSummaryY += 16;
       }
 
       // SGST line
       if (sgst > 0) {
-        doc.font('Helvetica-Bold').text('SGST:', 380, currentSummaryY, { width: 100, align: 'right' });
-        doc.font('Helvetica').text(`INR ${sgst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 490, currentSummaryY, { width: 65, align: 'right' });
-        currentSummaryY += 15;
+        doc.font('Helvetica-Bold').text('SGST:', 370, currentSummaryY, { width: 100, align: 'right' });
+        doc.font('Helvetica').text(`INR ${sgst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 480, currentSummaryY, { width: 75, align: 'right' });
+        currentSummaryY += 16;
       }
 
       // IGST line
       if (igst > 0) {
-        doc.font('Helvetica-Bold').text('IGST:', 380, currentSummaryY, { width: 100, align: 'right' });
-        doc.font('Helvetica').text(`INR ${igst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 490, currentSummaryY, { width: 65, align: 'right' });
-        currentSummaryY += 15;
+        doc.font('Helvetica-Bold').text('IGST:', 370, currentSummaryY, { width: 100, align: 'right' });
+        doc.font('Helvetica').text(`INR ${igst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 480, currentSummaryY, { width: 75, align: 'right' });
+        currentSummaryY += 16;
       }
 
       // Grand Total line
-      doc.font('Helvetica-Bold').fillColor(goldColor).fontSize(10).text('Grand Total:', 380, currentSummaryY, { width: 100, align: 'right' });
-      doc.font('Helvetica-Bold').fillColor(primaryColor).fontSize(10).text(`INR ${totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 490, currentSummaryY, { width: 65, align: 'right' });
-      currentSummaryY += 20;
+      doc.font('Helvetica-Bold').fillColor(goldColor).fontSize(10).text('Grand Total:', 370, currentSummaryY, { width: 100, align: 'right' });
+      doc.font('Helvetica-Bold').fillColor(primaryColor).fontSize(10).text(`INR ${totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 480, currentSummaryY, { width: 75, align: 'right' });
+      currentSummaryY += 22;
 
-      // Special Notes / Terms & Conditions
-      const notesY = Math.max(currentSummaryY + 20, summaryY + 80);
-      if (quotation.notes) {
-        doc.font('Helvetica-Bold').fontSize(9).fillColor(primaryColor).text('Terms & Special Notes:', 40, notesY);
-        doc.font('Helvetica').fontSize(8).fillColor('#334155').text(quotation.notes, 40, notesY + 15, { width: 300 });
+      currentY = currentSummaryY;
+
+      // Special Notes / Terms & Conditions and Signature block
+      const notesHeight = quotation.notes ? doc.heightOfString(quotation.notes, { width: 280 }) + 30 : 0;
+      const sigHeight = 120;
+      const blockSpaceNeeded = Math.max(notesHeight, sigHeight);
+
+      if (currentY + blockSpaceNeeded > maxY) {
+        doc.addPage();
+        currentY = 50;
       }
 
-      // Signatures
-      const sigY = notesY + 100;
-      doc.font('Helvetica-Bold').fontSize(8.5).fillColor(primaryColor).text('Prepared By:', 400, sigY);
+      const sigY = currentY + 15;
+
+      // Draw left side: Terms & Conditions and Thank You
+      if (quotation.notes) {
+        doc.font('Helvetica-Bold').fontSize(9).fillColor(primaryColor).text('Terms & Special Notes:', 40, sigY);
+        doc.font('Helvetica').fontSize(7.5).fillColor('#334155').text(quotation.notes, 40, sigY + 15, { width: 280 });
+      }
       
+      const thankYouY = Math.max(sigY + notesHeight - 10, sigY + 85);
+      doc.font('Helvetica-Oblique').fontSize(9.5).fillColor(goldColor).text('Thank you for your business!', 40, thankYouY);
+
+      // Draw right side: Signatures & Stamp
       const repName = quotation.authorized_rep_name || 'Er. Rahul Sharma';
       const repDesg = quotation.authorized_rep_designation || 'Competent Person (Chief Inspector)';
       
-      doc.font('Helvetica-Bold').fillColor(goldColor).text(repName, 400, sigY + 15);
-      doc.font('Helvetica').fontSize(7.5).fillColor('#64748b').text(repDesg, 400, sigY + 25);
-      doc.text('Global Safety Solution', 400, sigY + 35);
+      doc.font('Helvetica-Bold').fontSize(8.5).fillColor(primaryColor).text('For M/s Global Safety Solution:', 360, sigY);
+      
+      if (stampSigBuffer) {
+        doc.image(stampSigBuffer, 360, sigY + 15, { width: 140, height: 60 });
+      }
+
+      doc.font('Helvetica-Bold').fillColor(goldColor).fontSize(8.5).text(repName, 360, sigY + 80, { width: 190 });
+      doc.font('Helvetica').fontSize(7.5).fillColor('#64748b').text(repDesg, 360, sigY + 90, { width: 190 });
+      doc.text('Global Safety Solution', 360, sigY + 100, { width: 190 });
+
+      // Add page numbers and borders dynamically to all pages
+      const range = doc.bufferedPageRange();
+      for (let i = 0; i < range.count; i++) {
+        doc.switchToPage(i);
+        
+        // Outer border
+        doc.rect(20, 20, 555, 802).lineWidth(0.5).stroke(primaryColor);
+        
+        // Footer text
+        doc.fillColor('#64748b').fontSize(7.5).font('Helvetica');
+        doc.text(
+          `Page ${i + 1} of ${range.count}   |   Global Safety Solution   |   Phone: 6201186550   Email: id-globalsafety56@gmail.com`,
+          40,
+          808,
+          { align: 'center', width: 515 }
+        );
+      }
 
       // Finish PDF doc
       doc.end();
