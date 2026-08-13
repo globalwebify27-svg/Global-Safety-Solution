@@ -634,32 +634,87 @@ export class QuotationsService {
           try {
             const debitAcc = await tx.account.findUnique({ where: { code: '1200' } });
             const creditAcc = await tx.account.findUnique({ where: { code: '4000' } });
+            const gstAcc = await tx.account.findUnique({ where: { code: '2200' } });
+
             if (debitAcc && creditAcc) {
-              const count = await tx.ledgerEntry.count();
-              const voucherNo = `JV-${year}-${String(count + 1).padStart(4, '0')}`;
+              const sub = Number(quotation.subtotal);
+              const tax = Number(quotation.tax_amount);
+              const total = Number(quotation.total_amount);
 
-              await tx.ledgerEntry.create({
-                data: {
-                  voucher_no: voucherNo,
-                  description: `Auto-generated: Invoice created for ${invoiceNumber} (Converted from Quotation ${quotation.quote_number})`,
-                  amount: quotation.total_amount,
-                  debit_account_id: debitAcc.id,
-                  credit_account_id: creditAcc.id,
-                  created_by: 'System',
-                }
-              });
+              if (tax > 0 && gstAcc) {
+                const count = await tx.ledgerEntry.count();
+                const voucherNo1 = `JV-${year}-${String(count + 1).padStart(4, '0')}`;
+                const voucherNo2 = `JV-${year}-${String(count + 2).padStart(4, '0')}`;
 
-              // Update Debit Account (Accounts Receivable is ASSET, increases on Debit)
-              await tx.account.update({
-                where: { id: debitAcc.id },
-                data: { balance: { increment: quotation.total_amount } }
-              });
+                // 1. Post taxable revenue portion
+                await tx.ledgerEntry.create({
+                  data: {
+                    voucher_no: voucherNo1,
+                    description: `Auto-generated: Invoice subtotal for ${invoiceNumber} (Converted from Quotation ${quotation.quote_number})`,
+                    amount: sub,
+                    debit_account_id: debitAcc.id,
+                    credit_account_id: creditAcc.id,
+                    created_by: 'System',
+                    invoice_id: invoice.id,
+                  }
+                });
 
-              // Update Credit Account (Sales Revenue is REVENUE, increases on Credit)
-              await tx.account.update({
-                where: { id: creditAcc.id },
-                data: { balance: { increment: quotation.total_amount } }
-              });
+                // 2. Post GST portion
+                await tx.ledgerEntry.create({
+                  data: {
+                    voucher_no: voucherNo2,
+                    description: `Auto-generated: GST (Tax) for ${invoiceNumber} (Converted from Quotation ${quotation.quote_number})`,
+                    amount: tax,
+                    debit_account_id: debitAcc.id,
+                    credit_account_id: gstAcc.id,
+                    created_by: 'System',
+                    invoice_id: invoice.id,
+                  }
+                });
+
+                // 3. Update account balances
+                // AR (1200) increases on Debit
+                await tx.account.update({
+                  where: { id: debitAcc.id },
+                  data: { balance: { increment: total } }
+                });
+                // Sales Revenue (4000) increases on Credit
+                await tx.account.update({
+                  where: { id: creditAcc.id },
+                  data: { balance: { increment: sub } }
+                });
+                // GST Payable (2200) increases on Credit
+                await tx.account.update({
+                  where: { id: gstAcc.id },
+                  data: { balance: { increment: tax } }
+                });
+              } else {
+                const count = await tx.ledgerEntry.count();
+                const voucherNo = `JV-${year}-${String(count + 1).padStart(4, '0')}`;
+
+                await tx.ledgerEntry.create({
+                  data: {
+                    voucher_no: voucherNo,
+                    description: `Auto-generated: Invoice created for ${invoiceNumber} (Converted from Quotation ${quotation.quote_number})`,
+                    amount: total,
+                    debit_account_id: debitAcc.id,
+                    credit_account_id: creditAcc.id,
+                    created_by: 'System',
+                    invoice_id: invoice.id,
+                  }
+                });
+
+                // AR (1200) increases on Debit
+                await tx.account.update({
+                  where: { id: debitAcc.id },
+                  data: { balance: { increment: total } }
+                });
+                // Sales Revenue (4000) increases on Credit
+                await tx.account.update({
+                  where: { id: creditAcc.id },
+                  data: { balance: { increment: total } }
+                });
+              }
             }
           } catch (err) {
             console.warn('[Auto-Accounting] Failed to post converted invoice voucher:', err.message);
