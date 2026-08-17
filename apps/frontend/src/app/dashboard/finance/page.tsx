@@ -482,9 +482,16 @@ export default function FinancePage() {
       // 2. Calculation Breakdown (Bottom Right)
       const subtotalVal = Number(invoice.subtotal) || (Number(invoice.total_amount) / 1.18);
       const taxVal = Number(invoice.tax_amount) || (Number(invoice.total_amount) - subtotalVal);
-      const cgstVal = Number(invoice.cgst) || (taxVal / 2);
-      const sgstVal = Number(invoice.sgst) || (taxVal / 2);
+      let cgstVal = Number(invoice.cgst) || 0;
+      let sgstVal = Number(invoice.sgst) || 0;
+      let igstVal = Number(invoice.igst) || 0;
       const discountVal = Number(invoice.discount) || 0;
+
+      // Fallback for older invoices
+      if (taxVal > 0 && cgstVal === 0 && sgstVal === 0 && igstVal === 0) {
+        cgstVal = taxVal / 2;
+        sgstVal = taxVal / 2;
+      }
 
       const calcX = 130;
       const calcValX = 190;
@@ -498,13 +505,18 @@ export default function FinancePage() {
         doc.text(`-Rs.${discountVal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`, calcValX, bankY + 5, { align: "right" });
       }
 
-      doc.text("SGST @ 9.0%:", calcX, bankY + 10);
-      doc.text(`Rs.${sgstVal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`, calcValX, bankY + 10, { align: "right" });
-      doc.text("CGST @ 9.0%:", calcX, bankY + 15);
-      doc.text(`Rs.${cgstVal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`, calcValX, bankY + 15, { align: "right" });
+      if (igstVal > 0) {
+        doc.text("IGST @ 18.0%:", calcX, bankY + 10);
+        doc.text(`Rs.${igstVal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`, calcValX, bankY + 10, { align: "right" });
+      } else {
+        doc.text("SGST @ 9.0%:", calcX, bankY + 10);
+        doc.text(`Rs.${sgstVal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`, calcValX, bankY + 10, { align: "right" });
+        doc.text("CGST @ 9.0%:", calcX, bankY + 15);
+        doc.text(`Rs.${cgstVal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`, calcValX, bankY + 15, { align: "right" });
+      }
 
       // Round off
-      const roundOffVal = Number(invoice.total_amount) - (subtotalVal - discountVal + cgstVal + sgstVal);
+      const roundOffVal = Number(invoice.total_amount) - (subtotalVal - discountVal + cgstVal + sgstVal + igstVal);
       doc.text("Round off:", calcX, bankY + 20);
       doc.text(`${roundOffVal >= 0 ? "+" : "-"}Rs.${Math.abs(roundOffVal).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`, calcValX, bankY + 20, { align: "right" });
 
@@ -1345,14 +1357,23 @@ export default function FinancePage() {
                   </tr>
                   {Number(selectedInvoice?.tax_amount || 0) > 0 && (
                     <>
-                      <tr>
-                        <td colSpan={4} className="px-4 py-2 text-muted-foreground uppercase tracking-widest text-[10px]">CGST (9%)</td>
-                        <td className="px-4 py-2 text-foreground tabular-nums">₹{Number(selectedInvoice?.cgst || (Number(selectedInvoice?.tax_amount || 0) / 2)).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                      </tr>
-                      <tr>
-                        <td colSpan={4} className="px-4 py-2 text-muted-foreground uppercase tracking-widest text-[10px]">SGST (9%)</td>
-                        <td className="px-4 py-2 text-foreground tabular-nums">₹{Number(selectedInvoice?.sgst || (Number(selectedInvoice?.tax_amount || 0) / 2)).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                      </tr>
+                      {Number(selectedInvoice?.igst || 0) > 0 ? (
+                        <tr>
+                          <td colSpan={4} className="px-4 py-2 text-muted-foreground uppercase tracking-widest text-[10px]">IGST (18%)</td>
+                          <td className="px-4 py-2 text-foreground tabular-nums">₹{Number(selectedInvoice?.igst).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                        </tr>
+                      ) : (
+                        <>
+                          <tr>
+                            <td colSpan={4} className="px-4 py-2 text-muted-foreground uppercase tracking-widest text-[10px]">CGST (9%)</td>
+                            <td className="px-4 py-2 text-foreground tabular-nums">₹{Number(selectedInvoice?.cgst || (Number(selectedInvoice?.tax_amount || 0) / 2)).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                          </tr>
+                          <tr>
+                            <td colSpan={4} className="px-4 py-2 text-muted-foreground uppercase tracking-widest text-[10px]">SGST (9%)</td>
+                            <td className="px-4 py-2 text-foreground tabular-nums">₹{Number(selectedInvoice?.sgst || (Number(selectedInvoice?.tax_amount || 0) / 2)).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                          </tr>
+                        </>
+                      )}
                     </>
                   )}
                   <tr className="border-t border-border/80 bg-emerald-500/5 text-base font-black">

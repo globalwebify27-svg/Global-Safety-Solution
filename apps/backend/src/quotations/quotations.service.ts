@@ -8,6 +8,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { TemplateEngineService } from '../email-management/template-engine.service';
 import { LocalStorageService } from '../common/services/local-storage.service';
 import { getPersistentUploadsDir } from '../common/utils/storage-utils';
+import { getResolvedState } from '../finance/invoices.service';
 
 @Injectable()
 export class QuotationsService {
@@ -603,18 +604,34 @@ export class QuotationsService {
 
           const invoiceNumber = `INV-${year}-${String(nextInvSerial).padStart(4, '0')}`;
 
+          // Determine state classification
+          const client = await tx.client.findUnique({ where: { id: clientId } });
+          const settings = await tx.systemSetting.findMany({ where: { key: { in: ['address', 'gst_number'] } } });
+          const settingsMap = settings.reduce((acc: any, s: any) => ({ ...acc, [s.key]: s.value }), {} as Record<string, string>);
+          const companyState = getResolvedState(settingsMap['gst_number'] || '', settingsMap['address'] || '');
+          const clientState = client?.state || getResolvedState(client?.gst_number || '', client?.billing_address || '', companyState);
+          const isIntraState = companyState.trim().toLowerCase() === clientState.trim().toLowerCase();
+
+          const sub = Number(quotation.subtotal);
+          const discount = Number(quotation.discount || 0);
+          const cgst = isIntraState ? sub * 0.09 : 0;
+          const sgst = isIntraState ? sub * 0.09 : 0;
+          const igst = isIntraState ? 0 : sub * 0.18;
+          const taxAmount = cgst + sgst + igst;
+          const totalAmount = sub + taxAmount - discount;
+
           const invoice = await tx.invoice.create({
             data: {
               client_id: clientId,
               quotation_id: quotation.id,
               invoice_number: invoiceNumber,
-              subtotal: quotation.subtotal,
-              discount: quotation.discount,
-              tax_amount: quotation.tax_amount,
-              cgst: quotation.cgst,
-              sgst: quotation.sgst,
-              igst: quotation.igst,
-              total_amount: quotation.total_amount,
+              subtotal: sub,
+              discount: discount,
+              tax_amount: taxAmount,
+              cgst: cgst,
+              sgst: sgst,
+              igst: igst,
+              total_amount: totalAmount,
               status: 'UNPAID',
               due_date: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000), // Default 15 days
               notes: `Invoice generated for Quotation ${quotation.quote_number}`,
@@ -634,24 +651,40 @@ export class QuotationsService {
           try {
             const debitAcc = await tx.account.findUnique({ where: { code: '1200' } });
             const creditAcc = await tx.account.findUnique({ where: { code: '4000' } });
-            const gstAcc = await tx.account.findUnique({ where: { code: '2200' } });
+
+            // Ensure Output GST Accounts exist in the Chart of Accounts
+            const checkAndCreateAccountTx = async (code: string, name: string) => {
+              let acc = await tx.account.findUnique({ where: { code } });
+              if (!acc) {
+                acc = await tx.account.create({
+                  data: {
+                    code,
+                    name,
+                    type: 'LIABILITY',
+                    balance: 0,
+                  },
+                });
+              }
+              return acc;
+            };
+
+            const cgstAcc = await checkAndCreateAccountTx('2210', 'Output CGST');
+            const sgstAcc = await checkAndCreateAccountTx('2220', 'Output SGST');
+            const igstAcc = await checkAndCreateAccountTx('2230', 'Output IGST');
 
             if (debitAcc && creditAcc) {
-              const sub = Number(quotation.subtotal);
-              const tax = Number(quotation.tax_amount);
-              const total = Number(quotation.total_amount);
+              const netSales = sub - discount;
 
-              if (tax > 0 && gstAcc) {
+              if (taxAmount > 0) {
                 const count = await tx.ledgerEntry.count();
-                const voucherNo1 = `JV-${year}-${String(count + 1).padStart(4, '0')}`;
-                const voucherNo2 = `JV-${year}-${String(count + 2).padStart(4, '0')}`;
+                let voucherIndex = 1;
 
                 // 1. Post taxable revenue portion
                 await tx.ledgerEntry.create({
                   data: {
-                    voucher_no: voucherNo1,
+                    voucher_no: `JV-${year}-${String(count + (voucherIndex++)).padStart(4, '0')}`,
                     description: `Auto-generated: Invoice subtotal for ${invoiceNumber} (Converted from Quotation ${quotation.quote_number})`,
-                    amount: sub,
+                    amount: netSales,
                     debit_account_id: debitAcc.id,
                     credit_account_id: creditAcc.id,
                     created_by: 'System',
@@ -659,34 +692,74 @@ export class QuotationsService {
                   }
                 });
 
-                // 2. Post GST portion
-                await tx.ledgerEntry.create({
-                  data: {
-                    voucher_no: voucherNo2,
-                    description: `Auto-generated: GST (Tax) for ${invoiceNumber} (Converted from Quotation ${quotation.quote_number})`,
-                    amount: tax,
-                    debit_account_id: debitAcc.id,
-                    credit_account_id: gstAcc.id,
-                    created_by: 'System',
-                    invoice_id: invoice.id,
-                  }
-                });
-
-                // 3. Update account balances
-                // AR (1200) increases on Debit
-                await tx.account.update({
-                  where: { id: debitAcc.id },
-                  data: { balance: { increment: total } }
-                });
                 // Sales Revenue (4000) increases on Credit
                 await tx.account.update({
                   where: { id: creditAcc.id },
-                  data: { balance: { increment: sub } }
+                  data: { balance: { increment: netSales } }
                 });
-                // GST Payable (2200) increases on Credit
+
+                // 2. Post tax portion
+                if (igst > 0 && igstAcc) {
+                  await tx.ledgerEntry.create({
+                    data: {
+                      voucher_no: `JV-${year}-${String(count + (voucherIndex++)).padStart(4, '0')}`,
+                      description: `Auto-generated: Output IGST for ${invoiceNumber} (Converted from Quotation ${quotation.quote_number})`,
+                      amount: igst,
+                      debit_account_id: debitAcc.id,
+                      credit_account_id: igstAcc.id,
+                      created_by: 'System',
+                      invoice_id: invoice.id,
+                    }
+                  });
+
+                  await tx.account.update({
+                    where: { id: igstAcc.id },
+                    data: { balance: { increment: igst } }
+                  });
+                } else {
+                  if (cgst > 0 && cgstAcc) {
+                    await tx.ledgerEntry.create({
+                      data: {
+                        voucher_no: `JV-${year}-${String(count + (voucherIndex++)).padStart(4, '0')}`,
+                        description: `Auto-generated: Output CGST for ${invoiceNumber} (Converted from Quotation ${quotation.quote_number})`,
+                        amount: cgst,
+                        debit_account_id: debitAcc.id,
+                        credit_account_id: cgstAcc.id,
+                        created_by: 'System',
+                        invoice_id: invoice.id,
+                      }
+                    });
+
+                    await tx.account.update({
+                      where: { id: cgstAcc.id },
+                      data: { balance: { increment: cgst } }
+                    });
+                  }
+
+                  if (sgst > 0 && sgstAcc) {
+                    await tx.ledgerEntry.create({
+                      data: {
+                        voucher_no: `JV-${year}-${String(count + (voucherIndex++)).padStart(4, '0')}`,
+                        description: `Auto-generated: Output SGST for ${invoiceNumber} (Converted from Quotation ${quotation.quote_number})`,
+                        amount: sgst,
+                        debit_account_id: debitAcc.id,
+                        credit_account_id: sgstAcc.id,
+                        created_by: 'System',
+                        invoice_id: invoice.id,
+                      }
+                    });
+
+                    await tx.account.update({
+                      where: { id: sgstAcc.id },
+                      data: { balance: { increment: sgst } }
+                    });
+                  }
+                }
+
+                // AR (1200) increases on Debit
                 await tx.account.update({
-                  where: { id: gstAcc.id },
-                  data: { balance: { increment: tax } }
+                  where: { id: debitAcc.id },
+                  data: { balance: { increment: totalAmount } }
                 });
               } else {
                 const count = await tx.ledgerEntry.count();
@@ -696,7 +769,7 @@ export class QuotationsService {
                   data: {
                     voucher_no: voucherNo,
                     description: `Auto-generated: Invoice created for ${invoiceNumber} (Converted from Quotation ${quotation.quote_number})`,
-                    amount: total,
+                    amount: totalAmount,
                     debit_account_id: debitAcc.id,
                     credit_account_id: creditAcc.id,
                     created_by: 'System',
@@ -704,15 +777,14 @@ export class QuotationsService {
                   }
                 });
 
-                // AR (1200) increases on Debit
                 await tx.account.update({
                   where: { id: debitAcc.id },
-                  data: { balance: { increment: total } }
+                  data: { balance: { increment: totalAmount } }
                 });
-                // Sales Revenue (4000) increases on Credit
+
                 await tx.account.update({
                   where: { id: creditAcc.id },
-                  data: { balance: { increment: total } }
+                  data: { balance: { increment: totalAmount } }
                 });
               }
             }

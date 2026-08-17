@@ -7,6 +7,79 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AccountingService } from '../accounting/accounting.service';
 import { TemplateEngineService } from '../email-management/template-engine.service';
 
+function resolveStateFromGst(gst: string): string | null {
+  if (!gst || gst.length < 2) return null;
+  const stateCode = gst.trim().substring(0, 2);
+  const stateCodeMap: Record<string, string> = {
+    "01": "Jammu & Kashmir",
+    "02": "Himachal Pradesh",
+    "03": "Punjab",
+    "04": "Chandigarh",
+    "05": "Uttarakhand",
+    "06": "Haryana",
+    "07": "Delhi",
+    "08": "Rajasthan",
+    "09": "Uttar Pradesh",
+    "10": "Bihar",
+    "11": "Sikkim",
+    "12": "Arunachal Pradesh",
+    "13": "Nagaland",
+    "14": "Manipur",
+    "15": "Mizoram",
+    "16": "Tripura",
+    "17": "Meghalaya",
+    "18": "Assam",
+    "19": "West Bengal",
+    "20": "Jharkhand",
+    "21": "Odisha",
+    "22": "Chhattisgarh",
+    "23": "Madhya Pradesh",
+    "24": "Gujarat",
+    "26": "Dadra and Nagar Haveli and Daman and Diu",
+    "27": "Maharashtra",
+    "28": "Andhra Pradesh",
+    "29": "Karnataka",
+    "30": "Goa",
+    "31": "Lakshadweep",
+    "32": "Kerala",
+    "33": "Tamil Nadu",
+    "34": "Puducherry",
+    "35": "Andaman and Nicobar Islands",
+    "36": "Telangana",
+    "37": "Andhra Pradesh",
+    "38": "Ladakh"
+  };
+  return stateCodeMap[stateCode] || null;
+}
+
+function resolveStateFromAddress(address: string): string | null {
+  if (!address) return null;
+  const states = [
+    "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Goa", "Gujarat", "Haryana", 
+    "Himachal Pradesh", "Jharkhand", "Karnataka", "Kerala", "Madhya Pradesh", "Maharashtra", "Manipur", 
+    "Meghalaya", "Mizoram", "Nagaland", "Odisha", "Orissa", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu", 
+    "Telangana", "Tripura", "Uttar Pradesh", "Uttarakhand", "West Bengal", "Delhi", "Jammu & Kashmir", 
+    "Jammu and Kashmir", "Ladakh", "Puducherry", "Pondicherry", "Chandigarh"
+  ];
+  for (const s of states) {
+    if (new RegExp(`\\b${s}\\b`, 'i').test(address)) {
+      if (s.toLowerCase() === 'orissa') return 'Odisha';
+      if (s.toLowerCase() === 'jammu and kashmir') return 'Jammu & Kashmir';
+      if (s.toLowerCase() === 'pondicherry') return 'Puducherry';
+      return s;
+    }
+  }
+  return null;
+}
+
+export function getResolvedState(gst: string, address: string, defaultVal: string = "Jharkhand"): string {
+  const stateByGst = resolveStateFromGst(gst);
+  if (stateByGst) return stateByGst;
+  const stateByAddr = resolveStateFromAddress(address);
+  if (stateByAddr) return stateByAddr;
+  return defaultVal;
+}
+
 @Injectable()
 export class InvoicesService {
   constructor(
@@ -89,17 +162,37 @@ export class InvoicesService {
       invoiceData.invoice_number = `INV-${year}-${String(nextInvSerial).padStart(4, '0')}`;
     }
 
+    // Fetch client to resolve customer state
+    const client = await this.prisma.client.findUnique({
+      where: { id: invoiceData.client_id },
+    });
+    if (!client) throw new BadRequestException('Client not found');
+
+    // Fetch company settings to resolve company state
+    const settings = await this.prisma.systemSetting.findMany({
+      where: { key: { in: ['address', 'gst_number'] } },
+    });
+    const settingsMap = settings.reduce(
+      (acc, s) => ({ ...acc, [s.key]: s.value }),
+      {} as Record<string, string>,
+    );
+    const companyState = getResolvedState(settingsMap['gst_number'] || '', settingsMap['address'] || '');
+    const clientState = client.state || getResolvedState(client.gst_number || '', client.billing_address || '', companyState);
+
+    const isIntraState = companyState.trim().toLowerCase() === clientState.trim().toLowerCase();
+
     // Server-side financial calculations
     const subtotal = items.reduce(
       (acc: number, item: any) =>
         acc + Number(item.unit_price) * Number(item.quantity),
       0,
     );
-    const cgst = subtotal * 0.09;
-    const sgst = subtotal * 0.09;
-    const igst = 0;
+    const discount = Number(invoiceData.discount || 0);
+    const cgst = isIntraState ? subtotal * 0.09 : 0;
+    const sgst = isIntraState ? subtotal * 0.09 : 0;
+    const igst = isIntraState ? 0 : subtotal * 0.18;
     const taxAmount = cgst + sgst + igst;
-    const totalAmount = subtotal + taxAmount;
+    const totalAmount = subtotal + taxAmount - discount;
 
     // Check for similar active invoice to prevent duplicates
     const duplicateInvoice = await this.prisma.invoice.findFirst({
@@ -149,7 +242,7 @@ export class InvoicesService {
     // Use a transaction to update invoice and its items
     const invoice = await this.prisma.$transaction(async (tx) => {
       // 1. Update main invoice data
-      const updatedInvoice = await tx.invoice.update({
+      await tx.invoice.update({
         where: { id },
         data: invoiceData,
       });
@@ -172,10 +265,52 @@ export class InvoicesService {
         });
       }
 
-      return tx.invoice.findUnique({
+      // 3. Recalculate totals and taxes dynamically
+      const currentInvoice = await tx.invoice.findUnique({
         where: { id },
+        include: { items: true, client: true },
+      });
+      if (!currentInvoice) throw new NotFoundException('Invoice not found');
+
+      const subtotal = currentInvoice.items.reduce(
+        (acc: number, item: any) =>
+          acc + Number(item.unit_price) * Number(item.quantity),
+        0,
+      );
+
+      const settings = await tx.systemSetting.findMany({
+        where: { key: { in: ['address', 'gst_number'] } },
+      });
+      const settingsMap = settings.reduce(
+        (acc, s) => ({ ...acc, [s.key]: s.value }),
+        {} as Record<string, string>,
+      );
+      const companyState = getResolvedState(settingsMap['gst_number'] || '', settingsMap['address'] || '');
+      const clientState = currentInvoice.client.state || getResolvedState(currentInvoice.client.gst_number || '', currentInvoice.client.billing_address || '', companyState);
+
+      const isIntraState = companyState.trim().toLowerCase() === clientState.trim().toLowerCase();
+
+      const discount = Number(currentInvoice.discount || 0);
+      const cgst = isIntraState ? subtotal * 0.09 : 0;
+      const sgst = isIntraState ? subtotal * 0.09 : 0;
+      const igst = isIntraState ? 0 : subtotal * 0.18;
+      const taxAmount = cgst + sgst + igst;
+      const totalAmount = subtotal + taxAmount - discount;
+
+      const finalInvoice = await tx.invoice.update({
+        where: { id },
+        data: {
+          subtotal,
+          tax_amount: taxAmount,
+          cgst,
+          sgst,
+          igst,
+          total_amount: totalAmount,
+        },
         include: { items: true },
       });
+
+      return finalInvoice;
     });
 
     await this.syncInvoiceVouchers(id);
@@ -216,28 +351,82 @@ export class InvoicesService {
         return;
       }
 
+      // Ensure Output GST Accounts exist in the Chart of Accounts
+      const checkAndCreateAccount = async (code: string, name: string) => {
+        let acc = await this.prisma.account.findUnique({ where: { code } });
+        if (!acc) {
+          acc = await this.prisma.account.create({
+            data: {
+              code,
+              name,
+              type: 'LIABILITY',
+              balance: 0,
+            },
+          });
+        }
+        return acc;
+      };
+
+      await checkAndCreateAccount('2210', 'Output CGST');
+      await checkAndCreateAccount('2220', 'Output SGST');
+      await checkAndCreateAccount('2230', 'Output IGST');
+
       const clientName = invoice.client?.name || 'Unknown Client';
       const sub = Number(invoice.subtotal);
+      const discount = Number(invoice.discount || 0);
       const tax = Number(invoice.tax_amount);
+      const cgst = Number(invoice.cgst || 0);
+      const sgst = Number(invoice.sgst || 0);
+      const igst = Number(invoice.igst || 0);
+
+      // Amount to debit/credit to Sales Revenue (subtotal less discount)
+      const netSales = sub - discount;
 
       if (tax > 0) {
+        // 1. Post sales revenue portion
         await this.accountingService.postVoucher({
           description: `Auto-generated: Invoice subtotal for ${invoice.invoice_number} (${clientName})`,
-          amount: sub,
+          amount: netSales,
           debit_code: '1200', // Accounts Receivable
           credit_code: '4000', // Sales Revenue
           created_by: 'System',
           invoice_id: invoice.id,
         });
 
-        await this.accountingService.postVoucher({
-          description: `Auto-generated: GST (Tax) for ${invoice.invoice_number} (${clientName})`,
-          amount: tax,
-          debit_code: '1200', // Accounts Receivable
-          credit_code: '2200', // GST / Indirect Tax Payable
-          created_by: 'System',
-          invoice_id: invoice.id,
-        });
+        // 2. Post tax portion
+        if (igst > 0) {
+          // Inter-state
+          await this.accountingService.postVoucher({
+            description: `Auto-generated: Output IGST for ${invoice.invoice_number} (${clientName})`,
+            amount: igst,
+            debit_code: '1200', // Accounts Receivable
+            credit_code: '2230', // Output IGST
+            created_by: 'System',
+            invoice_id: invoice.id,
+          });
+        } else {
+          // Intra-state
+          if (cgst > 0) {
+            await this.accountingService.postVoucher({
+              description: `Auto-generated: Output CGST for ${invoice.invoice_number} (${clientName})`,
+              amount: cgst,
+              debit_code: '1200', // Accounts Receivable
+              credit_code: '2210', // Output CGST
+              created_by: 'System',
+              invoice_id: invoice.id,
+            });
+          }
+          if (sgst > 0) {
+            await this.accountingService.postVoucher({
+              description: `Auto-generated: Output SGST for ${invoice.invoice_number} (${clientName})`,
+              amount: sgst,
+              debit_code: '1200', // Accounts Receivable
+              credit_code: '2220', // Output SGST
+              created_by: 'System',
+              invoice_id: invoice.id,
+            });
+          }
+        }
       } else {
         await this.accountingService.postVoucher({
           description: `Auto-generated: Invoice created for ${invoice.invoice_number} (${clientName})`,
