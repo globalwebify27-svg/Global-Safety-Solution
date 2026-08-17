@@ -1,6 +1,86 @@
 import { Injectable, BadRequestException, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 
+export function getAccountClassification(code: string, type: string, name: string): string {
+  const codeNum = parseInt(code, 10);
+  const normalizedName = name.toLowerCase();
+
+  if (type === 'ASSET') {
+    const isCashOrBank = 
+      (code.startsWith('10') && code !== '10') || 
+      normalizedName.includes('cash') || 
+      normalizedName.includes('bank') || 
+      normalizedName.includes('hdfc') || 
+      normalizedName.includes('sbi');
+
+    const isAR = code.startsWith('12') || normalizedName.includes('receivable');
+    const isInventory = code.startsWith('14') || normalizedName.includes('inventory');
+
+    if (isCashOrBank || isAR || isInventory) {
+      return 'Current Assets';
+    }
+
+    const isFixedAsset = 
+      codeNum === 30 || 
+      codeNum === 20 || 
+      codeNum === 240 || 
+      codeNum === 200 || 
+      normalizedName.includes('laptop') || 
+      normalizedName.includes('machine') || 
+      normalizedName.includes('equipment') || 
+      normalizedName.includes('fixed asset') || 
+      normalizedName.includes('property');
+
+    if (isFixedAsset) {
+      return 'Non-Current Assets';
+    }
+
+    return 'Current Assets';
+  }
+
+  if (type === 'LIABILITY') {
+    const isGST = 
+      code.startsWith('22') || 
+      normalizedName.includes('gst') || 
+      normalizedName.includes('tax') || 
+      normalizedName.includes('duties') || 
+      normalizedName.includes('itc');
+
+    const isAP = code === '2000' || (normalizedName.includes('payable') && !isGST);
+
+    if (isGST || isAP) {
+      return 'Current Liabilities';
+    }
+
+    const isLongTerm = 
+      normalizedName.includes('loan') || 
+      normalizedName.includes('long term') || 
+      normalizedName.includes('long-term') || 
+      normalizedName.includes('borrowing') || 
+      normalizedName.includes('liabilities');
+
+    if (isLongTerm) {
+      return 'Non-Current Liabilities';
+    }
+
+    return 'Current Liabilities';
+  }
+
+  if (type === 'EQUITY') {
+    return 'Equity';
+  }
+
+  if (type === 'REVENUE') {
+    return 'Revenue';
+  }
+
+  if (type === 'EXPENSE') {
+    return 'Expenses';
+  }
+
+  return type;
+}
+
 @Injectable()
 export class AccountingService {
   constructor(private prisma: PrismaService) {}
@@ -14,7 +94,11 @@ export class AccountingService {
       accounts.filter(a => a.parent_id === accId).forEach(child => { total += getAggregateBalance(child.id); });
       return total;
     };
-    return accounts.map(acc => ({ ...acc, balance: getAggregateBalance(acc.id) }));
+    return accounts.map(acc => ({ 
+      ...acc, 
+      balance: getAggregateBalance(acc.id),
+      classification: getAccountClassification(acc.code, acc.type, acc.name)
+    }));
   }
 
   async createAccount(data: { name: string; code: string; type: string; parent_id?: string; opening_balance?: number; created_by?: string; }) {
@@ -370,19 +454,35 @@ export class AccountingService {
           code: acc.code,
           type: isOBE ? "DIFF_OP_BALANCE" : acc.type,
           debit: (acc.type === "ASSET" || acc.type === "EXPENSE") ? acc.periodBalance : (isOBE && acc.periodBalance < 0 ? Math.abs(acc.periodBalance) : 0),
-          credit: !(acc.type === "ASSET" || acc.type === "EXPENSE") ? (isOBE ? (acc.periodBalance >= 0 ? acc.periodBalance : 0) : acc.periodBalance) : 0
+          credit: !(acc.type === "ASSET" || acc.type === "EXPENSE") ? (isOBE ? (acc.periodBalance >= 0 ? acc.periodBalance : 0) : acc.periodBalance) : 0,
+          classification: getAccountClassification(acc.code, acc.type, acc.name)
         };
       });
     const profitAndLoss = {
-      revenues: statementBalances.filter(a => a.type === "REVENUE"),
-      expenses: statementBalances.filter(a => a.type === "EXPENSE"),
+      revenues: statementBalances.filter(a => a.type === "REVENUE").map(a => ({
+        ...a,
+        classification: getAccountClassification(a.code, a.type, a.name)
+      })),
+      expenses: statementBalances.filter(a => a.type === "EXPENSE").map(a => ({
+        ...a,
+        classification: getAccountClassification(a.code, a.type, a.name)
+      })),
       totalRevenue: statementBalances.filter(a => a.type === "REVENUE" && isLeafAccount(a.id)).reduce((sum, a) => sum + a.periodBalance, 0),
       totalExpense: statementBalances.filter(a => a.type === "EXPENSE" && isLeafAccount(a.id)).reduce((sum, a) => sum + a.periodBalance, 0),
     };
     const balanceSheet = {
-      assets: statementBalances.filter(a => a.type === "ASSET"),
-      liabilities: statementBalances.filter(a => a.type === "LIABILITY"),
-      equity: statementBalances.filter(a => a.type === "EQUITY" && a.code !== "3999"),
+      assets: statementBalances.filter(a => a.type === "ASSET").map(a => ({
+        ...a,
+        classification: getAccountClassification(a.code, a.type, a.name)
+      })),
+      liabilities: statementBalances.filter(a => a.type === "LIABILITY").map(a => ({
+        ...a,
+        classification: getAccountClassification(a.code, a.type, a.name)
+      })),
+      equity: statementBalances.filter(a => a.type === "EQUITY" && a.code !== "3999").map(a => ({
+        ...a,
+        classification: getAccountClassification(a.code, a.type, a.name)
+      })),
       differenceInOpeningBalances: statementBalances.find(a => a.code === "3999")?.periodBalance || 0,
       totalAssets: statementBalances.filter(a => a.type === "ASSET" && isLeafAccount(a.id)).reduce((sum, a) => sum + a.periodBalance, 0),
       totalLiabilities: statementBalances.filter(a => a.type === "LIABILITY" && isLeafAccount(a.id)).reduce((sum, a) => sum + a.periodBalance, 0),
