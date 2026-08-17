@@ -46,6 +46,7 @@ interface Asset {
   assigned_to?: string;
   assignee?: { name: string; designation?: string };
   purchase_date?: string;
+  purchase_value?: number;
   calibration_cert_url?: string;
   invoice_url?: string;
 }
@@ -408,6 +409,18 @@ export default function AssetsPage() {
                   <Input type="date" value={formData.purchase_date} onChange={(e) => setFormData({...formData, purchase_date: e.target.value})} className="bg-background border-border text-foreground" />
                 </div>
               </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Purchase Value (Asset Cost, INR) *</Label>
+                  <Input required type="number" min="0" value={formData.purchase_value || ""} onChange={(e) => setFormData({...formData, purchase_value: Number(e.target.value)})} placeholder="50000" className="bg-background border-border text-foreground" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Estimated GST (18%)</Label>
+                  <div className="h-10 px-3 border border-border rounded-md bg-muted text-muted-foreground flex items-center text-sm font-semibold">
+                    ₹{(Number(formData.purchase_value || 0) * 0.18).toLocaleString()}
+                  </div>
+                </div>
+              </div>
               <div className="space-y-2">
                 <Label>Assign to Personnel</Label>
                 <select value={formData.assigned_to} onChange={(e) => setFormData({...formData, assigned_to: e.target.value})} className="w-full bg-background border border-border rounded-md h-10 px-3 text-sm text-foreground">
@@ -463,17 +476,18 @@ export default function AssetsPage() {
                 <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-widest">Assignment</th>
                 <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-widest">Status</th>
                 <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-widest">Purchase Date</th>
+                <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-widest">Cost Value</th>
                 <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-widest text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-muted-foreground italic font-medium">Syncing with hardware registry...</td>
+                  <td colSpan={7} className="px-6 py-12 text-center text-muted-foreground italic font-medium">Syncing with hardware registry...</td>
                 </tr>
               ) : assets.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-muted-foreground italic text-[10px] uppercase font-bold tracking-widest">No assets currently registered.</td>
+                  <td colSpan={7} className="px-6 py-12 text-center text-muted-foreground italic text-[10px] uppercase font-bold tracking-widest">No assets currently registered.</td>
                 </tr>
               ) : assets.map((asset) => (
                 <tr key={asset.id} className="hover:bg-accent/5 transition-colors group">
@@ -515,6 +529,9 @@ export default function AssetsPage() {
                   </td>
                   <td className="px-6 py-5 text-sm font-medium text-foreground">
                     {asset.purchase_date ? new Date(asset.purchase_date).toLocaleDateString() : 'N/A'}
+                  </td>
+                  <td className="px-6 py-5 text-sm font-bold text-emerald-500">
+                    {asset.purchase_value ? `₹${Number(asset.purchase_value).toLocaleString()}` : '—'}
                   </td>
 
                   <td className="px-6 py-5 text-right">

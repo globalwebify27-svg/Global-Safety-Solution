@@ -128,7 +128,7 @@ export class AccountingService {
     return this.prisma.account.findUnique({ where: { id: account.id } });
   }
 
-  async postVoucher(data: { description: string; amount: number; debit_code: string; credit_code: string; created_by?: string; transaction_date?: string; invoice_id?: string; payment_id?: string; }) {
+  async postVoucher(data: { description: string; amount: number; debit_code: string; credit_code: string; created_by?: string; transaction_date?: string; invoice_id?: string; payment_id?: string; voucher_no?: string; }) {
     const amt = Number(data.amount);
     if (isNaN(amt) || amt <= 0) throw new BadRequestException("Invalid amount");
     const debitAcc = await this.prisma.account.findUnique({ where: { code: data.debit_code } });
@@ -139,7 +139,7 @@ export class AccountingService {
     return this.prisma.$transaction(async (tx) => {
       const year = new Date().getFullYear();
       const count = await tx.ledgerEntry.count();
-      const voucherNo = `JV-${year}-${String(count + 1).padStart(4, "0")}`;
+      const voucherNo = data.voucher_no || `JV-${year}-${String(count + 1).padStart(4, "0")}`;
       const entry = await tx.ledgerEntry.create({
         data: { 
           voucher_no: voucherNo, 
