@@ -256,10 +256,10 @@ export class AccountingService {
       const diff = newAmt - oldAmt;
       const isDebitClass = account.type === "ASSET" || account.type === "EXPENSE";
       
-      // For ASSETS, debit increases (+diff) and credit decreases (-diff)
+      // For ASSETS, debit increases (+diff) and credit increases (+diff)
       // For EQUITY/LIABILITY/REVENUE, credit increases (+diff) and debit decreases (-diff)
-      const targetInc = isDebitClass ? diff : -diff;
-      const obeInc = isDebitClass ? -diff : diff;
+      const targetInc = diff;
+      const obeInc = isDebitClass ? diff : -diff;
 
       await this.prisma.$transaction(async (tx) => {
         // Adjust main account balance
@@ -362,7 +362,17 @@ export class AccountingService {
     const isLeafAccount = (accId: string) => !accounts.some(a => a.parent_id === accId);
     const trialBalance = statementBalances
       .filter(acc => isLeafAccount(acc.id))
-      .map(acc => ({ id: acc.id, name: acc.name, code: acc.code, type: acc.type, debit: (acc.type === "ASSET" || acc.type === "EXPENSE") ? acc.periodBalance : 0, credit: !(acc.type === "ASSET" || acc.type === "EXPENSE") ? acc.periodBalance : 0 }));
+      .map(acc => {
+        const isOBE = acc.code === "3999";
+        return {
+          id: acc.id,
+          name: isOBE ? "Difference in Opening Balances" : acc.name,
+          code: acc.code,
+          type: isOBE ? "DIFF_OP_BALANCE" : acc.type,
+          debit: (acc.type === "ASSET" || acc.type === "EXPENSE") ? acc.periodBalance : (isOBE && acc.periodBalance < 0 ? Math.abs(acc.periodBalance) : 0),
+          credit: !(acc.type === "ASSET" || acc.type === "EXPENSE") ? (isOBE ? (acc.periodBalance >= 0 ? acc.periodBalance : 0) : acc.periodBalance) : 0
+        };
+      });
     const profitAndLoss = {
       revenues: statementBalances.filter(a => a.type === "REVENUE"),
       expenses: statementBalances.filter(a => a.type === "EXPENSE"),
@@ -372,10 +382,11 @@ export class AccountingService {
     const balanceSheet = {
       assets: statementBalances.filter(a => a.type === "ASSET"),
       liabilities: statementBalances.filter(a => a.type === "LIABILITY"),
-      equity: statementBalances.filter(a => a.type === "EQUITY"),
+      equity: statementBalances.filter(a => a.type === "EQUITY" && a.code !== "3999"),
+      differenceInOpeningBalances: statementBalances.find(a => a.code === "3999")?.periodBalance || 0,
       totalAssets: statementBalances.filter(a => a.type === "ASSET" && isLeafAccount(a.id)).reduce((sum, a) => sum + a.periodBalance, 0),
       totalLiabilities: statementBalances.filter(a => a.type === "LIABILITY" && isLeafAccount(a.id)).reduce((sum, a) => sum + a.periodBalance, 0),
-      totalEquity: statementBalances.filter(a => a.type === "EQUITY" && isLeafAccount(a.id)).reduce((sum, a) => sum + a.periodBalance, 0),
+      totalEquity: statementBalances.filter(a => a.type === "EQUITY" && isLeafAccount(a.id) && a.code !== "3999").reduce((sum, a) => sum + a.periodBalance, 0),
     };
     return { trialBalance, profitAndLoss: { ...profitAndLoss, netProfit: profitAndLoss.totalRevenue - profitAndLoss.totalExpense }, balanceSheet, period: { startDate, endDate } };
   }

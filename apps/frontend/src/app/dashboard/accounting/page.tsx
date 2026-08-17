@@ -103,7 +103,7 @@ export default function AccountingPage() {
   const [creditParentId, setCreditParentId] = useState("");
 
   const toggleAccountExpand = (id: string) => setExpandedAccounts(prev => ({ ...prev, [id]: !prev[id] }));
-  const accountTypeColor = (type: string) => { if (type === "ASSET") return "bg-blue-500/10 text-blue-500"; if (type === "LIABILITY") return "bg-amber-500/10 text-amber-500"; if (type === "EQUITY") return "bg-purple-500/10 text-purple-500"; if (type === "REVENUE") return "bg-emerald-500/10 text-emerald-500"; return "bg-rose-500/10 text-rose-500"; };
+  const accountTypeColor = (type: string) => { if (type === "ASSET") return "bg-blue-500/10 text-blue-500"; if (type === "LIABILITY") return "bg-amber-500/10 text-amber-500"; if (type === "EQUITY") return "bg-purple-500/10 text-purple-500"; if (type === "REVENUE") return "bg-emerald-500/10 text-emerald-500"; if (type === "DIFF_OP_BALANCE") return "bg-orange-500/10 text-orange-500"; return "bg-rose-500/10 text-rose-500"; };
 
   const renderCollapsibleAccountRows = (accountsList: any[], type: string, colorClass: string) => {
     if (!accountsList || !Array.isArray(accountsList)) return null;
@@ -387,8 +387,9 @@ export default function AccountingPage() {
         [],
         ["EQUITY", "", "", ""],
         ...(reportData.balanceSheet?.equity || []).map((eq: any) => ["Equity", eq.name, eq.code, Number(eq.periodBalance)]),
+        ["Difference in Opening Balances", "", "", Number(reportData.balanceSheet?.differenceInOpeningBalances || 0)],
         ["Total Equity", "", "", Number(reportData.balanceSheet?.totalEquity || 0)],
-        ["Total Liabilities & Equity", "", "", Number(reportData.balanceSheet?.totalLiabilities || 0) + Number(reportData.balanceSheet?.totalEquity || 0)]
+        ["Total Liabilities & Equity", "", "", Number(reportData.balanceSheet?.totalLiabilities || 0) + Number(reportData.balanceSheet?.totalEquity || 0) + Number(reportData.balanceSheet?.differenceInOpeningBalances || 0)]
       ];
 
       const wb = XLSX.utils.book_new();
@@ -412,7 +413,7 @@ export default function AccountingPage() {
     doc.setFontSize(12); doc.setFont("helvetica", "normal"); doc.text(`Consolidated Audit Statement - ${ds}`, 14, 28); doc.text(`Generated: ${new Date().toLocaleDateString()}`, 14, 34); doc.line(14, 38, 196, 38);
     autoTable(doc, { startY: 42, head: [["Indicator", "Balance"]], body: [["Total Revenue", `INR ${(reportData.profitAndLoss?.totalRevenue || 0).toLocaleString()}`], ["Total Expenses", `INR ${(reportData.profitAndLoss?.totalExpense || 0).toLocaleString()}`], ["Net Profit", `INR ${(reportData.profitAndLoss?.netProfit || 0).toLocaleString()}`]], theme: "striped", styles: { fontSize: 10 }, headStyles: { fillColor: [79, 70, 229] } });
     let y = (doc as any).lastAutoTable.finalY + 15;
-    autoTable(doc, { startY: y, head: [["Classification", "Balance"]], body: [["Total Assets", `INR ${(reportData.balanceSheet?.totalAssets || 0).toLocaleString()}`], ["Total Liabilities", `INR ${(reportData.balanceSheet?.totalLiabilities || 0).toLocaleString()}`], ["Total Equity", `INR ${(reportData.balanceSheet?.totalEquity || 0).toLocaleString()}`]], theme: "striped", styles: { fontSize: 10 }, headStyles: { fillColor: [13, 148, 136] } });
+    autoTable(doc, { startY: y, head: [["Classification", "Balance"]], body: [["Total Assets", `INR ${(reportData.balanceSheet?.totalAssets || 0).toLocaleString()}`], ["Total Liabilities", `INR ${(reportData.balanceSheet?.totalLiabilities || 0).toLocaleString()}`], ["Total Equity", `INR ${(reportData.balanceSheet?.totalEquity || 0).toLocaleString()}`], ["Difference in Opening Balances", `INR ${(reportData.balanceSheet?.differenceInOpeningBalances || 0).toLocaleString()}`], ["Total Liabilities & Equity", `INR ${(Number(reportData.balanceSheet?.totalLiabilities || 0) + Number(reportData.balanceSheet?.totalEquity || 0) + Number(reportData.balanceSheet?.differenceInOpeningBalances || 0)).toLocaleString()}`]], theme: "striped", styles: { fontSize: 10 }, headStyles: { fillColor: [13, 148, 136] } });
     const savDs = period === "monthly" ? `${new Date(year, month).toLocaleString("default", { month: "short" })}-${year}` : `${year}`;
     doc.save(`Audit_Financial_Statement_${savDs}.pdf`); 
     toast.success("PDF downloaded!");
@@ -464,7 +465,7 @@ export default function AccountingPage() {
         ["TRIAL BALANCE"],
         [],
         ["Code", "Account Name", "Type", "Debit (INR)", "Credit (INR)"],
-        ...tb.map((t: any) => [t.code, t.name, t.type, t.debit > 0 ? Number(t.debit) : "", t.credit > 0 ? Number(t.credit) : ""]),
+        ...tb.map((t: any) => [t.code, t.name, t.type === "DIFF_OP_BALANCE" ? "Diff in Op. Balance" : t.type, t.debit > 0 ? Number(t.debit) : "", t.credit > 0 ? Number(t.credit) : ""]),
         [],
         ["Total Sum", "", "", td, tc],
         [Math.abs(td - tc) < 0.01 ? "✓ Balanced" : "✗ Unbalanced", "", "", "", ""]
@@ -491,7 +492,7 @@ export default function AccountingPage() {
       startY: 36,
       head: [["Code", "Account Name", "Classification", "Debit (Dr)", "Credit (Cr)"]],
       body: [
-        ...tb.map((t: any) => [t.code, t.name, t.type, t.debit > 0 ? `₹${Number(t.debit).toLocaleString()}` : "—", t.credit > 0 ? `₹${Number(t.credit).toLocaleString()}` : "—"]),
+        ...tb.map((t: any) => [t.code, t.name, t.type === "DIFF_OP_BALANCE" ? "Diff in Op. Balance" : t.type, t.debit > 0 ? `₹${Number(t.debit).toLocaleString()}` : "—", t.credit > 0 ? `₹${Number(t.credit).toLocaleString()}` : "—"]),
         ["Total Sum", "Aggregate Totals", "", `₹${td.toLocaleString()}`, `₹${tc.toLocaleString()}`],
         [isBalanced ? "✓ Balanced — Books Correct" : "✗ Unbalanced", "", "", "", ""]
       ],
@@ -1008,7 +1009,32 @@ export default function AccountingPage() {
                           <div className="flex items-center justify-between border-b border-border pb-4"><h3 className="font-bold text-base sm:text-lg text-teal-500 uppercase tracking-wider">Balance Sheet Summary</h3><DollarSign className="w-5 h-5 text-teal-500" /></div>
                           <div className="space-y-4">
                             <div><h4 className="text-[10px] sm:text-xs font-black text-muted-foreground uppercase mb-2">Assets (Dr.)</h4><div className="space-y-1">{renderCollapsibleAccountRows(reportData.balanceSheet?.assets, "ASSET", "text-emerald-500")}</div><div className="flex justify-between py-3 font-bold text-xs sm:text-sm border-b-2 border-border/80 mt-1"><span>Total Assets</span><span className="text-emerald-500 underline decoration-double">₹{Number(reportData.balanceSheet?.totalAssets || 0).toLocaleString()}</span></div></div>
-                            <div className="pt-4"><h4 className="text-[10px] sm:text-xs font-black text-muted-foreground uppercase mb-2">Liabilities & Equity (Cr.)</h4><div className="space-y-1">{renderCollapsibleAccountRows(reportData.balanceSheet?.liabilities, "LIABILITY", "text-rose-500")}{renderCollapsibleAccountRows(reportData.balanceSheet?.equity, "EQUITY", "text-purple-500")}</div><div className="flex justify-between py-3 font-bold text-xs sm:text-sm border-b-2 border-border/80 mt-1"><span>Total Liabilities & Equity</span><span className="text-teal-500 underline decoration-double">₹{(Number(reportData.balanceSheet?.totalLiabilities || 0) + Number(reportData.balanceSheet?.totalEquity || 0)).toLocaleString()}</span></div></div>
+                            <div className="pt-4">
+                              <h4 className="text-[10px] sm:text-xs font-black text-muted-foreground uppercase mb-2">Liabilities & Equity (Cr.)</h4>
+                              <div className="space-y-1">
+                                {renderCollapsibleAccountRows(reportData.balanceSheet?.liabilities, "LIABILITY", "text-rose-500")}
+                                {renderCollapsibleAccountRows(reportData.balanceSheet?.equity, "EQUITY", "text-purple-500")}
+                                {reportData.balanceSheet?.differenceInOpeningBalances !== undefined && (
+                                  <div className="flex justify-between items-center py-2.5 text-sm border-b border-border/40 font-semibold select-none">
+                                    <div className="flex items-center gap-1.5">
+                                      <div className="w-4 h-4 shrink-0" />
+                                      <span>Difference in Opening Balances</span>
+                                    </div>
+                                    <span className="font-bold text-purple-500">₹{Number(reportData.balanceSheet.differenceInOpeningBalances).toLocaleString()}</span>
+                                  </div>
+                                )}
+                              </div>
+                              <div className="flex justify-between py-3 font-bold text-xs sm:text-sm border-b-2 border-border/80 mt-1">
+                                <span>Total Liabilities & Equity</span>
+                                <span className="text-teal-500 underline decoration-double">
+                                  ₹{(
+                                    Number(reportData.balanceSheet?.totalLiabilities || 0) +
+                                    Number(reportData.balanceSheet?.totalEquity || 0) +
+                                    Number(reportData.balanceSheet?.differenceInOpeningBalances || 0)
+                                  ).toLocaleString()}
+                                </span>
+                              </div>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -1105,7 +1131,7 @@ export default function AccountingPage() {
                     <table className="w-full text-left border-collapse min-w-[600px]">
                       <thead><tr className="bg-accent/5 border-b border-border text-muted-foreground text-xs font-black uppercase tracking-wider"><th className="py-4 px-6">Code</th><th className="py-4 px-6">Account Name</th><th className="py-4 px-6">Type</th><th className="py-4 px-6 text-right">Debit (Dr)</th><th className="py-4 px-6 text-right">Credit (Cr)</th></tr></thead>
                       <tbody className="divide-y divide-border/60 text-sm">
-                        {(reportData.trialBalance || []).map((t: any) => (<tr key={t.id} className="hover:bg-accent/5 transition-colors"><td className="py-3 px-6 font-mono font-bold text-indigo-500">{t.code}</td><td className="py-3 px-6 font-medium">{t.name}</td><td className="py-3 px-6"><span className={cn("text-xs px-2.5 py-1 rounded-full font-bold", accountTypeColor(t.type))}>{t.type}</span></td><td className="py-3 px-6 text-right font-bold text-emerald-500">{t.debit > 0 ? `₹${Number(t.debit).toLocaleString()}` : "—"}</td><td className="py-3 px-6 text-right font-bold text-rose-500">{t.credit > 0 ? `₹${Number(t.credit).toLocaleString()}` : "—"}</td></tr>))}
+                        {(reportData.trialBalance || []).map((t: any) => (<tr key={t.id} className="hover:bg-accent/5 transition-colors"><td className="py-3 px-6 font-mono font-bold text-indigo-500">{t.code}</td><td className="py-3 px-6 font-medium">{t.name}</td><td className="py-3 px-6"><span className={cn("text-xs px-2.5 py-1 rounded-full font-bold", accountTypeColor(t.type))}>{t.type === "DIFF_OP_BALANCE" ? "Diff in Op. Balance" : t.type}</span></td><td className="py-3 px-6 text-right font-bold text-emerald-500">{t.debit > 0 ? `₹${Number(t.debit).toLocaleString()}` : "—"}</td><td className="py-3 px-6 text-right font-bold text-rose-500">{t.credit > 0 ? `₹${Number(t.credit).toLocaleString()}` : "—"}</td></tr>))}
                       </tbody>
                       <tfoot>{(() => { const td = (reportData.trialBalance || []).reduce((s: number, t: any) => s + Number(t.debit), 0); const tc = (reportData.trialBalance || []).reduce((s: number, t: any) => s + Number(t.credit), 0); const bal = Math.abs(td - tc) < 0.01; return (<tr className={cn("border-t-2 font-black text-sm", bal ? "bg-emerald-500/5 border-emerald-500/30" : "bg-rose-500/5 border-rose-500/30")}><td colSpan={3} className="py-4 px-6">{bal ? <span className="text-emerald-500">✓ Balanced — Books are correct</span> : <span className="text-rose-500">✗ Unbalanced — Diff: ₹{Math.abs(td - tc).toLocaleString()}</span>}</td><td className="py-4 px-6 text-right text-emerald-500">₹{td.toLocaleString()}</td><td className="py-4 px-6 text-right text-rose-500">₹{tc.toLocaleString()}</td></tr>); })()}</tfoot>
                     </table>
