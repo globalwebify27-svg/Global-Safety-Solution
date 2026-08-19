@@ -26,7 +26,8 @@ import {
   BanIcon,
   Pencil,
   Trash2,
-  Info
+  Info,
+  Scale
 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -423,6 +424,9 @@ export default function AssetsPage() {
     acc.type === 'ASSET' || acc.type === 'LIABILITY' || acc.type === 'EQUITY'
   );
 
+  // Total opening balance calculation
+  const totalOpeningBalance = assets.reduce((sum, a) => sum + (Number(a.opening_balance) || 0), 0);
+
   return (
     <div className="space-y-8 pb-10">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -481,18 +485,18 @@ export default function AssetsPage() {
                 </div>
               </div>
 
-              {/* Single-Entry Opening Balance Field */}
-              <div className="space-y-2 p-3 bg-muted/40 rounded-xl border border-border">
+              {/* Single-Entry Opening Balance Field (No Auto Equity Adjustment) */}
+              <div className="space-y-2 p-3.5 bg-muted/40 rounded-xl border border-border">
                 <div className="flex items-center justify-between">
                   <Label className="text-sm font-semibold flex items-center gap-1.5">
-                    Opening Balance (Pre-Existing Asset Value, INR)
+                    Opening Balance (Historical Asset Value, INR)
                   </Label>
-                  <span className="text-[10px] uppercase font-bold bg-indigo-500/10 text-indigo-500 px-2 py-0.5 rounded-md">Single-Entry Mode</span>
+                  <span className="text-[10px] uppercase font-bold bg-indigo-500/10 text-indigo-500 px-2 py-0.5 rounded-md">No Auto Equity Adjustment</span>
                 </div>
                 <Input type="number" min="0" value={formData.opening_balance || ""} onChange={(e) => setFormData({...formData, opening_balance: Number(e.target.value)})} placeholder="0" className="bg-background border-border text-foreground" />
                 <p className="text-[11px] text-muted-foreground flex items-center gap-1">
-                  <Info className="w-3 h-3 text-indigo-500 inline shrink-0" />
-                  Single-Entry: Records carrying value for historical assets without generating new ledger transaction entries.
+                  <Info className="w-3.5 h-3.5 text-indigo-500 inline shrink-0" />
+                  No Auto Adjustment with Equity: Records historical carrying value without generating equity vouchers. Difference is displayed for CA review.
                 </p>
               </div>
 
@@ -554,14 +558,14 @@ export default function AssetsPage() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         {[
           { label: "Tracked Assets", value: assets.length, icon: Tag, color: "text-blue-600 dark:text-blue-400", bg: "bg-blue-500/10" },
-          { label: "Currently Assigned", value: assets.filter(a => a.status === 'IN_USE').length, icon: UserPlus, color: "text-indigo-600 dark:text-indigo-400", bg: "bg-indigo-500/10" },
+          { label: "Total Op. Balance", value: `₹${totalOpeningBalance.toLocaleString()}`, icon: Scale, color: "text-indigo-600 dark:text-indigo-400", bg: "bg-indigo-500/10" },
+          { label: "Currently Assigned", value: assets.filter(a => a.status === 'IN_USE').length, icon: UserPlus, color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-500/10" },
           { label: "Maintenance Required", value: assets.filter(a => a.status === 'MAINTENANCE').length, icon: Wrench, color: "text-rose-600 dark:text-rose-400", bg: "bg-rose-500/10" },
-          { label: "Not In Use", value: assets.filter(a => a.status === 'NOT_IN_USE').length, icon: BanIcon, color: "text-slate-500 dark:text-slate-400", bg: "bg-slate-500/10" },
         ].map((stat, i) => (
           <div key={i} className="bg-card/40 border border-border rounded-2xl p-6 flex items-center justify-between shadow-sm backdrop-blur-md hover:border-primary/20 transition-all group">
             <div className="space-y-1">
               <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">{stat.label}</p>
-              <p className="text-3xl font-black text-foreground group-hover:text-primary transition-colors">{stat.value}</p>
+              <p className="text-2xl font-black text-foreground group-hover:text-primary transition-colors">{stat.value}</p>
             </div>
             <div className={`w-14 h-14 rounded-2xl ${stat.bg} flex items-center justify-center ${stat.color} shadow-lg shadow-black/5`}>
               <stat.icon className="w-7 h-7" />
@@ -647,7 +651,7 @@ export default function AssetsPage() {
                     ) : null}
                     {asset.opening_balance ? (
                       <div className="text-indigo-400">
-                        Op Bal: ₹{Number(asset.opening_balance).toLocaleString()} (Single Entry)
+                        Op Bal: ₹{Number(asset.opening_balance).toLocaleString()} (No Auto Equity)
                       </div>
                     ) : null}
                     {!asset.purchase_value && !asset.opening_balance && (
@@ -772,10 +776,10 @@ export default function AssetsPage() {
             </div>
 
             {/* Opening Balance Field in Edit */}
-            <div className="space-y-2 p-3 bg-muted/40 rounded-xl border border-border">
+            <div className="space-y-2 p-3.5 bg-muted/40 rounded-xl border border-border">
               <div className="flex items-center justify-between">
                 <Label className="text-sm font-semibold">Opening Balance (INR)</Label>
-                <span className="text-[10px] uppercase font-bold bg-indigo-500/10 text-indigo-500 px-2 py-0.5 rounded-md">Single Entry</span>
+                <span className="text-[10px] uppercase font-bold bg-indigo-500/10 text-indigo-500 px-2 py-0.5 rounded-md">No Auto Equity</span>
               </div>
               <Input type="number" min="0" value={editFormData.opening_balance || ""} onChange={(e) => setEditFormData({...editFormData, opening_balance: Number(e.target.value)})} className="bg-background border-border text-foreground" />
             </div>
@@ -841,8 +845,8 @@ export default function AssetsPage() {
           <div className="space-y-4 py-3 text-sm text-muted-foreground">
             <p className="text-rose-500 font-medium">Accounting Safety Check:</p>
             <ul className="list-disc pl-5 space-y-1.5 text-xs">
-              <li>If accounting vouchers exist for this asset, they will be <strong>safely reversed</strong> in the General Ledger with audit logs.</li>
-              <li>The asset entry will be removed from active inventory registry.</li>
+              <li>If purchase accounting vouchers exist for this asset, they will be <strong>safely reversed</strong> in the General Ledger.</li>
+              <li>The asset record will be permanently removed from active inventory.</li>
             </ul>
           </div>
           <DialogFooter className="gap-2 sm:gap-0">

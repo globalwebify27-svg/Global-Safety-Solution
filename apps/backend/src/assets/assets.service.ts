@@ -35,6 +35,33 @@ export class AssetsService {
     return asset;
   }
 
+  async syncAssetOpeningBalanceWithAccounting(user?: string) {
+    // Resolve Fixed Assets Account (Code 30 or containing "Fixed Assets")
+    let assetAcc = await this.prisma.account.findFirst({
+      where: {
+        OR: [
+          { code: '30' },
+          { name: { contains: 'Fixed Assets' } }
+        ]
+      }
+    });
+    if (!assetAcc) {
+      assetAcc = await this.prisma.account.findFirst({
+        where: { type: 'ASSET', code: { startsWith: '3' } }
+      });
+    }
+    if (!assetAcc) return;
+
+    // Calculate sum of opening_balance across all assets
+    const aggregate = await this.prisma.asset.aggregate({
+      _sum: { opening_balance: true }
+    });
+    const totalOpBal = Number(aggregate._sum.opening_balance || 0);
+
+    // Call existing AccountingService updateOpeningBalance for Fixed Assets Account
+    await this.accountingService.updateOpeningBalance(assetAcc.id, totalOpBal, user || 'Asset Registry');
+  }
+
   async postAssetPurchaseVouchers(asset: any, selectedCreditAccountId?: string, user?: string) {
     const costAmt = Number(asset.purchase_value);
     if (!costAmt || costAmt <= 0) return;
@@ -167,6 +194,11 @@ export class AssetsService {
       await this.postAssetPurchaseVouchers(asset, data.credit_account_id, user);
     }
 
+    // Reuse existing Account Opening Balance engine for asset opening balances
+    if (asset.opening_balance && Number(asset.opening_balance) > 0) {
+      await this.syncAssetOpeningBalanceWithAccounting(user);
+    }
+
     return asset;
   }
 
@@ -208,12 +240,19 @@ export class AssetsService {
     const oldCreditId = existingAsset.credit_account_id;
     const newCreditId = updatedAsset.credit_account_id;
 
-    // If financial value or credit account changed, update accounting vouchers without duplication
+    // If financial purchase value or credit account changed, update purchase vouchers
     if (oldCost !== newCost || oldCreditId !== newCreditId) {
       await this.removeAssetPurchaseVouchers(id, user);
       if (newCost > 0) {
         await this.postAssetPurchaseVouchers(updatedAsset, newCreditId || undefined, user);
       }
+    }
+
+    // If opening_balance changed, update existing account opening balance engine
+    const oldOpBal = Number(existingAsset.opening_balance || 0);
+    const newOpBal = Number(updatedAsset.opening_balance || 0);
+    if (oldOpBal !== newOpBal) {
+      await this.syncAssetOpeningBalanceWithAccounting(user);
     }
 
     return updatedAsset;
@@ -223,11 +262,20 @@ export class AssetsService {
     const existingAsset = await this.prisma.asset.findUnique({ where: { id } });
     if (!existingAsset) throw new NotFoundException('Asset not found');
 
+    const hasOpBal = Number(existingAsset.opening_balance || 0) > 0;
+
     // Reverse any linked purchase accounting entries cleanly before removing asset
     await this.removeAssetPurchaseVouchers(id, user);
 
-    return this.prisma.asset.delete({
+    const result = await this.prisma.asset.delete({
       where: { id },
     });
+
+    // Recalculate opening balance with existing account opening balance engine if asset had op bal
+    if (hasOpBal) {
+      await this.syncAssetOpeningBalanceWithAccounting(user);
+    }
+
+    return result;
   }
 }
