@@ -638,6 +638,8 @@ model Asset {
   model_number     String?   @db.VarChar(255)
   purchase_date    DateTime? @db.Date
   purchase_value   Decimal?  @db.Decimal(15, 2)
+  opening_balance  Decimal?  @db.Decimal(15, 2)
+  credit_account_id String?  @db.VarChar(36)
   assigned_to      String?   @db.VarChar(36)
   status           String    @default("AVAILABLE") @db.VarChar(50)
   last_maintenance DateTime? @db.DateTime(6)
@@ -646,8 +648,10 @@ model Asset {
   calibration_cert_url String?   @db.Text
   invoice_url          String?   @db.Text
   assignee         User?     @relation("AssetAssignee", fields: [assigned_to], references: [id])
+  credit_account   Account?  @relation("AssetCreditAccount", fields: [credit_account_id], references: [id])
 
   @@index([assigned_to], map: "assets_assigned_to_fkey")
+  @@index([credit_account_id], map: "assets_credit_account_id_fkey")
   @@map("assets")
 }
 
@@ -1073,6 +1077,7 @@ model Account {
   updated_at     DateTime      @updatedAt @db.DateTime(6)
   debits         LedgerEntry[] @relation("DebitAccount")
   credits        LedgerEntry[] @relation("CreditAccount")
+  credited_assets Asset[]      @relation("AssetCreditAccount")
   parent         Account?      @relation("ParentChild", fields: [parent_id], references: [id])
   children       Account[]     @relation("ParentChild")
 

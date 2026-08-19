@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AccountingService } from '../accounting/accounting.service';
 
@@ -15,7 +15,11 @@ export class AssetsService {
         assignee: {
           select: { id: true, name: true, designation: true },
         },
+        credit_account: {
+          select: { id: true, name: true, code: true, type: true },
+        },
       },
+      orderBy: { created_at: 'desc' },
     });
   }
 
@@ -24,30 +28,21 @@ export class AssetsService {
       where: { id },
       include: {
         assignee: true,
+        credit_account: true,
       },
     });
     if (!asset) throw new NotFoundException('Asset not found');
     return asset;
   }
 
-  async postAssetPurchaseVouchers(asset: any) {
+  async postAssetPurchaseVouchers(asset: any, selectedCreditAccountId?: string, user?: string) {
     const costAmt = Number(asset.purchase_value);
     if (!costAmt || costAmt <= 0) return;
 
-    // Duplicate protection check
     const costVoucherNo = `AST-PUR-COST-${asset.id}`;
     const gstVoucherNo = `AST-PUR-GST-${asset.id}`;
 
-    const existingVoucher = await this.prisma.ledgerEntry.findUnique({
-      where: { voucher_no: costVoucherNo }
-    });
-    if (existingVoucher) {
-      // Vouchers already posted for this asset, skip
-      return;
-    }
-
-    // Resolve accounts dynamically
-    // Fixed Assets account (code 30 or containing "Fixed Assets")
+    // Resolve Fixed Assets debit account (code 30 or containing "Fixed Assets")
     let assetAcc = await this.prisma.account.findFirst({
       where: {
         OR: [
@@ -63,7 +58,7 @@ export class AssetsService {
     }
     const assetCode = assetAcc?.code || '30';
 
-    // Input GST / ITC account (code 2299.1 or containing "Input Tax Credit" / "ITC")
+    // Resolve Input GST / ITC account (code 2299.1 or containing "Input Tax Credit" / "ITC")
     let gstAcc = await this.prisma.account.findFirst({
       where: {
         OR: [
@@ -80,25 +75,35 @@ export class AssetsService {
     }
     const gstCode = gstAcc?.code || '2299.1';
 
-    // Bank / Payment account (code 1010 or containing "Bank Current Account" / "HDFC Current Account")
-    let bankAcc = await this.prisma.account.findFirst({
-      where: {
-        OR: [
-          { code: '1010' },
-          { name: { contains: 'Bank Current Account' } },
-          { name: { contains: 'HDFC Current Account' } }
-        ]
-      }
-    });
-    if (!bankAcc) {
-      bankAcc = await this.prisma.account.findFirst({
-        where: { type: 'ASSET', code: { startsWith: '10' } }
-      });
+    // Resolve Credit Account
+    let creditAcc: any = null;
+    const targetCreditId = selectedCreditAccountId || asset.credit_account_id;
+    if (targetCreditId) {
+      creditAcc = await this.prisma.account.findUnique({ where: { id: targetCreditId } });
     }
-    const bankCode = bankAcc?.code || '1010';
 
-    // Calculate GST (18%) and total amount
+    if (!creditAcc) {
+      // Fallback to Bank / Payment account (code 1010 or containing "Bank Current Account" / "HDFC Current Account")
+      creditAcc = await this.prisma.account.findFirst({
+        where: {
+          OR: [
+            { code: '1010' },
+            { name: { contains: 'Bank Current Account' } },
+            { name: { contains: 'HDFC Current Account' } }
+          ]
+        }
+      });
+      if (!creditAcc) {
+        creditAcc = await this.prisma.account.findFirst({
+          where: { type: 'ASSET', code: { startsWith: '10' } }
+        });
+      }
+    }
+    const creditCode = creditAcc?.code || '1010';
+
+    // Calculate GST (18%) and post Cost + GST vouchers
     const gstAmt = costAmt * 0.18;
+    const createdBy = user || 'System';
 
     // Post Cost Voucher
     await this.accountingService.postVoucher({
@@ -106,8 +111,8 @@ export class AssetsService {
       description: `Capitalized asset: ${asset.name} (Tag: ${asset.asset_tag})`,
       amount: costAmt,
       debit_code: assetCode,
-      credit_code: bankCode,
-      created_by: 'System'
+      credit_code: creditCode,
+      created_by: createdBy
     });
 
     // Post GST Voucher
@@ -116,51 +121,111 @@ export class AssetsService {
       description: `Input GST for capitalized asset: ${asset.name} (Tag: ${asset.asset_tag})`,
       amount: gstAmt,
       debit_code: gstCode,
-      credit_code: bankCode,
-      created_by: 'System'
+      credit_code: creditCode,
+      created_by: createdBy
     });
   }
 
-  async create(data: any) {
+  async removeAssetPurchaseVouchers(assetId: string, user?: string) {
+    const costVoucherNo = `AST-PUR-COST-${assetId}`;
+    const gstVoucherNo = `AST-PUR-GST-${assetId}`;
+    const deletedBy = user || 'System';
+
+    const costVoucher = await this.prisma.ledgerEntry.findUnique({ where: { voucher_no: costVoucherNo } });
+    if (costVoucher) {
+      await this.accountingService.deleteVoucher(costVoucher.id, deletedBy);
+    }
+
+    const gstVoucher = await this.prisma.ledgerEntry.findUnique({ where: { voucher_no: gstVoucherNo } });
+    if (gstVoucher) {
+      await this.accountingService.deleteVoucher(gstVoucher.id, deletedBy);
+    }
+  }
+
+  async create(data: any, user?: string) {
     const asset = await this.prisma.asset.create({
       data: {
         asset_tag: data.asset_tag,
         name: data.name,
-        serial_number: data.serial_number,
-        model_number: data.model_number,
+        serial_number: data.serial_number || null,
+        model_number: data.model_number || null,
         purchase_date: data.purchase_date ? new Date(data.purchase_date) : null,
-        purchase_value: data.purchase_value,
+        purchase_value: data.purchase_value ? Number(data.purchase_value) : null,
+        opening_balance: data.opening_balance ? Number(data.opening_balance) : null,
+        credit_account_id: data.credit_account_id || null,
         status: data.status || 'AVAILABLE',
         assigned_to: data.assigned_to || null,
       },
-    });
-
-    if (asset.purchase_value && Number(asset.purchase_value) > 0) {
-      await this.postAssetPurchaseVouchers(asset);
-    }
-
-    return asset;
-  }
-
-  async update(id: string, data: any) {
-    const asset = await this.prisma.asset.update({
-      where: { id },
-      data: {
-        ...data,
-        purchase_date: data.purchase_date
-          ? new Date(data.purchase_date)
-          : undefined,
+      include: {
+        assignee: { select: { id: true, name: true, designation: true } },
+        credit_account: { select: { id: true, name: true, code: true, type: true } },
       },
     });
 
+    // Double-Entry accounting flow for fresh purchase value
     if (asset.purchase_value && Number(asset.purchase_value) > 0) {
-      await this.postAssetPurchaseVouchers(asset);
+      await this.postAssetPurchaseVouchers(asset, data.credit_account_id, user);
     }
 
     return asset;
   }
 
-  async delete(id: string) {
+  async update(id: string, data: any, user?: string) {
+    const existingAsset = await this.prisma.asset.findUnique({ where: { id } });
+    if (!existingAsset) throw new NotFoundException('Asset not found');
+
+    const updatePayload: any = {};
+    if (data.asset_tag !== undefined) updatePayload.asset_tag = data.asset_tag;
+    if (data.name !== undefined) updatePayload.name = data.name;
+    if (data.serial_number !== undefined) updatePayload.serial_number = data.serial_number || null;
+    if (data.model_number !== undefined) updatePayload.model_number = data.model_number || null;
+    if (data.status !== undefined) updatePayload.status = data.status;
+    if (data.assigned_to !== undefined) updatePayload.assigned_to = data.assigned_to || null;
+    if (data.purchase_date !== undefined) {
+      updatePayload.purchase_date = data.purchase_date ? new Date(data.purchase_date) : null;
+    }
+    if (data.purchase_value !== undefined) {
+      updatePayload.purchase_value = data.purchase_value !== null && data.purchase_value !== '' ? Number(data.purchase_value) : null;
+    }
+    if (data.opening_balance !== undefined) {
+      updatePayload.opening_balance = data.opening_balance !== null && data.opening_balance !== '' ? Number(data.opening_balance) : null;
+    }
+    if (data.credit_account_id !== undefined) {
+      updatePayload.credit_account_id = data.credit_account_id || null;
+    }
+
+    const updatedAsset = await this.prisma.asset.update({
+      where: { id },
+      data: updatePayload,
+      include: {
+        assignee: { select: { id: true, name: true, designation: true } },
+        credit_account: { select: { id: true, name: true, code: true, type: true } },
+      },
+    });
+
+    const oldCost = Number(existingAsset.purchase_value || 0);
+    const newCost = Number(updatedAsset.purchase_value || 0);
+    const oldCreditId = existingAsset.credit_account_id;
+    const newCreditId = updatedAsset.credit_account_id;
+
+    // If financial value or credit account changed, update accounting vouchers without duplication
+    if (oldCost !== newCost || oldCreditId !== newCreditId) {
+      await this.removeAssetPurchaseVouchers(id, user);
+      if (newCost > 0) {
+        await this.postAssetPurchaseVouchers(updatedAsset, newCreditId || undefined, user);
+      }
+    }
+
+    return updatedAsset;
+  }
+
+  async delete(id: string, user?: string) {
+    const existingAsset = await this.prisma.asset.findUnique({ where: { id } });
+    if (!existingAsset) throw new NotFoundException('Asset not found');
+
+    // Reverse any linked purchase accounting entries cleanly before removing asset
+    await this.removeAssetPurchaseVouchers(id, user);
+
     return this.prisma.asset.delete({
       where: { id },
     });

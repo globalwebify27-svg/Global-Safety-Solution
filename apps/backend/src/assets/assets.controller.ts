@@ -6,6 +6,7 @@ import {
   Delete,
   Param,
   Body,
+  Req,
   UseGuards,
 } from '@nestjs/common';
 import { AssetsService } from './assets.service';
@@ -32,19 +33,28 @@ export class AssetsController {
 
   @Post()
   @Permissions('CREATE_ASSET')
-  create(@Body() data: any) {
-    return this.assetsService.create(data);
+  create(@Body() data: any, @Req() req: any) {
+    const user = req.user?.name 
+      ? `${req.user.name}${req.user.employee_id ? " (" + req.user.employee_id + ")" : ""}` 
+      : (req.user?.email || "System");
+    return this.assetsService.create(data, user);
   }
 
   @Patch(':id')
   @Permissions('UPDATE_ASSET')
-  update(@Param('id') id: string, @Body() data: any) {
-    return this.assetsService.update(id, data);
+  update(@Param('id') id: string, @Body() data: any, @Req() req: any) {
+    const user = req.user?.name 
+      ? `${req.user.name}${req.user.employee_id ? " (" + req.user.employee_id + ")" : ""}` 
+      : (req.user?.email || "System");
+    return this.assetsService.update(id, data, user);
   }
 
   @Delete(':id')
   @Permissions('DELETE_ASSET')
-  delete(@Param('id') id: string) {
-    return this.assetsService.delete(id);
+  delete(@Param('id') id: string, @Req() req: any) {
+    const user = req.user?.name 
+      ? `${req.user.name}${req.user.employee_id ? " (" + req.user.employee_id + ")" : ""}` 
+      : (req.user?.email || "System");
+    return this.assetsService.delete(id, user);
   }
 }

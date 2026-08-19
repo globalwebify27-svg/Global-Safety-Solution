@@ -23,7 +23,10 @@ import {
   CheckCircle2,
   XCircle,
   Loader2,
-  BanIcon
+  BanIcon,
+  Pencil,
+  Trash2,
+  Info
 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -47,6 +50,9 @@ interface Asset {
   assignee?: { name: string; designation?: string };
   purchase_date?: string;
   purchase_value?: number;
+  opening_balance?: number;
+  credit_account_id?: string;
+  credit_account?: { id: string; name: string; code: string; type: string };
   calibration_cert_url?: string;
   invoice_url?: string;
 }
@@ -56,11 +62,21 @@ interface User {
   name: string;
 }
 
+interface Account {
+  id: string;
+  name: string;
+  code: string;
+  type: string;
+}
+
 export default function AssetsPage() {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [users, setUsers] = useState<User[]>([]);
+  const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [reassignOpen, setReassignOpen] = useState(false);
@@ -70,8 +86,6 @@ export default function AssetsPage() {
   const [newAssigneeId, setNewAssigneeId] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
 
-
-  
   const token = useAuthStore((state) => state.token);
 
   const [formData, setFormData] = useState({
@@ -81,6 +95,21 @@ export default function AssetsPage() {
     model_number: "",
     purchase_date: "",
     purchase_value: 0,
+    opening_balance: 0,
+    credit_account_id: "",
+    status: "AVAILABLE",
+    assigned_to: ""
+  });
+
+  const [editFormData, setEditFormData] = useState({
+    asset_tag: "",
+    name: "",
+    serial_number: "",
+    model_number: "",
+    purchase_date: "",
+    purchase_value: 0,
+    opening_balance: 0,
+    credit_account_id: "",
     status: "AVAILABLE",
     assigned_to: ""
   });
@@ -93,19 +122,24 @@ export default function AssetsPage() {
     if (!token) return;
     setLoading(true);
     try {
-      const [assetRes, userRes] = await Promise.all([
+      const [assetRes, userRes, accountRes] = await Promise.all([
         fetch(`${API_BASE_URL}/assets`, {
           headers: { Authorization: `Bearer ${token}` }
         }),
         fetch(`${API_BASE_URL}/users`, {
           headers: { Authorization: `Bearer ${token}` }
+        }),
+        fetch(`${API_BASE_URL}/accounting/accounts`, {
+          headers: { Authorization: `Bearer ${token}` }
         })
       ]);
       const assetData = await assetRes.json();
       const userData = await userRes.json();
+      const accountData = await accountRes.json();
       
       if (Array.isArray(assetData)) setAssets(assetData);
       if (Array.isArray(userData)) setUsers(userData);
+      if (Array.isArray(accountData)) setAccounts(accountData);
     } catch (e) {
       console.error(e);
     } finally {
@@ -114,7 +148,18 @@ export default function AssetsPage() {
   };
 
   const resetForm = () => {
-    setFormData({ asset_tag: "", name: "", serial_number: "", model_number: "", purchase_date: "", purchase_value: 0, status: "AVAILABLE", assigned_to: "" });
+    setFormData({
+      asset_tag: "",
+      name: "",
+      serial_number: "",
+      model_number: "",
+      purchase_date: "",
+      purchase_value: 0,
+      opening_balance: 0,
+      credit_account_id: "",
+      status: "AVAILABLE",
+      assigned_to: ""
+    });
   };
 
   const handleCreateAsset = async (e: React.FormEvent) => {
@@ -131,6 +176,8 @@ export default function AssetsPage() {
         },
         body: JSON.stringify({
           ...formData,
+          purchase_value: Number(formData.purchase_value || 0),
+          opening_balance: Number(formData.opening_balance || 0),
         })
       });
       if (res.ok) {
@@ -142,7 +189,7 @@ export default function AssetsPage() {
         const errData = await res.json().catch(() => ({}));
         const msg = errData.message || "Failed to register asset.";
         if (res.status === 409) {
-          toast.error(`Duplicate Asset: An asset with this Tag or Serial Number already exists. Please use a unique Asset Tag and Serial Number.`);
+          toast.error(`Duplicate Asset: An asset with this Tag or Serial Number already exists.`);
         } else {
           toast.error(msg);
         }
@@ -152,6 +199,90 @@ export default function AssetsPage() {
       toast.error("Network error. Please try again.");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const openEditModal = (asset: Asset) => {
+    setSelectedAsset(asset);
+    setEditFormData({
+      asset_tag: asset.asset_tag || "",
+      name: asset.name || "",
+      serial_number: asset.serial_number || "",
+      model_number: asset.model_number || "",
+      purchase_date: asset.purchase_date ? asset.purchase_date.split("T")[0] : "",
+      purchase_value: asset.purchase_value ? Number(asset.purchase_value) : 0,
+      opening_balance: asset.opening_balance ? Number(asset.opening_balance) : 0,
+      credit_account_id: asset.credit_account_id || "",
+      status: asset.status || "AVAILABLE",
+      assigned_to: asset.assigned_to || ""
+    });
+    setEditOpen(true);
+  };
+
+  const handleEditAsset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedAsset || !token) return;
+
+    setSubmitting(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/assets/${selectedAsset.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          ...editFormData,
+          purchase_value: Number(editFormData.purchase_value || 0),
+          opening_balance: Number(editFormData.opening_balance || 0),
+        })
+      });
+      if (res.ok) {
+        toast.success("Asset updated successfully!");
+        setEditOpen(false);
+        setSelectedAsset(null);
+        fetchData();
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        toast.error(errData.message || "Failed to update asset.");
+      }
+    } catch (e) {
+      console.error(e);
+      toast.error("Network error updating asset.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const openDeleteModal = (asset: Asset) => {
+    setSelectedAsset(asset);
+    setDeleteOpen(true);
+  };
+
+  const handleDeleteAsset = async () => {
+    if (!selectedAsset || !token) return;
+    setActionLoading(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/assets/${selectedAsset.id}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      if (res.ok) {
+        toast.success("Asset deleted successfully!");
+        setDeleteOpen(false);
+        setSelectedAsset(null);
+        fetchData();
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        toast.error(errData.message || "Failed to delete asset.");
+      }
+    } catch (e) {
+      console.error(e);
+      toast.error("Error deleting asset.");
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -287,69 +418,9 @@ export default function AssetsPage() {
     }
   };
 
-  // File upload field component
-  const FileUploadField = ({
-    label,
-    required,
-    file,
-    uploading,
-    uploadedUrl,
-    onChange,
-    accept = ".pdf",
-    icon,
-    color,
-  }: {
-    label: string;
-    required?: boolean;
-    file: File | null;
-    uploading: boolean;
-    uploadedUrl: string;
-    onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-    accept?: string;
-    icon: React.ReactNode;
-    color: string;
-  }) => (
-    <div className="space-y-2">
-      <Label className="flex items-center gap-1.5 text-sm font-semibold">
-        {icon}
-        {label} {required && <span className="text-rose-500">*</span>}
-      </Label>
-      <label className={cn(
-        "relative flex flex-col items-center justify-center w-full h-24 rounded-xl border-2 border-dashed cursor-pointer transition-all",
-        uploadedUrl
-          ? "border-emerald-500/50 bg-emerald-500/5 hover:bg-emerald-500/10"
-          : "border-border bg-background hover:border-primary/40 hover:bg-accent/5"
-      )}>
-        <input
-          type="file"
-          accept={accept}
-          onChange={onChange}
-          className="absolute inset-0 opacity-0 cursor-pointer"
-        />
-        {uploading ? (
-          <div className="flex flex-col items-center gap-1.5">
-            <Loader2 className={`w-6 h-6 animate-spin ${color}`} />
-            <span className="text-xs text-muted-foreground font-medium">Uploading...</span>
-          </div>
-        ) : uploadedUrl ? (
-          <div className="flex flex-col items-center gap-1.5">
-            <CheckCircle2 className="w-6 h-6 text-emerald-500" />
-            <span className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold">
-              {file?.name || "Uploaded"}
-            </span>
-            <span className="text-[10px] text-muted-foreground">Click to replace</span>
-          </div>
-        ) : (
-          <div className="flex flex-col items-center gap-1.5">
-            <Upload className={`w-5 h-5 ${color}`} />
-            <span className="text-xs font-semibold text-muted-foreground">
-              {file ? file.name : "Click to upload PDF"}
-            </span>
-            <span className="text-[10px] text-muted-foreground uppercase tracking-widest">PDF only</span>
-          </div>
-        )}
-      </label>
-    </div>
+  // Filter credit accounts for dropdown (Asset/Bank/Cash, Liability/Payables, Equity/Capital)
+  const selectableCreditAccounts = accounts.filter(acc => 
+    acc.type === 'ASSET' || acc.type === 'LIABILITY' || acc.type === 'EQUITY'
   );
 
   return (
@@ -409,10 +480,27 @@ export default function AssetsPage() {
                   <Input type="date" value={formData.purchase_date} onChange={(e) => setFormData({...formData, purchase_date: e.target.value})} className="bg-background border-border text-foreground" />
                 </div>
               </div>
+
+              {/* Single-Entry Opening Balance Field */}
+              <div className="space-y-2 p-3 bg-muted/40 rounded-xl border border-border">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-semibold flex items-center gap-1.5">
+                    Opening Balance (Pre-Existing Asset Value, INR)
+                  </Label>
+                  <span className="text-[10px] uppercase font-bold bg-indigo-500/10 text-indigo-500 px-2 py-0.5 rounded-md">Single-Entry Mode</span>
+                </div>
+                <Input type="number" min="0" value={formData.opening_balance || ""} onChange={(e) => setFormData({...formData, opening_balance: Number(e.target.value)})} placeholder="0" className="bg-background border-border text-foreground" />
+                <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+                  <Info className="w-3 h-3 text-indigo-500 inline shrink-0" />
+                  Single-Entry: Records carrying value for historical assets without generating new ledger transaction entries.
+                </p>
+              </div>
+
+              {/* Purchase Value & Credit Account */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Purchase Value (Asset Cost, INR) *</Label>
-                  <Input required type="number" min="0" value={formData.purchase_value || ""} onChange={(e) => setFormData({...formData, purchase_value: Number(e.target.value)})} placeholder="50000" className="bg-background border-border text-foreground" />
+                  <Label>Purchase Value (Asset Cost, INR)</Label>
+                  <Input type="number" min="0" value={formData.purchase_value || ""} onChange={(e) => setFormData({...formData, purchase_value: Number(e.target.value)})} placeholder="50000" className="bg-background border-border text-foreground" />
                 </div>
                 <div className="space-y-2">
                   <Label>Estimated GST (18%)</Label>
@@ -421,6 +509,22 @@ export default function AssetsPage() {
                   </div>
                 </div>
               </div>
+
+              {/* Credit Account Selection */}
+              {Number(formData.purchase_value || 0) > 0 && (
+                <div className="space-y-2">
+                  <Label className="font-semibold text-indigo-500 dark:text-indigo-400">Credit Account (Cr. Side for Double-Entry)</Label>
+                  <select value={formData.credit_account_id} onChange={(e) => setFormData({...formData, credit_account_id: e.target.value})} className="w-full bg-background border border-border rounded-md h-10 px-3 text-sm text-foreground">
+                    <option value="">Default (Bank Current Account)</option>
+                    {selectableCreditAccounts.map(acc => (
+                      <option key={acc.id} value={acc.id}>
+                        [{acc.code}] {acc.name} ({acc.type})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               <div className="space-y-2">
                 <Label>Assign to Personnel</Label>
                 <select value={formData.assigned_to} onChange={(e) => setFormData({...formData, assigned_to: e.target.value})} className="w-full bg-background border border-border rounded-md h-10 px-3 text-sm text-foreground">
@@ -476,7 +580,7 @@ export default function AssetsPage() {
                 <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-widest">Assignment</th>
                 <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-widest">Status</th>
                 <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-widest">Purchase Date</th>
-                <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-widest">Cost Value</th>
+                <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-widest">Values (Cost / Op. Bal)</th>
                 <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-widest text-right">Actions</th>
               </tr>
             </thead>
@@ -530,8 +634,25 @@ export default function AssetsPage() {
                   <td className="px-6 py-5 text-sm font-medium text-foreground">
                     {asset.purchase_date ? new Date(asset.purchase_date).toLocaleDateString() : 'N/A'}
                   </td>
-                  <td className="px-6 py-5 text-sm font-bold text-emerald-500">
-                    {asset.purchase_value ? `₹${Number(asset.purchase_value).toLocaleString()}` : '—'}
+                  <td className="px-6 py-5 text-xs font-bold">
+                    {asset.purchase_value ? (
+                      <div className="text-emerald-500">
+                        Purchase: ₹{Number(asset.purchase_value).toLocaleString()}
+                        {asset.credit_account && (
+                          <div className="text-[10px] text-muted-foreground font-normal">
+                            Cr: [{asset.credit_account.code}] {asset.credit_account.name}
+                          </div>
+                        )}
+                      </div>
+                    ) : null}
+                    {asset.opening_balance ? (
+                      <div className="text-indigo-400">
+                        Op Bal: ₹{Number(asset.opening_balance).toLocaleString()} (Single Entry)
+                      </div>
+                    ) : null}
+                    {!asset.purchase_value && !asset.opening_balance && (
+                      <span className="text-muted-foreground">—</span>
+                    )}
                   </td>
 
                   <td className="px-6 py-5 text-right">
@@ -542,12 +663,18 @@ export default function AssetsPage() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent className="bg-card border-border text-foreground min-w-[190px] shadow-2xl rounded-xl p-2">
                           <DropdownMenuItem 
+                            onClick={() => openEditModal(asset)}
+                            className="hover:bg-accent/10 cursor-pointer flex items-center gap-3 py-2.5 rounded-xl font-bold text-sm"
+                          >
+                            <Pencil className="w-4 h-4 text-indigo-500" /> Edit Asset
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
                             onClick={() => {
                               setSelectedAsset(asset);
                               setNewAssigneeId(asset.assigned_to || "");
                               setReassignOpen(true);
                             }}
-                            className="hover:bg-accent/10 cursor-pointer flex items-center gap-3 py-3 rounded-xl font-bold text-sm"
+                            className="hover:bg-accent/10 cursor-pointer flex items-center gap-3 py-2.5 rounded-xl font-bold text-sm"
                           >
                             <ArrowRightLeft className="w-4 h-4 text-muted-foreground" /> Reassign Asset
                           </DropdownMenuItem>
@@ -556,7 +683,7 @@ export default function AssetsPage() {
                               setSelectedAsset(asset);
                               setMaintenanceOpen(true);
                             }}
-                            className="hover:bg-accent/10 cursor-pointer flex items-center gap-3 py-3 rounded-xl font-bold text-sm"
+                            className="hover:bg-accent/10 cursor-pointer flex items-center gap-3 py-2.5 rounded-xl font-bold text-sm"
                           >
                             <Wrench className="w-4 h-4 text-muted-foreground" /> Schedule Maintenance
                           </DropdownMenuItem>
@@ -565,7 +692,7 @@ export default function AssetsPage() {
                               setSelectedAsset(asset);
                               setNotInUseOpen(true);
                             }}
-                            className="hover:bg-slate-500/10 text-slate-500 dark:text-slate-400 cursor-pointer flex items-center gap-3 py-3 rounded-xl font-bold text-sm mt-1 border-t border-border"
+                            className="hover:bg-slate-500/10 text-slate-500 dark:text-slate-400 cursor-pointer flex items-center gap-3 py-2.5 rounded-xl font-bold text-sm"
                           >
                             <BanIcon className="w-4 h-4" /> Mark Not In Use
                           </DropdownMenuItem>
@@ -574,9 +701,15 @@ export default function AssetsPage() {
                               setSelectedAsset(asset);
                               setMissingOpen(true);
                             }}
-                            className="hover:bg-rose-500/10 text-rose-600 dark:text-rose-400 cursor-pointer flex items-center gap-3 py-3 rounded-xl font-bold text-sm border-t border-border"
+                            className="hover:bg-amber-500/10 text-amber-600 dark:text-amber-400 cursor-pointer flex items-center gap-3 py-2.5 rounded-xl font-bold text-sm border-t border-border mt-1"
                           >
                             <AlertCircle className="w-4 h-4" /> Report Missing
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            onClick={() => openDeleteModal(asset)}
+                            className="hover:bg-rose-500/10 text-rose-600 dark:text-rose-400 cursor-pointer flex items-center gap-3 py-2.5 rounded-xl font-bold text-sm border-t border-border mt-1"
+                          >
+                            <Trash2 className="w-4 h-4" /> Delete Asset
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -588,6 +721,140 @@ export default function AssetsPage() {
           </table>
         </div>
       </div>
+
+      {/* Edit Asset Dialog */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="sm:max-w-[640px] bg-card border-border text-foreground rounded-[2rem] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold flex items-center gap-2">
+              <Pencil className="w-5 h-5 text-indigo-500" /> Edit Enterprise Asset
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground">
+              Modify asset specifications or accounting values.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleEditAsset} className="space-y-4 mt-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Asset Tag (Unique ID) *</Label>
+                <Input required value={editFormData.asset_tag} onChange={(e) => setEditFormData({...editFormData, asset_tag: e.target.value})} className="bg-background border-border text-foreground" />
+              </div>
+              <div className="space-y-2">
+                <Label>Asset Name *</Label>
+                <Input required value={editFormData.name} onChange={(e) => setEditFormData({...editFormData, name: e.target.value})} className="bg-background border-border text-foreground" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Serial Number</Label>
+                <Input value={editFormData.serial_number} onChange={(e) => setEditFormData({...editFormData, serial_number: e.target.value})} className="bg-background border-border text-foreground" />
+              </div>
+              <div className="space-y-2">
+                <Label>Model Number</Label>
+                <Input value={editFormData.model_number} onChange={(e) => setEditFormData({...editFormData, model_number: e.target.value})} className="bg-background border-border text-foreground" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Status</Label>
+                <select value={editFormData.status} onChange={(e) => setEditFormData({...editFormData, status: e.target.value})} className="w-full bg-background border border-border rounded-md h-10 px-3 text-sm text-foreground">
+                  <option value="AVAILABLE">AVAILABLE</option>
+                  <option value="IN_USE">IN USE</option>
+                  <option value="MAINTENANCE">MAINTENANCE</option>
+                  <option value="NOT_IN_USE">NOT IN USE</option>
+                  <option value="RETIRED">RETIRED</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <Label>Purchase Date</Label>
+                <Input type="date" value={editFormData.purchase_date} onChange={(e) => setEditFormData({...editFormData, purchase_date: e.target.value})} className="bg-background border-border text-foreground" />
+              </div>
+            </div>
+
+            {/* Opening Balance Field in Edit */}
+            <div className="space-y-2 p-3 bg-muted/40 rounded-xl border border-border">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-semibold">Opening Balance (INR)</Label>
+                <span className="text-[10px] uppercase font-bold bg-indigo-500/10 text-indigo-500 px-2 py-0.5 rounded-md">Single Entry</span>
+              </div>
+              <Input type="number" min="0" value={editFormData.opening_balance || ""} onChange={(e) => setEditFormData({...editFormData, opening_balance: Number(e.target.value)})} className="bg-background border-border text-foreground" />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Purchase Value (Asset Cost, INR)</Label>
+                <Input type="number" min="0" value={editFormData.purchase_value || ""} onChange={(e) => setEditFormData({...editFormData, purchase_value: Number(e.target.value)})} className="bg-background border-border text-foreground" />
+              </div>
+              <div className="space-y-2">
+                <Label>Estimated GST (18%)</Label>
+                <div className="h-10 px-3 border border-border rounded-md bg-muted text-muted-foreground flex items-center text-sm font-semibold">
+                  ₹{(Number(editFormData.purchase_value || 0) * 0.18).toLocaleString()}
+                </div>
+              </div>
+            </div>
+
+            {Number(editFormData.purchase_value || 0) > 0 && (
+              <div className="space-y-2">
+                <Label className="font-semibold text-indigo-500 dark:text-indigo-400">Credit Account (Cr. Side)</Label>
+                <select value={editFormData.credit_account_id} onChange={(e) => setEditFormData({...editFormData, credit_account_id: e.target.value})} className="w-full bg-background border border-border rounded-md h-10 px-3 text-sm text-foreground">
+                  <option value="">Default (Bank Current Account)</option>
+                  {selectableCreditAccounts.map(acc => (
+                    <option key={acc.id} value={acc.id}>
+                      [{acc.code}] {acc.name} ({acc.type})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label>Assign to Personnel</Label>
+              <select value={editFormData.assigned_to} onChange={(e) => setEditFormData({...editFormData, assigned_to: e.target.value})} className="w-full bg-background border border-border rounded-md h-10 px-3 text-sm text-foreground">
+                <option value="">Keep in Central Pool</option>
+                {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+              </select>
+            </div>
+
+            <DialogFooter className="pt-2">
+              <Button type="button" variant="ghost" onClick={() => setEditOpen(false)} className="rounded-xl font-bold">
+                Cancel
+              </Button>
+              <Button type="submit" disabled={submitting} className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl px-6 border-0 shadow-lg shadow-indigo-500/20">
+                {submitting ? "Saving..." : "Update Asset"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent className="sm:max-w-[480px] bg-card border-border text-foreground rounded-[2rem] p-6 z-[9999] transform-gpu isolate">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold flex items-center gap-2 text-rose-500">
+              <Trash2 className="w-5 h-5" /> Delete Asset Confirmation
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground">
+              Are you sure you want to permanently delete <strong className="text-foreground">{selectedAsset?.name}</strong> ({selectedAsset?.asset_tag})?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-3 text-sm text-muted-foreground">
+            <p className="text-rose-500 font-medium">Accounting Safety Check:</p>
+            <ul className="list-disc pl-5 space-y-1.5 text-xs">
+              <li>If accounting vouchers exist for this asset, they will be <strong>safely reversed</strong> in the General Ledger with audit logs.</li>
+              <li>The asset entry will be removed from active inventory registry.</li>
+            </ul>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button type="button" variant="ghost" onClick={() => setDeleteOpen(false)} className="rounded-xl font-bold border-0">
+              Cancel
+            </Button>
+            <Button type="button" onClick={handleDeleteAsset} disabled={actionLoading} className="bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl px-6 border-0 shadow-lg shadow-rose-500/20">
+              {actionLoading ? "Deleting..." : "Confirm Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Reassign Dialog */}
       <Dialog open={reassignOpen} onOpenChange={setReassignOpen}>
