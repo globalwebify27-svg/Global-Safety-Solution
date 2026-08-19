@@ -63,6 +63,8 @@ export default function AccountingPage() {
   const [auditLoadingLogs, setAuditLoadingLogs] = useState(false);
   const [deleteVoucherTarget, setDeleteVoucherTarget] = useState<Voucher | null>(null);
   const [deletingVoucher, setDeletingVoucher] = useState(false);
+  const [deleteAccountTarget, setDeleteAccountTarget] = useState<Account | null>(null);
+  const [deletingAccount, setDeletingAccount] = useState(false);
   const [editOBAccount, setEditOBAccount] = useState<Account | null>(null);
   const [editOBAmount, setEditOBAmount] = useState("");
   const [editOBLoading, setEditOBLoading] = useState(false);
@@ -326,6 +328,31 @@ export default function AccountingPage() {
       toast.error("Network error occurred.");
     } finally {
       setDeletingVoucher(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!token || !deleteAccountTarget) return;
+    try {
+      setDeletingAccount(true);
+      const res = await fetch(`${API_BASE_URL}/accounting/accounts/${deleteAccountTarget.id}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        toast.success(data.message || `Account ${deleteAccountTarget.name} deleted successfully.`);
+        setDeleteAccountTarget(null);
+        fetchAccountsAndVouchers();
+      } else {
+        toast.error(data.message || "Failed to delete account.");
+      }
+    } catch (e) {
+      toast.error("Network error occurred.");
+    } finally {
+      setDeletingAccount(false);
     }
   };
 
@@ -900,7 +927,12 @@ export default function AccountingPage() {
                             <td className={cn("py-4 px-6 font-medium", a.parent_id ? "pl-8 text-muted-foreground text-xs" : "")}>{a.name}</td>
                             <td className="py-4 px-6"><span className={cn("text-xs px-2.5 py-1 rounded-full font-bold", accountTypeColor(a.type))}>{a.classification || a.type}</span></td>
                             <td className={cn("py-4 px-6 text-right font-black text-base", Number(a.balance) >= 0 ? "text-emerald-500" : "text-rose-500")}>₹{Number(a.balance).toLocaleString()}</td>
-                            <td className="py-4 px-6 text-center"><button onClick={() => { setEditOBAccount(a); setEditOBAmount(String(a.balance)); }} title="Edit Opening Balance" className="p-1.5 rounded-lg hover:bg-indigo-500/10 text-muted-foreground hover:text-rose-500 transition-colors"><Pencil className="w-3.5 h-3.5" /></button></td>
+                            <td className="py-4 px-6 text-center">
+                              <div className="flex items-center justify-center gap-1">
+                                <button onClick={() => { setEditOBAccount(a); setEditOBAmount(String(a.balance)); }} title="Edit Opening Balance" className="p-1.5 rounded-lg hover:bg-indigo-500/10 text-muted-foreground hover:text-indigo-500 transition-colors"><Pencil className="w-3.5 h-3.5" /></button>
+                                <button onClick={() => setDeleteAccountTarget(a)} title="Delete Account" className="p-1.5 rounded-lg hover:bg-rose-500/10 text-muted-foreground hover:text-rose-500 transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
+                              </div>
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -1279,6 +1311,67 @@ export default function AccountingPage() {
                   className="h-9 px-5 text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white"
                 >
                   {deletingVoucher ? "Deleting..." : "Confirm Delete"}
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Account Confirmation Dialog */}
+      <Dialog open={!!deleteAccountTarget} onOpenChange={(open) => { if (!open) setDeleteAccountTarget(null); }}>
+        <DialogContent className="bg-card border-border text-foreground rounded-2xl max-w-md p-4 sm:p-6 w-[95vw] sm:w-full">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold text-rose-500 flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5" /> Delete Account
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground mt-1">
+              Are you sure you want to delete account <span className="font-bold text-foreground">{deleteAccountTarget?.name} ({deleteAccountTarget?.code})</span>?
+            </DialogDescription>
+          </DialogHeader>
+
+          {deleteAccountTarget && (
+            <div className="space-y-4 my-3 text-xs">
+              <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-600 dark:text-rose-400 font-medium">
+                Warning: Deleting an account is permanent. If this account is linked to any active ledger transactions, child accounts, or assets, you must delete or reassign them first.
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 bg-accent/10 p-3 rounded-xl border border-border/50">
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-muted-foreground">Code</span>
+                  <p className="font-mono font-bold text-indigo-500">{deleteAccountTarget.code}</p>
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-muted-foreground">Type</span>
+                  <p className="font-bold text-foreground">{deleteAccountTarget.type}</p>
+                </div>
+                <div className="col-span-2">
+                  <span className="text-[10px] uppercase font-bold text-muted-foreground">Account Name</span>
+                  <p className="font-semibold text-foreground">{deleteAccountTarget.name}</p>
+                </div>
+                <div className="col-span-2">
+                  <span className="text-[10px] uppercase font-bold text-muted-foreground">Current Balance</span>
+                  <p className="font-bold text-foreground">₹{Number(deleteAccountTarget.balance).toLocaleString()}</p>
+                </div>
+              </div>
+
+              <DialogFooter className="pt-3 border-t border-border flex items-center justify-between">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setDeleteAccountTarget(null)}
+                  className="h-9 text-xs"
+                  disabled={deletingAccount}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleDeleteAccount}
+                  disabled={deletingAccount}
+                  className="h-9 px-5 text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white"
+                >
+                  {deletingAccount ? "Deleting..." : "Confirm Delete"}
                 </Button>
               </DialogFooter>
             </div>

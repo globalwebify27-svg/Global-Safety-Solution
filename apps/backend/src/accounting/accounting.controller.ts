@@ -33,6 +33,14 @@ export class AccountingController {
     return this.accountingService.updateOpeningBalance(id, body.amount, user);
   }
 
+  @Delete("accounts/:id")
+  async deleteAccount(@Param("id") id: string, @Req() req: any) {
+    const user = req.user?.name 
+      ? `${req.user.name}${req.user.employee_id ? " (" + req.user.employee_id + ")" : ""}` 
+      : (req.user?.email === "admin@globalsafety.com" || req.user?.email === "amrvbloggers@gmail.com" ? "Super Admin (SYSTEM)" : req.user?.email || "System");
+    return this.accountingService.deleteAccount(id, user);
+  }
+
   @Get("vouchers")
   async getVouchers() {
     return this.accountingService.getVouchers();

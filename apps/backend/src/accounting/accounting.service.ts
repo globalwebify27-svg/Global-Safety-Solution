@@ -603,4 +603,49 @@ export class AccountingService {
       return { success: true };
     });
   }
+
+  async deleteAccount(id: string, deletedBy?: string) {
+    const account = await this.prisma.account.findUnique({
+      where: { id },
+      include: {
+        children: true,
+        debits: true,
+        credits: true,
+        credited_assets: true,
+      },
+    });
+
+    if (!account) {
+      throw new NotFoundException("Account not found");
+    }
+
+    if (account.children.length > 0) {
+      throw new BadRequestException("Cannot delete account because it has child accounts. Please delete child accounts first.");
+    }
+
+    const totalEntries = account.debits.length + account.credits.length;
+    if (totalEntries > 0) {
+      throw new BadRequestException(`Cannot delete account "${account.name}" because it has ${totalEntries} linked ledger transaction(s). Delete the associated vouchers/transactions first.`);
+    }
+
+    if (account.credited_assets.length > 0) {
+      throw new BadRequestException(`Cannot delete account "${account.name}" because it is linked to ${account.credited_assets.length} asset record(s).`);
+    }
+
+    await this.prisma.account.delete({
+      where: { id },
+    });
+
+    await this.prisma.auditLog.create({
+      data: {
+        action: "DELETE_ACCOUNT",
+        entity_type: "ACCOUNT",
+        entity_id: id,
+        old_data: JSON.stringify({ name: account.name, code: account.code, type: account.type }),
+        user_id: deletedBy || "System",
+      },
+    }).catch(() => {});
+
+    return { success: true, message: `Account "${account.name}" (${account.code}) deleted successfully.` };
+  }
 }
