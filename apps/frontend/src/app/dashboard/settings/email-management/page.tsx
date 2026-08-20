@@ -1137,7 +1137,7 @@ export default function EmailManagementPage() {
       {activeTab === "rules" && (
         <div className="space-y-6">
           <div className="bg-card border border-border rounded-3xl p-8 shadow-xs space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-4">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-border pb-4">
               <div>
                 <h3 className="text-xl font-bold text-foreground">Centralized Notification Rules Engine</h3>
                 <p className="text-muted-foreground text-xs font-medium">
@@ -1145,39 +1145,39 @@ export default function EmailManagementPage() {
                 </p>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 w-full lg:w-auto">
                 <Button
                   onClick={handleEnableAllRules}
                   variant="outline"
                   size="sm"
-                  className="font-bold text-xs rounded-xl hover:bg-emerald-500/10 hover:text-emerald-500"
+                  className="font-bold text-xs rounded-xl hover:bg-emerald-500/10 hover:text-emerald-500 w-full sm:w-auto justify-center"
                 >
-                  <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
+                  <CheckCircle2 className="w-3.5 h-3.5 mr-1 shrink-0" />
                   Enable All
                 </Button>
                 <Button
                   onClick={handleDisableAllRules}
                   variant="outline"
                   size="sm"
-                  className="font-bold text-xs rounded-xl hover:bg-rose-500/10 hover:text-rose-500"
+                  className="font-bold text-xs rounded-xl hover:bg-rose-500/10 hover:text-rose-500 w-full sm:w-auto justify-center"
                 >
-                  <XCircle className="w-3.5 h-3.5 mr-1" />
+                  <XCircle className="w-3.5 h-3.5 mr-1 shrink-0" />
                   Disable All
                 </Button>
                 <Button
                   onClick={handleRestoreDefaultRules}
                   variant="outline"
                   size="sm"
-                  className="font-bold text-xs rounded-xl"
+                  className="font-bold text-xs rounded-xl w-full sm:w-auto justify-center"
                 >
-                  <RotateCcw className="w-3.5 h-3.5 mr-1" />
+                  <RotateCcw className="w-3.5 h-3.5 mr-1 shrink-0" />
                   Restore Defaults
                 </Button>
                 <Button
                   onClick={() => setAuditModalOpen(true)}
-                  className="font-bold text-xs rounded-xl bg-primary text-primary-foreground"
+                  className="font-bold text-xs rounded-xl bg-primary text-primary-foreground w-full sm:w-auto justify-center"
                 >
-                  <History className="w-3.5 h-3.5 mr-1" />
+                  <History className="w-3.5 h-3.5 mr-1 shrink-0" />
                   Audit Trail ({auditLogs.length})
                 </Button>
               </div>
@@ -1202,16 +1202,16 @@ export default function EmailManagementPage() {
                       {moduleRules.map((rule) => (
                         <div
                           key={rule.id}
-                          className="p-4 rounded-2xl bg-muted/40 border border-border flex items-center justify-between gap-4 hover:border-border/80 transition-colors"
+                          className="p-4 rounded-2xl bg-muted/40 border border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 hover:border-border/80 transition-colors"
                         >
                           <div className="space-y-1">
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                               <span className="text-sm font-bold text-foreground">{rule.event_name}</span>
-                              <span className="px-2 py-0.5 rounded-md text-[9px] font-black uppercase bg-primary/10 text-primary">
+                              <span className="px-2 py-0.5 rounded-md text-[9px] font-black uppercase bg-primary/10 text-primary shrink-0">
                                 {rule.module}
                               </span>
                             </div>
-                            <p className="text-xs text-muted-foreground font-medium">
+                            <p className="text-xs text-muted-foreground font-medium leading-relaxed">
                               {rule.description || "Automated system trigger"}
                             </p>
                           </div>
@@ -1225,13 +1225,13 @@ export default function EmailManagementPage() {
                               } catch {}
                             }
                             return (
-                              <div className="flex items-center gap-6 shrink-0 bg-background/40 p-2.5 rounded-2xl border border-border/60">
+                              <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-6 shrink-0 bg-background/40 p-2.5 rounded-2xl border border-border/60 w-full sm:w-auto mt-1 sm:mt-0">
                                 {/* EMAIL TOGGLE */}
                                 <div className="flex items-center gap-2">
                                   <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Email</span>
                                   <span
                                     className={cn(
-                                      "text-[10px] font-black uppercase tracking-wider w-8 text-right",
+                                      "text-[10px] font-black uppercase tracking-wider w-7 text-right",
                                       rule.is_email_enabled ? "text-indigo-500" : "text-muted-foreground"
                                     )}
                                   >
@@ -1241,7 +1241,7 @@ export default function EmailManagementPage() {
                                     type="button"
                                     onClick={() => handleToggleRule(rule.id, rule.is_email_enabled, 'email')}
                                     className={cn(
-                                      "w-10 h-5 rounded-full transition-colors relative flex items-center px-0.5 btn-tactile",
+                                      "w-10 h-5 rounded-full transition-colors relative flex items-center px-0.5 btn-tactile shrink-0",
                                       rule.is_email_enabled ? "bg-indigo-600" : "bg-muted-foreground/30"
                                     )}
                                   >
@@ -1255,11 +1255,11 @@ export default function EmailManagementPage() {
                                 </div>
 
                                 {/* WHATSAPP TOGGLE */}
-                                <div className="flex items-center gap-2 border-l border-border/60 pl-4">
+                                <div className="flex items-center gap-2 border-l border-border/60 pl-3 sm:pl-4">
                                   <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">WhatsApp</span>
                                   <span
                                     className={cn(
-                                      "text-[10px] font-black uppercase tracking-wider w-8 text-right",
+                                      "text-[10px] font-black uppercase tracking-wider w-7 text-right",
                                       isWAEnabled ? "text-emerald-500" : "text-muted-foreground"
                                     )}
                                   >
@@ -1269,7 +1269,7 @@ export default function EmailManagementPage() {
                                     type="button"
                                     onClick={() => handleToggleRule(rule.id, isWAEnabled, 'whatsapp')}
                                     className={cn(
-                                      "w-10 h-5 rounded-full transition-colors relative flex items-center px-0.5 btn-tactile",
+                                      "w-10 h-5 rounded-full transition-colors relative flex items-center px-0.5 btn-tactile shrink-0",
                                       isWAEnabled ? "bg-emerald-600" : "bg-muted-foreground/30"
                                     )}
                                   >

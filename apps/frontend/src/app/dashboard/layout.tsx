@@ -559,7 +559,7 @@ export default function DashboardLayout({
           </div>
         </header>
         
-        <div className="flex-1 overflow-y-auto p-4 lg:p-10 relative scroll-smooth">
+        <div className="flex-1 overflow-y-auto p-4 pb-16 sm:p-6 sm:pb-20 lg:p-10 lg:pb-24 relative scroll-smooth">
           <div className="absolute top-0 right-0 w-[60%] h-[60%] bg-blue-600/5 blur-[140px] rounded-full pointer-events-none -z-10" />
           <div className="max-w-7xl mx-auto">
             {children}

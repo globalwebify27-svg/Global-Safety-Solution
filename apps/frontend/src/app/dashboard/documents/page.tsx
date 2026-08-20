@@ -758,12 +758,12 @@ export default function DocumentVaultPage() {
   }).filter(Boolean) as VaultClientNode[];
 
   return (
-    <div className="space-y-8 pb-10">
+    <div className="space-y-8 pb-12 sm:pb-16 md:pb-20">
       {/* Top Header & Navigation */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 pb-2 border-b border-border/50">
+      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 sm:gap-6 pb-4 border-b border-border/50">
         <div className="space-y-1.5 max-w-xl">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400">
-            <ShieldCheck className="w-3.5 h-3.5" />
+            <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
             <span className="text-[10px] font-black uppercase tracking-widest">Enterprise Compliance Vault</span>
           </div>
           <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-500 via-cyan-400 to-emerald-400 leading-tight">
@@ -774,59 +774,62 @@ export default function DocumentVaultPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-col sm:flex-row flex-wrap xl:flex-nowrap items-stretch sm:items-center gap-3 w-full xl:w-auto">
           {/* View Mode Switcher */}
-          <div className="bg-muted p-1 rounded-xl border border-border flex items-center shadow-inner">
+          <div className="bg-muted p-1 rounded-xl border border-border flex items-center shadow-inner overflow-x-auto no-scrollbar max-w-full w-full sm:w-auto shrink-0">
             <button
               onClick={() => setViewMode("HIERARCHY")}
               className={cn(
-                "flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all",
+                "flex items-center justify-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap shrink-0 flex-1 sm:flex-none",
                 viewMode === "HIERARCHY"
                   ? "bg-background text-foreground shadow-md font-extrabold"
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
-              <Building2 className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+              <Building2 className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
               Structured Hierarchy
             </button>
             <button
               onClick={() => setViewMode("REGISTRY")}
               className={cn(
-                "flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all",
+                "flex items-center justify-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap shrink-0 flex-1 sm:flex-none",
                 viewMode === "REGISTRY"
                   ? "bg-background text-foreground shadow-md font-extrabold"
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
-              <LayoutGrid className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+              <LayoutGrid className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
               All Vault Files
             </button>
             <button
               onClick={() => setViewMode("IMAGES")}
               className={cn(
-                "flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all",
+                "flex items-center justify-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap shrink-0 flex-1 sm:flex-none",
                 viewMode === "IMAGES"
                   ? "bg-background text-foreground shadow-md font-extrabold"
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
-              <ImageIcon className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+              <ImageIcon className="w-4 h-4 text-purple-600 dark:text-purple-400 shrink-0" />
               Inspection Image Vault
             </button>
           </div>
 
-          <Button 
-            onClick={() => router.push('/dashboard/documents/due')} 
-            className="bg-amber-600 hover:bg-amber-500 text-white font-bold shadow-xl shadow-amber-500/20 px-6 h-11 transition-all active:scale-95 border-0 rounded-xl"
-          >
-            <CalendarClock className="w-4 h-4 mr-2" /> Expiry Monitor
-          </Button>
+          <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
+            <Button 
+              onClick={() => router.push('/dashboard/documents/due')} 
+              className="bg-amber-600 hover:bg-amber-500 text-white font-bold shadow-xl shadow-amber-500/20 px-4 sm:px-6 h-11 transition-all active:scale-95 border-0 rounded-xl flex-1 sm:flex-initial text-xs sm:text-sm justify-center"
+            >
+              <CalendarClock className="w-4 h-4 mr-1.5 shrink-0" /> Expiry Monitor
+            </Button>
 
-          {!isClient && (
-            <Dialog open={open} onOpenChange={setOpen}>
-              <DialogTrigger render={<Button className="bg-blue-600 hover:bg-blue-500 text-white font-bold shadow-xl shadow-blue-500/20 px-6 h-11 transition-all active:scale-95 border-0 rounded-xl" />}>
-                <FilePlus className="w-4 h-4 mr-2" /> Deposit Document
-              </DialogTrigger>
+            {!isClient && (
+              <Dialog open={open} onOpenChange={setOpen}>
+                <DialogTrigger asChild>
+                  <Button className="bg-blue-600 hover:bg-blue-500 text-white font-bold shadow-xl shadow-blue-500/20 px-4 sm:px-6 h-11 transition-all active:scale-95 border-0 rounded-xl flex-1 sm:flex-initial text-xs sm:text-sm justify-center">
+                    <FilePlus className="w-4 h-4 mr-1.5 shrink-0" /> Deposit Document
+                  </Button>
+                </DialogTrigger>
               <DialogContent className="sm:max-w-[600px] bg-card border-border text-foreground shadow-2xl rounded-[2rem] max-h-[80vh] overflow-y-auto p-6 relative">
                 <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-600 via-cyan-500 to-emerald-600" />
                 <DialogHeader>
@@ -921,6 +924,7 @@ export default function DocumentVaultPage() {
           )}
         </div>
       </div>
+    </div>
 
       {/* Summary KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">

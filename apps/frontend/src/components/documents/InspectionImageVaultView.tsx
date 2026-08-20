@@ -266,14 +266,14 @@ export function InspectionImageVaultView({ token }: InspectionImageVaultViewProp
           />
         </div>
 
-        <div className="flex items-center gap-2 w-full md:w-auto justify-end">
-          <Button variant="outline" size="sm" onClick={expandAll} className="rounded-xl text-xs font-bold h-9">
+        <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end flex-wrap sm:flex-nowrap">
+          <Button variant="outline" size="sm" onClick={expandAll} className="rounded-xl text-xs font-bold h-9 flex-1 sm:flex-initial">
             Expand All
           </Button>
-          <Button variant="outline" size="sm" onClick={collapseAll} className="rounded-xl text-xs font-bold h-9">
+          <Button variant="outline" size="sm" onClick={collapseAll} className="rounded-xl text-xs font-bold h-9 flex-1 sm:flex-initial">
             Collapse All
           </Button>
-          <Button variant="outline" size="sm" onClick={fetchImageTree} className="rounded-xl text-xs font-bold h-9 gap-1.5">
+          <Button variant="outline" size="sm" onClick={fetchImageTree} className="rounded-xl text-xs font-bold h-9 gap-1.5 flex-1 sm:flex-initial">
             <RefreshCw className="w-3.5 h-3.5" />
             Refresh
           </Button>
