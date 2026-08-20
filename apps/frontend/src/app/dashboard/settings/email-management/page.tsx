@@ -687,7 +687,7 @@ export default function EmailManagementPage() {
 
       {/* TAB 1: SMTP CONFIGURATION */}
       {activeTab === "smtp" && (
-        <div className="bg-card border border-border rounded-3xl p-8 shadow-xs space-y-6">
+        <div className="bg-card border border-border rounded-3xl p-4 sm:p-6 lg:p-8 shadow-xs space-y-6">
           {!loading && (!smtpConfig.host || !smtpConfig.username || !smtpConfig.is_active) && (
             <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center gap-3 text-amber-600 dark:text-amber-400 text-sm font-bold">
               <Lock className="w-5 h-5 shrink-0" />
@@ -804,19 +804,19 @@ export default function EmailManagementPage() {
             </div>
           </div>
 
-          <div className="pt-4 flex justify-end gap-3">
+          <div className="pt-4 flex flex-col sm:flex-row sm:items-center sm:justify-end gap-3 w-full">
             <Button
               variant="outline"
               onClick={handleVerifySmtp}
               disabled={verifyingSmtp}
-              className="font-bold rounded-xl px-4 bg-card border-border"
+              className="font-bold rounded-xl px-4 bg-card border-border w-full sm:w-auto justify-center"
             >
-              <Server className={cn("w-4 h-4 mr-2", verifyingSmtp && "animate-spin")} />
+              <Server className={cn("w-4 h-4 mr-2 shrink-0", verifyingSmtp && "animate-spin")} />
               {verifyingSmtp ? "Verifying..." : "Test Connection"}
             </Button>
 
-            <Button onClick={handleSaveSmtp} className="font-bold rounded-xl px-6">
-              <Save className="w-4 h-4 mr-2" /> Save SMTP Configuration
+            <Button onClick={handleSaveSmtp} className="font-bold rounded-xl px-6 w-full sm:w-auto justify-center">
+              <Save className="w-4 h-4 mr-2 shrink-0" /> Save SMTP Configuration
             </Button>
           </div>
         </div>
