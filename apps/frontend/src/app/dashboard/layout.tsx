@@ -301,6 +301,21 @@ export default function DashboardLayout({
     setIsMobileMenuOpen(false);
   }, [pathname]);
 
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      if (isMobileMenuOpen) {
+        document.body.style.overflow = "hidden";
+      } else {
+        document.body.style.overflow = "";
+      }
+    }
+    return () => {
+      if (typeof document !== 'undefined') {
+        document.body.style.overflow = "";
+      }
+    };
+  }, [isMobileMenuOpen]);
+
   // Global Client-side Route Guard to block manual URL entry for disabled modules
   useEffect(() => {
     if (!hydrated || !user || !pathname) return;
@@ -424,13 +439,13 @@ export default function DashboardLayout({
       {/* Mobile Drawer Overlay */}
       {isMobileMenuOpen && (
         <div 
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 lg:hidden"
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] lg:hidden"
           onClick={() => setIsMobileMenuOpen(false)}
         />
       )}
 
       {/* Mobile Sidebar (Drawer) */}
-      <aside className={`fixed inset-y-0 left-0 w-72 bg-card border-r border-border z-[60] lg:hidden transform transition-transform duration-300 ease-out flex flex-col ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"}`}>
+      <aside className={`fixed inset-y-0 left-0 w-72 bg-card border-r border-border z-[70] lg:hidden transform transition-transform duration-300 ease-out flex flex-col ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"}`}>
         <div className="h-16 flex items-center justify-between px-6 border-b border-border">
           <div className="flex items-center gap-3">
             <Image src="/logo.webp" alt="Logo" width={32} height={32} className="rounded-lg" />
@@ -476,6 +491,7 @@ export default function DashboardLayout({
                                 <Link
                                   key={child.name}
                                   href={child.href}
+                                  onClick={() => setIsMobileMenuOpen(false)}
                                   className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${childActive ? "bg-primary/10 text-primary ring-1 ring-primary/20" : "text-muted-foreground hover:bg-accent/5"}`}
                                 >
                                   <child.icon className={`w-4 h-4 ${childActive ? "text-primary" : ""}`} />
@@ -495,6 +511,7 @@ export default function DashboardLayout({
                   <Link
                     key={item.name}
                     href={item.href}
+                    onClick={() => setIsMobileMenuOpen(false)}
                     className={`flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-bold transition-all ${
                       isActive 
                         ? "bg-primary/10 text-primary ring-1 ring-primary/20" 
@@ -513,6 +530,7 @@ export default function DashboardLayout({
         <div className="p-4 border-t border-border">
           <button 
             onClick={() => {
+              setIsMobileMenuOpen(false);
               logout();
               window.location.href = "/login";
             }}
@@ -525,11 +543,12 @@ export default function DashboardLayout({
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col h-screen overflow-hidden relative">
-        <header className="h-16 border-b border-border bg-card/30 flex items-center justify-between lg:justify-end px-4 lg:px-8 backdrop-blur-xl shrink-0 relative z-50">
+      <main className="flex-1 flex flex-col h-[100dvh] overflow-hidden relative">
+        <header className="sticky top-0 z-40 h-16 border-b border-border bg-card/80 flex items-center justify-between lg:justify-end px-4 lg:px-8 backdrop-blur-xl shrink-0">
           <button 
             onClick={() => setIsMobileMenuOpen(true)}
             className="lg:hidden p-2 text-muted-foreground hover:text-foreground hover:bg-accent/5 rounded-xl transition-all"
+            aria-label="Open Navigation Menu"
           >
             <Menu className="w-6 h-6" />
           </button>
