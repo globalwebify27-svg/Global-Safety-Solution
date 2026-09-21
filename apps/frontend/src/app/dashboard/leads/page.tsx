@@ -27,7 +27,7 @@ import {
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { cn } from "@/lib/utils";
+import { cn, formatDateDDMMYYYY } from "@/lib/utils";
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -584,7 +584,7 @@ export default function LeadsPage() {
                       {lead.next_follow_up ? (
                         <div className="flex flex-col">
                            <span className="text-xs text-indigo-600 font-black uppercase">Follow-up</span>
-                           <span className="text-foreground">{new Date(lead.next_follow_up).toLocaleDateString([], { day: '2-digit', month: 'short' })}</span>
+                           <span className="text-foreground">{formatDateDDMMYYYY(lead.next_follow_up)}</span>
                         </div>
                       ) : (
                         <span className="text-muted-foreground italic">No action set</span>
@@ -705,7 +705,7 @@ export default function LeadsPage() {
                           <div className="flex items-center gap-1.5 mt-2 text-[9px] font-black text-indigo-400 bg-indigo-500/5 ring-1 ring-indigo-500/10 px-2 py-1 rounded-lg w-fit">
                             <Clock className="w-3 h-3" />
                             <span>
-                              {new Date(lead.next_follow_up).toLocaleDateString([], { day: '2-digit', month: 'short' })}
+                              {formatDateDDMMYYYY(lead.next_follow_up)}
                             </span>
                           </div>
                         )}

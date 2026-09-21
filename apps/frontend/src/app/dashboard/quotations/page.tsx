@@ -779,15 +779,15 @@ function QuotationsContent() {
                               <DropdownMenuItem onClick={() => handleSendProposal(q.id)} className="hover:bg-blue-500/10 text-blue-600 dark:text-blue-400 cursor-pointer flex items-center gap-3 py-3 rounded-xl font-bold text-sm transition-colors">
                                 <Mail className="w-4 h-4 text-blue-500" /> Send Proposal Email
                               </DropdownMenuItem>
+                              {(q.status === 'DRAFT' || q.status === 'SENT') && (
+                                <DropdownMenuItem onClick={() => handleEditQuotation(q)} className="hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 cursor-pointer flex items-center gap-3 py-3 rounded-xl font-bold text-sm">
+                                  <Calculator className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> Edit Proposal
+                                </DropdownMenuItem>
+                              )}
                               {q.status === 'DRAFT' && (
-                                <>
-                                  <DropdownMenuItem onClick={() => handleEditQuotation(q)} className="hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 cursor-pointer flex items-center gap-3 py-3 rounded-xl font-bold text-sm">
-                                    <Calculator className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> Edit Proposal
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => handleUpdateStatus(q.id, 'SENT')} className="hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 cursor-pointer flex items-center gap-3 py-3 rounded-xl font-bold text-sm">
-                                    <CheckCircle2 className="w-4 h-4" /> Mark as Sent
-                                  </DropdownMenuItem>
-                                </>
+                                <DropdownMenuItem onClick={() => handleUpdateStatus(q.id, 'SENT')} className="hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 cursor-pointer flex items-center gap-3 py-3 rounded-xl font-bold text-sm">
+                                  <CheckCircle2 className="w-4 h-4" /> Mark as Sent
+                                </DropdownMenuItem>
                               )}
                               {q.status === 'SENT' && (
                                  <DropdownMenuItem onClick={() => handleUpdateStatus(q.id, 'ACCEPTED')} className="hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 cursor-pointer flex items-center gap-3 py-3 rounded-xl font-bold text-sm">

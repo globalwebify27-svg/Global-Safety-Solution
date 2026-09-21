@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -116,13 +116,30 @@ export class ProjectsService {
   }
 
   async update(id: string, data: any) {
+    const existing = await this.prisma.project.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException('Project not found');
+
+    const { id: _id, client_id: _cid, quotation_id: _qid, updated_by, remarks, ...allowedData } = data;
+
+    if (allowedData.contract_value !== undefined) {
+      allowedData.contract_value = Number(allowedData.contract_value) || 0;
+    }
+    if (allowedData.start_date) {
+      allowedData.start_date = new Date(allowedData.start_date);
+    }
+    if (allowedData.end_date) {
+      allowedData.end_date = new Date(allowedData.end_date);
+    }
+
     const project = await this.prisma.project.update({
       where: { id },
-      data,
+      data: allowedData,
     });
 
-    if (data.stage) {
-      await this.logActivity(id, `Stage set to ${data.stage}`, data.updated_by, data.remarks);
+    if (data.stage && data.stage !== existing.stage) {
+      await this.logActivity(id, `Stage set to ${data.stage}`, updated_by, remarks);
+    } else {
+      await this.logActivity(id, 'Project Details Updated', updated_by || 'Admin', remarks || `Project details updated`);
     }
 
     return project;
@@ -198,8 +215,35 @@ export class ProjectsService {
   }
 
   async remove(id: string) {
-    return this.prisma.project.delete({
+    const project = await this.prisma.project.findUnique({
       where: { id },
+      include: {
+        work_orders: { select: { id: true } },
+        inspections: { select: { id: true } },
+        documents: { select: { id: true } },
+        tasks: { select: { id: true } },
+        activities: { select: { id: true } },
+      },
+    });
+
+    if (!project) throw new NotFoundException('Project not found');
+
+    const hasDependencies =
+      (project.work_orders?.length || 0) > 0 ||
+      (project.inspections?.length || 0) > 0 ||
+      (project.documents?.length || 0) > 0;
+
+    if (hasDependencies) {
+      throw new BadRequestException(
+        'This project cannot be deleted because it contains associated work orders, site inspections, or documents.',
+      );
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      await tx.task.deleteMany({ where: { project_id: id } });
+      await tx.projectActivity.deleteMany({ where: { project_id: id } });
+      return tx.project.delete({ where: { id } });
     });
   }
 }
+

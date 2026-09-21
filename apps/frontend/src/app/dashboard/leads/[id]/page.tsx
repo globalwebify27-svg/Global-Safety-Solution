@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Activity, Phone, Mail, CheckCircle, Clock, Plus, History, ArrowLeft, MoreVertical, FileText, Banknote, TrendingDown, TrendingUp, CheckCircle2, XCircle, Download, Trash2, Paperclip } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, formatDateDDMMYYYY } from "@/lib/utils";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { 
@@ -495,7 +495,7 @@ export default function LeadDetailsPage() {
                   <div>
                     <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Next Follow Up</p>
                     <p className="text-base font-medium mt-1 text-indigo-400 font-bold">
-                      {lead.next_follow_up ? new Date(lead.next_follow_up).toLocaleDateString() : "None"}
+                      {lead.next_follow_up ? formatDateDDMMYYYY(lead.next_follow_up) : "None"}
                     </p>
                   </div>
                </div>
@@ -614,7 +614,7 @@ export default function LeadDetailsPage() {
               <div key={q.id} className="flex justify-between items-center bg-card/60 border border-border p-6 rounded-[2rem] shadow-sm transition-all hover:bg-card hover:border-indigo-500/30">
                 <div>
                   <p className="font-bold text-lg text-foreground">{q.quote_number}</p>
-                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mt-1">{new Date(q.created_at).toLocaleDateString()}</p>
+                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mt-1">{formatDateDDMMYYYY(q.created_at)}</p>
                 </div>
                 <div className="flex flex-col items-end gap-2">
                   <p className="font-black text-xl text-foreground">₹{Number(q.total_amount).toLocaleString()}</p>

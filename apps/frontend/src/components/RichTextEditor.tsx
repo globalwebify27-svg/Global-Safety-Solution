@@ -29,12 +29,12 @@ export default function RichTextEditor({ content, onChange, placeholder }: RichT
     },
   });
 
-  // Sync content from parent when it changes externally (e.g., edit mode)
+  // Sync content from parent when it changes externally (e.g., edit mode or selection change)
   useEffect(() => {
-    if (editor && content !== editor.getHTML()) {
+    if (editor && !editor.isFocused && content !== editor.getHTML()) {
       editor.commands.setContent(content || '');
     }
-  }, [content]);
+  }, [content, editor]);
 
   if (!editor) return null;
 

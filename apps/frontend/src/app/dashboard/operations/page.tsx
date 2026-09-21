@@ -32,7 +32,8 @@ import {
   History,
   Activity,
   DollarSign,
-  FileText
+  FileText,
+  Pencil
 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -103,11 +104,98 @@ export default function OperationsPage() {
   const [openOverviewDialog, setOpenOverviewDialog] = useState(false);
   const [selectedDashboard, setSelectedDashboard] = useState<any>(null);
   
+  const [openEditProjectDialog, setOpenEditProjectDialog] = useState(false);
+  const [openDeleteProjectDialog, setOpenDeleteProjectDialog] = useState(false);
+  const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const [editProjectForm, setEditProjectForm] = useState({
+    id: "",
+    name: "",
+    description: "",
+    contract_value: "",
+    status: "ONGOING",
+    start_date: "",
+    end_date: "",
+  });
+
   const [submitting, setSubmitting] = useState(false);
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
   const [selectedQuoteId, setSelectedQuoteId] = useState<string>("");
   const [expandedProjects, setExpandedProjects] = useState<Record<string, boolean>>({});
   const [searchQuery, setSearchQuery] = useState("");
+
+  const handleOpenEditProject = (proj: Project) => {
+    setEditProjectForm({
+      id: proj.id,
+      name: proj.name || "",
+      description: proj.description || "",
+      contract_value: proj.contract_value ? String(proj.contract_value) : "",
+      status: proj.status || "ONGOING",
+      start_date: (proj as any).start_date ? new Date((proj as any).start_date).toISOString().split('T')[0] : "",
+      end_date: (proj as any).end_date ? new Date((proj as any).end_date).toISOString().split('T')[0] : "",
+    });
+    setOpenEditProjectDialog(true);
+  };
+
+  const handleSaveEditProject = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editProjectForm.id) return;
+    setSubmitting(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/projects/${editProjectForm.id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          name: editProjectForm.name,
+          description: editProjectForm.description,
+          contract_value: editProjectForm.contract_value ? Number(editProjectForm.contract_value) : 0,
+          status: editProjectForm.status,
+          start_date: editProjectForm.start_date || null,
+          end_date: editProjectForm.end_date || null,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Failed to update project");
+      }
+      toast.success("Project updated successfully");
+      setOpenEditProjectDialog(false);
+      fetchData();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update project");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDeleteProject = async () => {
+    if (!deletingProjectId) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/projects/${deletingProjectId}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Failed to delete project");
+      }
+      toast.success("Project deleted successfully");
+      setOpenDeleteProjectDialog(false);
+      setDeletingProjectId(null);
+      fetchData();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to delete project");
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const [projectForm, setProjectForm] = useState({
     client_id: "",
@@ -567,6 +655,22 @@ export default function OperationsPage() {
                             <MoreVertical className="w-4 h-4 text-muted-foreground" />
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="bg-card border border-border text-foreground min-w-[200px] shadow-2xl rounded-2xl p-2 z-[9999]">
+                            <DropdownMenuItem
+                              onClick={() => handleOpenEditProject(proj)}
+                              className="cursor-pointer flex items-center gap-2 py-2 px-3 rounded-xl text-xs font-bold text-indigo-500 hover:bg-indigo-500/10"
+                            >
+                              <Pencil className="w-3.5 h-3.5 text-indigo-500" /> Edit Project Details
+                            </DropdownMenuItem>
+                            
+                            <DropdownMenuItem
+                              onClick={() => { setDeletingProjectId(proj.id); setOpenDeleteProjectDialog(true); }}
+                              className="cursor-pointer flex items-center gap-2 py-2 px-3 rounded-xl text-xs font-bold text-rose-500 hover:bg-rose-500/10"
+                            >
+                              <Trash2 className="w-3.5 h-3.5 text-rose-500" /> Delete Project
+                            </DropdownMenuItem>
+                            
+                            <div className="my-1 border-t border-border" />
+                            
                             <div className="text-[10px] font-black uppercase text-muted-foreground px-3 py-1">Set Pipeline Stage</div>
                             {PIPELINE_STAGES.map((s) => (
                               <DropdownMenuItem
@@ -776,6 +880,115 @@ export default function OperationsPage() {
               </DialogFooter>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+      {/* Edit Project Dialog */}
+      <Dialog open={openEditProjectDialog} onOpenChange={setOpenEditProjectDialog}>
+        <DialogContent className="sm:max-w-[550px] bg-card border-border text-foreground rounded-[2rem]">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold flex items-center gap-3">
+              <Pencil className="w-6 h-6 text-indigo-500" /> Edit Project Details
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground">
+              Modify operational project settings, contract value, and milestone dates.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSaveEditProject} className="space-y-4 mt-4">
+            <div className="space-y-2">
+              <Label>Project Name</Label>
+              <Input 
+                value={editProjectForm.name}
+                onChange={(e) => setEditProjectForm({...editProjectForm, name: e.target.value})}
+                placeholder="Project Title"
+                className="bg-background border-border h-11 rounded-xl"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Description</Label>
+              <textarea 
+                className="w-full bg-background border border-border rounded-xl p-3 text-sm min-h-[80px] focus:ring-2 focus:ring-indigo-500 text-foreground"
+                value={editProjectForm.description}
+                onChange={(e) => setEditProjectForm({...editProjectForm, description: e.target.value})}
+                placeholder="Project scope and details..."
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Contract Value (₹)</Label>
+                <Input 
+                  type="number"
+                  min="0"
+                  value={editProjectForm.contract_value}
+                  onChange={(e) => setEditProjectForm({...editProjectForm, contract_value: e.target.value})}
+                  className="bg-background border-border h-11 rounded-xl"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Project Status</Label>
+                <select
+                  value={editProjectForm.status}
+                  onChange={(e) => setEditProjectForm({...editProjectForm, status: e.target.value})}
+                  className="w-full bg-background border border-border h-11 rounded-xl px-3 text-sm font-bold focus:ring-2 focus:ring-indigo-500 text-foreground"
+                >
+                  <option value="ONGOING">ONGOING</option>
+                  <option value="COMPLETED">COMPLETED</option>
+                  <option value="ON_HOLD">ON_HOLD</option>
+                  <option value="PENDING">PENDING</option>
+                </select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Start Date</Label>
+                <Input 
+                  type="date"
+                  value={editProjectForm.start_date}
+                  onChange={(e) => setEditProjectForm({...editProjectForm, start_date: e.target.value})}
+                  className="bg-background border-border h-11 rounded-xl"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>End Date</Label>
+                <Input 
+                  type="date"
+                  value={editProjectForm.end_date}
+                  onChange={(e) => setEditProjectForm({...editProjectForm, end_date: e.target.value})}
+                  className="bg-background border-border h-11 rounded-xl"
+                />
+              </div>
+            </div>
+            <DialogFooter className="pt-4 border-t border-border flex gap-3">
+              <Button type="button" variant="outline" onClick={() => setOpenEditProjectDialog(false)} className="rounded-xl h-11 font-bold">
+                Cancel
+              </Button>
+              <Button type="submit" disabled={submitting} className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold h-11 rounded-xl border-0">
+                {submitting ? "Saving..." : "Save Changes"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Project Confirmation Dialog */}
+      <Dialog open={openDeleteProjectDialog} onOpenChange={setOpenDeleteProjectDialog}>
+        <DialogContent className="sm:max-w-[450px] bg-card border-border text-foreground rounded-[2rem]">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold flex items-center gap-3 text-rose-500">
+              <Trash2 className="w-6 h-6" /> Delete Project?
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground text-sm pt-2">
+              Are you sure you want to delete this project? Projects containing linked work orders, site inspections, or compliance documents cannot be deleted.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="pt-4 border-t border-border flex gap-3 mt-4">
+            <Button type="button" variant="outline" onClick={() => setOpenDeleteProjectDialog(false)} className="rounded-xl h-11 font-bold flex-1">
+              Cancel
+            </Button>
+            <Button type="button" onClick={handleDeleteProject} disabled={deleting} className="bg-rose-600 hover:bg-rose-500 text-white font-bold h-11 rounded-xl border-0 flex-1">
+              {deleting ? "Deleting..." : "Delete Project"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

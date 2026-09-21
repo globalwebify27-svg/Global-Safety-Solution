@@ -91,28 +91,30 @@ export class QuotationsService {
         throw new BadRequestException(`Quotation number "${quoteNumber}" already exists.`);
       }
     } else {
-      // Auto-generate: QT-YEAR-SERIAL (Scoped to current year)
+      // Auto-generate: GSS/QT/YYYY/SEQUENCE (Scoped to current year)
       const year = new Date().getFullYear();
+      const prefix = `GSS/QT/${year}/`;
       const latestQuote = await this.prisma.quotation.findFirst({
         where: {
           quote_number: {
-            startsWith: `QT-${year}-`,
+            startsWith: prefix,
           },
         },
-        orderBy: {
-          quote_number: 'desc',
-        },
+        orderBy: [
+          { created_at: 'desc' },
+          { quote_number: 'desc' },
+        ],
       });
 
       let nextSerial = 1;
       if (latestQuote) {
-        const parts = latestQuote.quote_number.split('-');
+        const parts = latestQuote.quote_number.split('/');
         const lastSerial = parseInt(parts[parts.length - 1], 10);
         if (!isNaN(lastSerial)) {
           nextSerial = lastSerial + 1;
         }
       }
-      quoteNumber = `QT-${year}-${String(nextSerial).padStart(4, '0')}`;
+      quoteNumber = `${prefix}${String(nextSerial).padStart(3, '0')}`;
     }
 
     // Calculate totals on server-side for integrity
@@ -287,7 +289,21 @@ export class QuotationsService {
   }
 
   async update(id: string, data: any) {
+    const current = await this.prisma.quotation.findUnique({ where: { id } });
+    if (!current) {
+      throw new NotFoundException('Quotation not found.');
+    }
+
+    if (current.status === 'ACCEPTED') {
+      throw new BadRequestException('Accepted quotations are locked and cannot be modified.');
+    }
+
     const { items, apply_gst, ...quoteData } = data;
+
+    // Preserve SENT status if editing a SENT quotation
+    if (!quoteData.status && current.status === 'SENT') {
+      quoteData.status = 'SENT';
+    }
 
     if (quoteData.lead_id === '') quoteData.lead_id = null;
     if (quoteData.client_id === '') quoteData.client_id = null;
@@ -1201,8 +1217,35 @@ export class QuotationsService {
 
       // Draw left side: Terms & Conditions and Thank You
       if (quotation.notes) {
+        // Parse HTML/multiline notes into sequential ordered list text for clean PDF output
+        const cleanNotes = quotation.notes
+          .replace(/<li[^>]*>/gi, '\n• ')
+          .replace(/<\/li>/gi, '')
+          .replace(/<p[^>]*>/gi, '\n')
+          .replace(/<\/p>/gi, '')
+          .replace(/<br\s*\/?>/gi, '\n')
+          .replace(/<[^>]+>/g, '')
+          .replace(/&nbsp;/g, ' ')
+          .replace(/&amp;/g, '&')
+          .replace(/&lt;/g, '<')
+          .replace(/&gt;/g, '>');
+
+        const noteLines = cleanNotes
+          .split('\n')
+          .map((l: string) => l.trim())
+          .filter(Boolean);
+
+        let noteIdx = 1;
+        const formattedNotesText = noteLines
+          .map((line: string) => {
+            const stripped = line.replace(/^(?:•|\d+[\.\)]|\s)+/, '').trim();
+            return stripped ? `${noteIdx++}. ${stripped}` : '';
+          })
+          .filter(Boolean)
+          .join('\n');
+
         doc.font('Helvetica-Bold').fontSize(9).fillColor(primaryColor).text('Terms & Special Notes:', 40, sigY);
-        doc.font('Helvetica').fontSize(7.5).fillColor('#334155').text(quotation.notes, 40, sigY + 15, { width: 280 });
+        doc.font('Helvetica').fontSize(7.5).fillColor('#334155').text(formattedNotesText || quotation.notes, 40, sigY + 15, { width: 280 });
       }
       
       const thankYouY = Math.max(sigY + notesHeight - 10, sigY + 85);

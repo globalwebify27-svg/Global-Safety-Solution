@@ -38,15 +38,17 @@ export function NotificationCenter() {
     try {
       const res = await fetch(`${API_BASE_URL}/notifications`, {
         headers: { Authorization: `Bearer ${token}` }
-      });
-      const data = await res.json();
+      }).catch(() => null);
+
+      if (!res || !res.ok) return;
+
+      const data = await res.json().catch(() => null);
       if (Array.isArray(data)) {
         setNotifications(data);
         setUnreadCount(data.filter(n => !n.is_read).length);
       }
     } catch (e) {
-      // Silently handle polling errors to avoid console spam, or use a concise warning
-      console.warn("[NotificationCenter] Polling failed:", (e as any).message || 'Connection refused');
+      // Silently handle polling network errors to avoid unhandled rejections
     }
   };
 
@@ -109,25 +111,29 @@ export function NotificationCenter() {
 
   const markAsRead = async (id: string) => {
     try {
-      await fetch(`${API_BASE_URL}/notifications/${id}/read`, {
+      const res = await fetch(`${API_BASE_URL}/notifications/${id}/read`, {
         method: 'PATCH',
         headers: { Authorization: `Bearer ${token}` }
-      });
-      fetchNotifications();
+      }).catch(() => null);
+      if (res && res.ok) {
+        fetchNotifications();
+      }
     } catch (e) {
-      console.error(e);
+      // Ignore network errors
     }
   };
 
   const markAllAsRead = async () => {
     try {
-      await fetch(`${API_BASE_URL}/notifications/read-all`, {
+      const res = await fetch(`${API_BASE_URL}/notifications/read-all`, {
         method: 'PATCH',
         headers: { Authorization: `Bearer ${token}` }
-      });
-      fetchNotifications();
+      }).catch(() => null);
+      if (res && res.ok) {
+        fetchNotifications();
+      }
     } catch (e) {
-      console.error(e);
+      // Ignore network errors
     }
   };
 
