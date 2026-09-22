@@ -78,6 +78,8 @@ interface Project {
   status: string;
   stage?: string;
   contract_value?: number;
+  order_number?: string;
+  order_date?: string;
   created_at: string;
   client_id?: string;
   client?: { id: string; name: string };
@@ -114,6 +116,8 @@ export default function OperationsPage() {
     name: "",
     description: "",
     contract_value: "",
+    order_number: "",
+    order_date: "",
     status: "ONGOING",
     start_date: "",
     end_date: "",
@@ -131,6 +135,8 @@ export default function OperationsPage() {
       name: proj.name || "",
       description: proj.description || "",
       contract_value: proj.contract_value ? String(proj.contract_value) : "",
+      order_number: proj.order_number || "",
+      order_date: proj.order_date ? new Date(proj.order_date).toISOString().split('T')[0] : "",
       status: proj.status || "ONGOING",
       start_date: (proj as any).start_date ? new Date((proj as any).start_date).toISOString().split('T')[0] : "",
       end_date: (proj as any).end_date ? new Date((proj as any).end_date).toISOString().split('T')[0] : "",
@@ -153,6 +159,8 @@ export default function OperationsPage() {
           name: editProjectForm.name,
           description: editProjectForm.description,
           contract_value: editProjectForm.contract_value ? Number(editProjectForm.contract_value) : 0,
+          order_number: editProjectForm.order_number || null,
+          order_date: editProjectForm.order_date || null,
           status: editProjectForm.status,
           start_date: editProjectForm.start_date || null,
           end_date: editProjectForm.end_date || null,
@@ -202,6 +210,8 @@ export default function OperationsPage() {
     name: "",
     description: "",
     contract_value: "",
+    order_number: "",
+    order_date: "",
     status: "ONGOING"
   });
 
@@ -303,7 +313,7 @@ export default function OperationsPage() {
       if (res.ok) {
         toast.success("Project launched successfully!");
         setOpenProjectDialog(false);
-        setProjectForm({ client_id: "", name: "", description: "", contract_value: "", status: "ONGOING" });
+        setProjectForm({ client_id: "", name: "", description: "", contract_value: "", order_number: "", order_date: "", status: "ONGOING" });
         fetchData();
       } else {
         toast.error("Failed to create project.");
@@ -508,13 +518,34 @@ export default function OperationsPage() {
                   />
                 </div>
 
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Contract Value (₹)</Label>
+                    <Input 
+                      type="number"
+                      placeholder="e.g. 150000"
+                      value={projectForm.contract_value}
+                      onChange={(e) => setProjectForm({...projectForm, contract_value: e.target.value})}
+                      className="h-11 bg-background border-border text-foreground font-medium rounded-xl"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Order Number (PO No.)</Label>
+                    <Input 
+                      placeholder="e.g. PO/2026/089"
+                      value={projectForm.order_number}
+                      onChange={(e) => setProjectForm({...projectForm, order_number: e.target.value})}
+                      className="h-11 bg-background border-border text-foreground font-medium rounded-xl"
+                    />
+                  </div>
+                </div>
+
                 <div className="space-y-2">
-                  <Label>Contract Value (₹)</Label>
+                  <Label>Order Date</Label>
                   <Input 
-                    type="number"
-                    placeholder="e.g. 150000"
-                    value={projectForm.contract_value}
-                    onChange={(e) => setProjectForm({...projectForm, contract_value: e.target.value})}
+                    type="date"
+                    value={projectForm.order_date}
+                    onChange={(e) => setProjectForm({...projectForm, order_date: e.target.value})}
                     className="h-11 bg-background border-border text-foreground font-medium rounded-xl"
                   />
                 </div>
@@ -633,6 +664,11 @@ export default function OperationsPage() {
                           <div className="flex items-center gap-2 text-muted-foreground text-xs font-bold uppercase tracking-wider">
                             <ListTodo className="w-4 h-4 text-amber-500" /> {proj.tasks?.length || 0} Tasks Assigned
                           </div>
+                          {proj.order_number && (
+                            <div className="flex items-center gap-2 text-purple-600 dark:text-purple-400 text-xs font-bold uppercase tracking-wider bg-purple-500/10 px-2.5 py-1 rounded-lg border border-purple-500/20">
+                              <FileText className="w-4 h-4" /> Order No: {proj.order_number} {proj.order_date ? `(${new Date(proj.order_date).toLocaleDateString('en-IN')})` : ''}
+                            </div>
+                          )}
                         </div>
                       </div>
 
@@ -936,6 +972,26 @@ export default function OperationsPage() {
                   <option value="ON_HOLD">ON_HOLD</option>
                   <option value="PENDING">PENDING</option>
                 </select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Order Number (PO No.)</Label>
+                <Input 
+                  value={editProjectForm.order_number}
+                  onChange={(e) => setEditProjectForm({...editProjectForm, order_number: e.target.value})}
+                  placeholder="e.g. PO/2026/089"
+                  className="bg-background border-border h-11 rounded-xl"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Order Date</Label>
+                <Input 
+                  type="date"
+                  value={editProjectForm.order_date}
+                  onChange={(e) => setEditProjectForm({...editProjectForm, order_date: e.target.value})}
+                  className="bg-background border-border h-11 rounded-xl"
+                />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">

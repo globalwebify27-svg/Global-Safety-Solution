@@ -340,6 +340,8 @@ model Project {
   stage          String            @default("PROJECT_CREATED") @db.VarChar(50)
   start_date     DateTime?         @db.Date
   end_date       DateTime?         @db.Date
+  order_number   String?           @db.VarChar(100)
+  order_date     DateTime?         @db.Date
   status         String            @default("PENDING") @db.VarChar(50)
   created_at     DateTime          @default(now()) @db.DateTime(6)
   updated_at     DateTime          @updatedAt @db.DateTime(6)

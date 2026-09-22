@@ -75,6 +75,7 @@ interface Inspection {
   remarks?: string;
   client_id?: string;
   project_id?: string;
+  project?: { id: string; name?: string; order_number?: string; order_date?: string };
   admin_feedback?: string;
   draft_cert_type?: string;
   draft_cert_data?: any;
@@ -1438,6 +1439,11 @@ export default function InspectionsPage() {
                     <td className="px-8 py-6">
                       <div className="flex flex-col">
                         <span className="text-sm font-bold text-foreground group-hover:text-blue-600 transition-colors">{i.client?.name}</span>
+                        {i.project?.order_number && (
+                          <span className="text-[10px] font-bold text-purple-600 dark:text-purple-400 mt-0.5">
+                            Order No: {i.project.order_number} {i.project.order_date ? `(${new Date(i.project.order_date).toLocaleDateString('en-IN')})` : ''}
+                          </span>
+                        )}
                         <span className="text-[10px] text-muted-foreground uppercase mt-1 flex items-center gap-1">
                           <MapPin className="w-3 h-3" /> Site Verified: {i.lat || i.status === 'COMPLETED' || i.status === 'REJECTED' ? "Yes" : "Pending"}
                         </span>

@@ -162,6 +162,31 @@ export class InvoicesService {
       invoiceData.invoice_number = `INV-${year}-${String(nextInvSerial).padStart(4, '0')}`;
     }
 
+    // Auto-fill PO number and PO date from linked Project if not explicitly provided
+    if (!invoiceData.po_number && (invoiceData.project_id || invoiceData.work_order_id || invoiceData.quotation_id)) {
+      try {
+        let proj: any = null;
+        if (invoiceData.project_id) {
+          proj = await this.prisma.project.findUnique({ where: { id: invoiceData.project_id } });
+        } else if (invoiceData.quotation_id) {
+          proj = await this.prisma.project.findFirst({ where: { quotation_id: invoiceData.quotation_id } });
+        } else if (invoiceData.work_order_id) {
+          const wo = await this.prisma.workOrder.findUnique({ where: { id: invoiceData.work_order_id }, select: { project_id: true } });
+          if (wo?.project_id) {
+            proj = await this.prisma.project.findUnique({ where: { id: wo.project_id } });
+          }
+        }
+        if (proj?.order_number) {
+          invoiceData.po_number = proj.order_number;
+          if (proj.order_date && !invoiceData.po_date) {
+            invoiceData.po_date = proj.order_date;
+          }
+        }
+      } catch (e) {
+        console.warn('[InvoicesService] Could not auto-sync PO info from project:', e?.message);
+      }
+    }
+
     // Fetch client to resolve customer state
     const client = await this.prisma.client.findUnique({
       where: { id: invoiceData.client_id },

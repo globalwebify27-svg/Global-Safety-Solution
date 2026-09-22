@@ -450,22 +450,25 @@ export class InspectionsService {
           },
         });
 
-        // Automatically sync to Digital Vault (Documents table)
-        await this.prisma.document.create({
-          data: {
-            name: `${inspection.client.name} - ${serviceName} Certificate`,
-            file_url: `/inspections/${inspection.id}/certificate`,
-            file_type: 'PDF',
-            file_size: 102400,
-            category: 'CERTIFICATE',
-            client_id: inspection.client_id,
-            project_id: inspection.project_id,
-            expiry_date: expiryDate,
-            test_date: new Date(),
-            notes: `Auto-generated Certificate No. ${certNo} for completed inspection.`,
-            uploaded_by: inspection.engineer_id || null,
-          },
-        });
+        // Automatically sync to Digital Vault (Documents table) ONLY if no item certificates exist
+        const hasItemCerts = inspection.items && inspection.items.some((i: any) => i.cert_ref_no);
+        if (!hasItemCerts) {
+          await this.prisma.document.create({
+            data: {
+              name: `${inspection.client.name} - ${serviceName} Certificate`,
+              file_url: `/inspections/${inspection.id}/certificate`,
+              file_type: 'PDF',
+              file_size: 102400,
+              category: 'CERTIFICATE',
+              client_id: inspection.client_id,
+              project_id: inspection.project_id,
+              expiry_date: expiryDate,
+              test_date: new Date(),
+              notes: `Auto-generated Certificate No. ${certNo} for completed inspection.`,
+              uploaded_by: inspection.engineer_id || null,
+            },
+          });
+        }
       }
 
       const pdfBuffer = await this.generateCertificate(id);
@@ -1482,6 +1485,7 @@ export class InspectionsService {
     const inspection = await this.prisma.inspection.findUnique({
       where: { id },
       include: {
+        client: true,
         items: { orderBy: { sort_order: 'asc' } },
       },
     });
@@ -1519,7 +1523,7 @@ export class InspectionsService {
             const certTestDate = item.cert_test_date || new Date();
             await this.prisma.document.create({
               data: {
-                name: `${inspection.client_id} - Certificate ${item.cert_ref_no}`,
+                name: `${inspection.client?.name || inspection.client_id} - Certificate ${item.cert_ref_no}`,
                 file_url: `/certificates/${newCert.id}/pdf`,
                 file_type: 'PDF',
                 file_size: 102400,

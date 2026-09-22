@@ -102,6 +102,8 @@ export class ProjectsService {
         status: data.status || 'PENDING',
         start_date: data.start_date ? new Date(data.start_date) : null,
         end_date: data.end_date ? new Date(data.end_date) : null,
+        order_number: data.order_number || null,
+        order_date: data.order_date ? new Date(data.order_date) : null,
       },
     });
 
@@ -129,6 +131,12 @@ export class ProjectsService {
     }
     if (allowedData.end_date) {
       allowedData.end_date = new Date(allowedData.end_date);
+    }
+    if (allowedData.order_date) {
+      allowedData.order_date = new Date(allowedData.order_date);
+    }
+    if (allowedData.order_number !== undefined) {
+      allowedData.order_number = allowedData.order_number ? String(allowedData.order_number).trim() : null;
     }
 
     const project = await this.prisma.project.update({
