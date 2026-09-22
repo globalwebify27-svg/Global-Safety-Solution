@@ -544,10 +544,28 @@ export default function InspectionsPage() {
     let successCount = 0;
     let failCount = 0;
 
-    for (const item of ungeneratedItems) {
+    const usedCertNumbers = new Set<string>(
+      existingCertList.map((c: any) => c.certificate_no).filter(Boolean)
+    );
+
+    for (let index = 0; index < ungeneratedItems.length; index++) {
+      const item = ungeneratedItems[index];
       try {
         const templateId = selectedTemplateIds[item.id] || (templates.length > 0 ? templates[0].id : null);
-        const certRefNo = item.cert_ref_no || `GSS/${item.id.substring(0, 4).toUpperCase()}/${new Date().getFullYear()}`;
+        
+        let certRefNo = item.cert_ref_no || `GSS/${item.id.substring(0, 4).toUpperCase()}/${new Date().getFullYear()}`;
+        
+        // Auto-deduplicate reference number if duplicate or already claimed
+        if (usedCertNumbers.has(certRefNo)) {
+          let suffix = 1;
+          let candidate = `${certRefNo}-${suffix}`;
+          while (usedCertNumbers.has(candidate)) {
+            suffix++;
+            candidate = `${certRefNo}-${suffix}`;
+          }
+          certRefNo = candidate;
+        }
+        usedCertNumbers.add(certRefNo);
 
         let tempFields: any[] = [];
         if (templateId) {
@@ -586,7 +604,12 @@ export default function InspectionsPage() {
         });
 
         if (res.ok) {
-          successCount++;
+          const certData = await res.json();
+          if (certData && certData.id) {
+            successCount++;
+          } else {
+            failCount++;
+          }
         } else {
           failCount++;
         }
@@ -599,13 +622,17 @@ export default function InspectionsPage() {
     await fetchSingleInspection(selectedInspection.id);
 
     const alreadyCount = selectedInspection.items.length - ungeneratedItems.length;
-    if (successCount > 0) {
+    if (successCount > 0 && failCount === 0) {
       toast.success(
         `Successfully generated ${successCount} new certificate(s) and saved to Compliance & Digital Vault!` +
         (alreadyCount > 0 ? ` (${alreadyCount} equipment section(s) were already generated)` : "")
       );
+    } else if (successCount > 0 && failCount > 0) {
+      toast.warning(
+        `Successfully generated ${successCount} certificate(s) in Vault. ${failCount} equipment item(s) failed. You can retry remaining items.`
+      );
     } else if (failCount > 0) {
-      toast.error("Failed to generate some certificates. Please check template details.");
+      toast.error(`Failed to generate ${failCount} equipment certificate(s). Please check template details or try again.`);
     }
   };
 

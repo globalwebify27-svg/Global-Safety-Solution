@@ -211,59 +211,64 @@ export class CertificatesService {
       }
     }
 
-    let cert: any;
-    try {
-      cert = await this.prisma.certificate.create({
-        data: {
-          ...rest,
-          issue_date: issueDate,
-          expiry_date: expiryDate,
-          validity_period,
-          metadata: metadataStr,
-        },
-        include: {
-          inspection: {
-            include: {
-              client: true,
-              work_order: true,
+    return await this.prisma.$transaction(async (tx) => {
+      let cert: any;
+      try {
+        cert = await tx.certificate.create({
+          data: {
+            ...rest,
+            issue_date: issueDate,
+            expiry_date: expiryDate,
+            validity_period,
+            metadata: metadataStr,
+          },
+          include: {
+            inspection: {
+              include: {
+                client: true,
+                work_order: true,
+              },
             },
           },
-        },
-      });
-    } catch (e: any) {
-      if (e?.code === 'P2002') {
-        throw new BadRequestException('A certificate has already been generated for this equipment item.');
+        });
+      } catch (e: any) {
+        if (e?.code === 'P2002') {
+          throw new BadRequestException('A certificate has already been generated for this equipment item.');
+        }
+        throw e;
       }
-      throw e;
-    }
 
-    await this.syncCertificateToVault(cert);
-    return cert;
+      await this.syncCertificateToVault(cert, tx);
+      return cert;
+    });
   }
 
-  private async syncCertificateToVault(certificate: any) {
+  private async syncCertificateToVault(certificate: any, txClient?: any) {
     if (!certificate || !certificate.inspection) return;
 
+    const prisma = txClient || this.prisma;
     const clientId = certificate.inspection.client_id;
     const projectId = certificate.inspection.project_id || certificate.inspection.work_order?.project_id || null;
     const certNo = certificate.certificate_no;
     const clientName = certificate.inspection.client?.name || 'Client';
     const certName = `${clientName} - Certificate ${certNo}`;
     const fileUrl = certificate.pdf_url || `/certificates/${certificate.id}/pdf`;
+    const certNotePattern = `Certificate No. ${certNo} |`;
 
     try {
       // 1. Sync to Digital Vault (Document)
-      const existingDoc = await this.prisma.document.findFirst({
+      // Match exact file_url or exact certificate reference pattern to avoid cross-item document overwrites
+      const existingDoc = await prisma.document.findFirst({
         where: {
           OR: [
             { file_url: fileUrl },
-            { notes: { contains: certNo } },
+            { notes: { contains: certNotePattern } },
           ],
         },
       });
 
       if (existingDoc) {
-        await this.prisma.document.update({
+        await prisma.document.update({
           where: { id: existingDoc.id },
           data: {
             name: certName,
@@ -278,7 +283,7 @@ export class CertificatesService {
           },
         });
       } else {
-        await this.prisma.document.create({
+        await prisma.document.create({
           data: {
             name: certName,
             file_url: fileUrl,
@@ -296,7 +301,7 @@ export class CertificatesService {
       }
 
       // 2. Sync to Compliance Table
-      const existingComp = await this.prisma.compliance.findFirst({
+      const existingComp = await prisma.compliance.findFirst({
         where: {
           client_id: clientId,
           reference_number: certNo,
@@ -304,7 +309,7 @@ export class CertificatesService {
       });
 
       if (existingComp) {
-        await this.prisma.compliance.update({
+        await prisma.compliance.update({
           where: { id: existingComp.id },
           data: {
             issue_date: certificate.issue_date,
@@ -313,7 +318,7 @@ export class CertificatesService {
           },
         });
       } else {
-        await this.prisma.compliance.create({
+        await prisma.compliance.create({
           data: {
             client_id: clientId,
             compliance_type: 'Safety Certificate',
@@ -324,8 +329,11 @@ export class CertificatesService {
           },
         });
       }
-    } catch (e) {
-      console.error('Failed to sync certificate to Digital Vault & Compliance:', e);
+    } catch (e: any) {
+      console.error('Failed to sync certificate to Digital Vault & Compliance:', e?.stack || e?.message || e);
+      throw new InternalServerErrorException(
+        `Failed to persist certificate into Digital Vault & Compliance: ${e?.message || 'Database error'}`,
+      );
     }
   }
 
