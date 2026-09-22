@@ -49,6 +49,10 @@ export class CreateInspectionDto {
   project_id?: string;
 
   @IsOptional()
+  @IsString()
+  project_selection_mode?: string;
+
+  @IsOptional()
   @IsUUID()
   engineer_id?: string;
 

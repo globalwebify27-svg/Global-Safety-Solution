@@ -6,6 +6,7 @@ import {
   Patch,
   Param,
   Delete,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { ProjectsService } from './projects.service';
@@ -26,8 +27,8 @@ export class ProjectsController {
 
   @Get()
   @Permissions('READ_PROJECT')
-  findAll() {
-    return this.projectsService.findAll();
+  findAll(@Query('client_id') clientId?: string) {
+    return this.projectsService.findAll(clientId);
   }
 
   @Get(':id/dashboard')

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   CreateInspectionDto,
@@ -28,7 +28,17 @@ export class InspectionsService {
   ) {}
 
   async create(data: CreateInspectionDto) {
-    const { items, engineer_ids, ...inspectionData } = data;
+    const { items, engineer_ids, project_selection_mode, ...inspectionData } = data;
+
+    // Validate project ownership if an explicit project_id is provided
+    if (inspectionData.project_id) {
+      const targetProj = await this.prisma.project.findUnique({
+        where: { id: inspectionData.project_id },
+      });
+      if (!targetProj || targetProj.client_id !== inspectionData.client_id) {
+        throw new BadRequestException('Selected project does not belong to the selected client.');
+      }
+    }
 
     const assignedEngIds: string[] = Array.isArray(engineer_ids) && engineer_ids.length > 0
       ? Array.from(new Set(engineer_ids.filter(Boolean)))
@@ -39,6 +49,7 @@ export class InspectionsService {
     const inspection = await this.prisma.inspection.create({
       data: {
         ...inspectionData,
+        project_id: project_selection_mode === 'standalone' ? null : (inspectionData.project_id || null),
         engineer_id: primaryEngId,
         scheduled_date: new Date(inspectionData.scheduled_date),
         items: {
@@ -60,7 +71,8 @@ export class InspectionsService {
     });
 
     let targetProjectId = inspection.project_id;
-    if (!targetProjectId && inspection.client_id) {
+    // Auto-link to latest project ONLY IF mode is auto_latest or omitted AND standalone was NOT selected
+    if (!targetProjectId && inspection.client_id && project_selection_mode !== 'standalone') {
       const activeProj = await this.prisma.project.findFirst({
         where: { client_id: inspection.client_id, status: { not: 'COMPLETED' } },
         orderBy: { created_at: 'desc' },

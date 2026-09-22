@@ -335,11 +335,15 @@ export default function InspectionsPage() {
   
   const [scheduleForm, setScheduleForm] = useState({
     client_id: "",
+    project_id: "",
+    project_selection_mode: "auto_latest",
     engineer_id: "",
     assigned_staff_id: "",
     scheduled_date: new Date().toISOString().split('T')[0],
     items: [{ description: "General Safety Check" }]
   });
+  const [clientProjects, setClientProjects] = useState<any[]>([]);
+  const [loadingProjects, setLoadingProjects] = useState(false);
   const [schedulePdf, setSchedulePdf] = useState<File | null>(null);
   const [itemValidityPeriods, setItemValidityPeriods] = useState<Record<string, string>>({});
   const [selectedEngineerIds, setSelectedEngineerIds] = useState<string[]>([]);
@@ -347,6 +351,38 @@ export default function InspectionsPage() {
   const [isEngineerDropdownOpen, setIsEngineerDropdownOpen] = useState(false);
 
   const { token, user } = useAuthStore();
+
+  const handleClientChange = async (clientId: string) => {
+    setScheduleForm((prev) => ({
+      ...prev,
+      client_id: clientId,
+      project_id: "",
+      project_selection_mode: "auto_latest",
+    }));
+    setClientProjects([]);
+
+    if (!clientId || !token) return;
+
+    setLoadingProjects(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/projects?client_id=${clientId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          const activeProjects = data.filter(
+            (p: any) => p.status !== 'COMPLETED' && p.status !== 'CANCELLED'
+          );
+          setClientProjects(activeProjects);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to fetch projects for client:", err);
+    } finally {
+      setLoadingProjects(false);
+    }
+  };
   const roleName = user?.roles?.[0]?.role?.name || "";
   const designation = (user?.designation || "").toUpperCase();
   const isClient = roleName === "CLIENT" || designation.includes("CLIENT");
@@ -634,12 +670,17 @@ export default function InspectionsPage() {
 
       const payload: any = {
         client_id: scheduleForm.client_id,
+        project_selection_mode: scheduleForm.project_selection_mode,
         engineer_id: selectedEngineerIds[0] || scheduleForm.engineer_id || null,
         engineer_ids: selectedEngineerIds,
         assigned_staff_id: scheduleForm.assigned_staff_id || null,
         scheduled_date: scheduleForm.scheduled_date,
         items: [{ description: "General Safety Check" }]
       };
+
+      if (scheduleForm.project_selection_mode === 'explicit' && scheduleForm.project_id) {
+        payload.project_id = scheduleForm.project_id;
+      }
 
       if (uploadedPdfUrl) {
         payload.pdf_url = uploadedPdfUrl;
@@ -654,6 +695,16 @@ export default function InspectionsPage() {
         const createdInspection = await res.json();
         setOpenSchedule(false);
         setSchedulePdf(null);
+        setScheduleForm({
+          client_id: "",
+          project_id: "",
+          project_selection_mode: "auto_latest",
+          engineer_id: "",
+          assigned_staff_id: "",
+          scheduled_date: new Date().toISOString().split('T')[0],
+          items: [{ description: "General Safety Check" }]
+        });
+        setClientProjects([]);
         toast.success("Inspection scheduled successfully! Opening site visit checklist...");
         
         setSelectedInspection(createdInspection);
@@ -1192,16 +1243,56 @@ export default function InspectionsPage() {
               <form onSubmit={handleSchedule} className="space-y-6 mt-4">
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <Label>Target Client</Label>
+                    <Label>Target Client *</Label>
                     <select 
                       required
                       value={scheduleForm.client_id}
-                      onChange={(e) => setScheduleForm({...scheduleForm, client_id: e.target.value})}
+                      onChange={(e) => handleClientChange(e.target.value)}
                       className="w-full h-11 px-4 bg-background border border-border rounded-xl text-sm"
                     >
                       <option value="">Select client...</option>
                       {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                     </select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Project / Order (PO) Number</Label>
+                    <select 
+                      disabled={!scheduleForm.client_id || loadingProjects}
+                      value={scheduleForm.project_selection_mode === 'explicit' ? scheduleForm.project_id : scheduleForm.project_selection_mode}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === 'auto_latest') {
+                          setScheduleForm(prev => ({ ...prev, project_id: "", project_selection_mode: "auto_latest" }));
+                        } else if (val === 'standalone') {
+                          setScheduleForm(prev => ({ ...prev, project_id: "", project_selection_mode: "standalone" }));
+                        } else {
+                          setScheduleForm(prev => ({ ...prev, project_id: val, project_selection_mode: "explicit" }));
+                        }
+                      }}
+                      className="w-full h-11 px-4 bg-background border border-border rounded-xl text-sm disabled:opacity-50 font-medium"
+                    >
+                      {!scheduleForm.client_id ? (
+                        <option value="auto_latest">Select a client first...</option>
+                      ) : loadingProjects ? (
+                        <option value="auto_latest">Loading active projects for client...</option>
+                      ) : (
+                        <>
+                          <option value="auto_latest">
+                            Auto-link to Latest Project {clientProjects[0]?.order_number ? `(PO: ${clientProjects[0].order_number})` : ''} (Default)
+                          </option>
+                          {clientProjects.map((p: any) => (
+                            <option key={p.id} value={p.id}>
+                              {p.name} — PO: {p.order_number || 'N/A'} (Status: {p.status || 'ACTIVE'})
+                            </option>
+                          ))}
+                          <option value="standalone">Standalone Visit — No PO / General Inspection</option>
+                        </>
+                      )}
+                    </select>
+                    {scheduleForm.client_id && !loadingProjects && clientProjects.length === 0 && (
+                      <p className="text-[11px] text-muted-foreground italic">No active projects found for this client. You can schedule a Standalone Visit.</p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label className="flex items-center justify-between">

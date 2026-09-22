@@ -42,8 +42,9 @@ export class ProjectsService {
     return updated;
   }
 
-  async findAll() {
+  async findAll(clientId?: string) {
     return this.prisma.project.findMany({
+      where: clientId ? { client_id: clientId } : undefined,
       include: {
         client: true,
         quotation: {
