@@ -40,6 +40,39 @@ export class InspectionsService {
       }
     }
 
+    let targetProjectId = project_selection_mode === 'standalone' ? null : (inspectionData.project_id || null);
+
+    // Auto-link to latest project ONLY IF mode is auto_latest or omitted AND standalone was NOT selected
+    if (!targetProjectId && inspectionData.client_id && project_selection_mode !== 'standalone') {
+      const activeProj = await this.prisma.project.findFirst({
+        where: { client_id: inspectionData.client_id, status: { not: 'COMPLETED' } },
+        orderBy: { created_at: 'desc' },
+      });
+      if (activeProj) {
+        targetProjectId = activeProj.id;
+      }
+    }
+
+    // Duplicate Prevention Check: Ensure 1 Project has at most 1 active/scheduled site inspection at a time
+    if (targetProjectId) {
+      const existingActive = await this.prisma.inspection.findFirst({
+        where: {
+          project_id: targetProjectId,
+          status: { in: ['SCHEDULED', 'IN_PROGRESS', 'PENDING_REVIEW'] },
+        },
+        include: { project: true },
+      });
+
+      if (existingActive) {
+        const projLabel = existingActive.project?.order_number
+          ? `PO: ${existingActive.project.order_number}`
+          : (existingActive.project?.name || 'this project');
+        throw new BadRequestException(
+          `An active site inspection is already scheduled for ${projLabel} (ID: ${existingActive.id.substring(0, 8)}). Please edit or complete the existing visit instead.`
+        );
+      }
+    }
+
     const assignedEngIds: string[] = Array.isArray(engineer_ids) && engineer_ids.length > 0
       ? Array.from(new Set(engineer_ids.filter(Boolean)))
       : (inspectionData.engineer_id ? [inspectionData.engineer_id] : []);
@@ -49,7 +82,7 @@ export class InspectionsService {
     const inspection = await this.prisma.inspection.create({
       data: {
         ...inspectionData,
-        project_id: project_selection_mode === 'standalone' ? null : (inspectionData.project_id || null),
+        project_id: targetProjectId,
         engineer_id: primaryEngId,
         scheduled_date: new Date(inspectionData.scheduled_date),
         items: {
@@ -69,22 +102,6 @@ export class InspectionsService {
         work_order: true,
       },
     });
-
-    let targetProjectId = inspection.project_id;
-    // Auto-link to latest project ONLY IF mode is auto_latest or omitted AND standalone was NOT selected
-    if (!targetProjectId && inspection.client_id && project_selection_mode !== 'standalone') {
-      const activeProj = await this.prisma.project.findFirst({
-        where: { client_id: inspection.client_id, status: { not: 'COMPLETED' } },
-        orderBy: { created_at: 'desc' },
-      });
-      if (activeProj) {
-        targetProjectId = activeProj.id;
-        await this.prisma.inspection.update({
-          where: { id: inspection.id },
-          data: { project_id: activeProj.id },
-        });
-      }
-    }
 
     if (targetProjectId) {
       try {
@@ -890,6 +907,29 @@ export class InspectionsService {
   }
 
   async remove(id: string) {
+    const inspection = await this.prisma.inspection.findUnique({
+      where: { id },
+      include: { certificates: true },
+    });
+
+    if (!inspection) {
+      throw new NotFoundException('Inspection not found');
+    }
+
+    if (inspection.status === 'COMPLETED' && inspection.certificates && inspection.certificates.length > 0) {
+      throw new BadRequestException(
+        'Completed inspections with issued certificates cannot be deleted. Compliance and Digital Vault records are linked.',
+      );
+    }
+
+    if (inspection.certificates && inspection.certificates.length > 0) {
+      for (const cert of inspection.certificates) {
+        await this.prisma.compliance.deleteMany({
+          where: { reference_number: cert.certificate_no },
+        });
+      }
+    }
+
     return this.prisma.inspection.delete({ where: { id } });
   }
 

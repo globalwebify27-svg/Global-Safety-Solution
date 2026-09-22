@@ -22,7 +22,9 @@ import {
   Loader2,
   Eye,
   ShieldCheck,
-  Sparkles
+  Sparkles,
+  Pencil,
+  Trash2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
@@ -184,10 +186,81 @@ export default function InspectionsPage() {
   const [engineers, setEngineers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [openSchedule, setOpenSchedule] = useState(false);
+  const [openEditSchedule, setOpenEditSchedule] = useState(false);
+  const [editingInspection, setEditingInspection] = useState<Inspection | null>(null);
+  const [editScheduleForm, setEditScheduleForm] = useState({
+    scheduled_date: "",
+    engineer_ids: [] as string[],
+  });
   const [openVisit, setOpenVisit] = useState(false);
   const [selectedInspection, setSelectedInspection] = useState<Inspection | null>(null);
   const [previewPdfUrl, setPreviewPdfUrl] = useState<string | null>(null);
   const [globalSettings, setGlobalSettings] = useState<Record<string, string>>({});
+
+  const handleOpenEdit = (inspection: Inspection) => {
+    setEditingInspection(inspection);
+    const engIds = (inspection.engineers || []).map((ie: any) => ie.engineer?.id || ie.engineer_id || ie.id).filter(Boolean);
+    const primaryId = inspection.engineer_id || (engIds.length > 0 ? engIds[0] : "");
+    const initialEngIds = engIds.length > 0 ? engIds : (primaryId ? [primaryId] : []);
+    setSelectedEngineerIds(initialEngIds);
+    setEditScheduleForm({
+      scheduled_date: inspection.scheduled_date ? new Date(inspection.scheduled_date).toISOString().split('T')[0] : '',
+      engineer_ids: initialEngIds,
+    });
+    setOpenEditSchedule(true);
+  };
+
+  const handleSaveEditSchedule = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!token || !editingInspection) return;
+    try {
+      const payload: any = {
+        scheduled_date: editScheduleForm.scheduled_date,
+        engineer_ids: selectedEngineerIds,
+        engineer_id: selectedEngineerIds[0] || null,
+      };
+
+      const res = await fetch(`${API_BASE_URL}/inspections/${editingInspection.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) {
+        toast.success("Site inspection visit updated successfully!");
+        setOpenEditSchedule(false);
+        setEditingInspection(null);
+        fetchData();
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        toast.error(errData.message || "Failed to update site inspection visit");
+      }
+    } catch (e) {
+      toast.error("Error updating site inspection visit");
+    }
+  };
+
+  const handleDeleteInspection = async (id: string, clientName: string) => {
+    if (!token) return;
+    if (!window.confirm(`Are you sure you want to delete/cancel the site inspection visit for "${clientName}"?`)) {
+      return;
+    }
+    try {
+      const res = await fetch(`${API_BASE_URL}/inspections/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        toast.success("Site inspection visit deleted successfully!");
+        fetchData();
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        toast.error(errData.message || "Failed to delete site inspection visit");
+      }
+    } catch (e) {
+      toast.error("Error deleting site inspection visit");
+    }
+  };
 
   const getAbsoluteFileUrl = (url: string | null | undefined) => {
     if (!url) return "";
@@ -739,6 +812,9 @@ export default function InspectionsPage() {
         setOpenVisit(true);
 
         fetchData();
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        toast.error(errData.message || "Failed to schedule inspection");
       }
     } catch (e) {
       toast.error("Failed to schedule inspection");
@@ -1475,6 +1551,185 @@ export default function InspectionsPage() {
             </DialogContent>
           </Dialog>
         )}
+
+        {/* Edit Scheduled Visit Dialog */}
+        <Dialog open={openEditSchedule} onOpenChange={(open) => {
+          setOpenEditSchedule(open);
+          if (!open) setIsEngineerDropdownOpen(false);
+        }}>
+          <DialogContent className="sm:max-w-[600px] bg-card border-border rounded-[2.5rem] max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-bold flex items-center gap-2">
+                <Pencil className="w-5 h-5 text-blue-600" /> Edit Site Inspection Visit
+              </DialogTitle>
+              <DialogDescription>
+                Update scheduled date or assigned field engineers for <span className="font-bold text-foreground">{editingInspection?.client?.name}</span>.
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleSaveEditSchedule} className="space-y-6 mt-4">
+              <div className="space-y-4">
+                <div className="space-y-1 bg-muted/20 p-3.5 rounded-2xl border border-border">
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase">Target Client & Project</span>
+                  <p className="text-sm font-bold text-foreground">{editingInspection?.client?.name}</p>
+                  {editingInspection?.project?.order_number && (
+                    <p className="text-xs text-purple-600 dark:text-purple-400 font-bold mt-0.5">
+                      Order No: {editingInspection.project.order_number} {editingInspection.project.name ? `— ${editingInspection.project.name}` : ''}
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Scheduled Date *</Label>
+                  <Input
+                    required
+                    type="date"
+                    value={editScheduleForm.scheduled_date}
+                    onChange={(e) => setEditScheduleForm({ ...editScheduleForm, scheduled_date: e.target.value })}
+                    className="h-11 bg-background border-border"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="flex items-center justify-between">
+                    <span>Reassign Engineers (Single or Multiple)</span>
+                    {selectedEngineerIds.length > 0 && (
+                      <span className="text-xs font-bold text-blue-600 dark:text-blue-400">
+                        {selectedEngineerIds.length} Selected
+                      </span>
+                    )}
+                  </Label>
+
+                  {/* Selected Engineer Chips */}
+                  {selectedEngineerIds.length > 0 && (
+                    <div className="flex flex-wrap gap-2 p-2 bg-muted/30 border border-border rounded-xl mb-2">
+                      {selectedEngineerIds.map((id) => {
+                        const eng = engineers.find((e) => e.id === id);
+                        return (
+                          <span
+                            key={id}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20"
+                          >
+                            <User className="w-3.5 h-3.5" />
+                            {eng?.name || 'Engineer'}
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setSelectedEngineerIds((prev) =>
+                                  prev.filter((item) => item !== id)
+                                )
+                              }
+                              className="ml-1 text-blue-500 hover:text-rose-500 focus:outline-none"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  <div className="relative">
+                    <Input
+                      placeholder="Search & select engineers..."
+                      value={engineerSearchQuery}
+                      onChange={(e) => {
+                        setEngineerSearchQuery(e.target.value);
+                        setIsEngineerDropdownOpen(true);
+                      }}
+                      onFocus={() => setIsEngineerDropdownOpen(true)}
+                      className="h-11 bg-background border-border pr-8 text-sm"
+                    />
+                    <Search className="w-4 h-4 text-muted-foreground absolute right-3 top-3.5 pointer-events-none" />
+
+                    {isEngineerDropdownOpen && (
+                      <>
+                        <div
+                          className="fixed inset-0 z-40 bg-black/5"
+                          onClick={() => setIsEngineerDropdownOpen(false)}
+                        />
+                        <div className="absolute z-50 left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-background border border-border rounded-xl shadow-2xl p-1.5 space-y-1">
+                          {engineers
+                            .filter((e) =>
+                              e.name.toLowerCase().includes(engineerSearchQuery.toLowerCase()) ||
+                              (e.employee_id || '').toLowerCase().includes(engineerSearchQuery.toLowerCase())
+                            )
+                            .map((e) => {
+                              const isSelected = selectedEngineerIds.includes(e.id);
+                              return (
+                                <div
+                                  key={e.id}
+                                  onClick={() => {
+                                    if (isSelected) {
+                                      setSelectedEngineerIds((prev) => prev.filter((id) => id !== e.id));
+                                    } else {
+                                      setSelectedEngineerIds((prev) => [...prev, e.id]);
+                                    }
+                                  }}
+                                  className={cn(
+                                    "px-3 py-2 rounded-lg text-xs font-medium cursor-pointer flex items-center justify-between transition-colors",
+                                    isSelected
+                                      ? "bg-blue-500/10 text-blue-600 dark:text-blue-400 font-bold"
+                                      : "hover:bg-muted text-foreground"
+                                  )}
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <div className={cn(
+                                      "w-4 h-4 rounded border flex items-center justify-center text-[10px]",
+                                      isSelected ? "bg-blue-600 text-white border-blue-600" : "border-muted-foreground/40"
+                                    )}>
+                                      {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
+                                    </div>
+                                    <span>{e.name}</span>
+                                    <span className="text-[10px] text-muted-foreground">({e.employee_id || e.designation || 'Field Engineer'})</span>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          {engineers.length === 0 && (
+                            <div className="p-3 text-center text-xs text-muted-foreground italic">
+                              No engineers found.
+                            </div>
+                          )}
+                          <div className="pt-1.5 border-t border-border mt-1 flex items-center justify-end">
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setIsEngineerDropdownOpen(false)}
+                              className="h-7 text-xs font-bold text-blue-600 hover:bg-blue-500/10 rounded-lg px-2.5"
+                            >
+                              Done Selecting
+                            </Button>
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <DialogFooter className="gap-2 pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setIsEngineerDropdownOpen(false);
+                    setOpenEditSchedule(false);
+                  }}
+                  className="h-11 rounded-xl font-bold"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  className="bg-blue-600 hover:bg-blue-500 text-white font-bold h-11 rounded-xl shadow-lg shadow-blue-500/20"
+                >
+                  Save Changes
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -1615,7 +1870,7 @@ export default function InspectionsPage() {
                       </span>
                     </td>
                     <td className="px-8 py-6 text-right">
-                      <div className="flex items-center justify-end gap-2">
+                      <div className="flex items-center justify-end gap-1.5">
                         {isClient ? (
                           <Button 
                             variant="ghost" 
@@ -1629,32 +1884,58 @@ export default function InspectionsPage() {
                           >
                             View Details
                           </Button>
-                        ) : i.status === 'COMPLETED' ? (
-                          <Button 
-                            variant="ghost" 
-                            className="h-9 px-3 rounded-xl text-xs font-bold text-muted-foreground hover:bg-muted/10 flex items-center gap-1"
-                            onClick={async () => {
-                              setSelectedInspection(i);
-                              await fetchSingleInspection(i.id);
-                              setUploadedPhotoUrls(parseRemarksPhotos(i.remarks));
-                              setOpenVisit(true);
-                            }}
-                          >
-                            Review Checklist
-                          </Button>
                         ) : (
-                          <Button 
-                            variant="ghost" 
-                            className="h-9 px-4 rounded-xl text-xs font-bold text-blue-600 hover:bg-blue-500/10"
-                            onClick={async () => {
-                              setSelectedInspection(i);
-                              await fetchSingleInspection(i.id);
-                              setUploadedPhotoUrls(parseRemarksPhotos(i.remarks));
-                              setOpenVisit(true);
-                            }}
-                          >
-                            {i.status === 'REJECTED' ? 'Update Checklist' : 'Start Visit'} <ChevronRight className="w-4 h-4 ml-1" />
-                          </Button>
+                          <>
+                            {i.status !== 'COMPLETED' && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                title="Edit Visit Date / Engineers"
+                                className="h-9 w-9 rounded-xl text-muted-foreground hover:text-blue-600 hover:bg-blue-500/10"
+                                onClick={() => handleOpenEdit(i)}
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </Button>
+                            )}
+                            {i.status !== 'COMPLETED' && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                title="Delete Scheduled Visit"
+                                className="h-9 w-9 rounded-xl text-muted-foreground hover:text-rose-600 hover:bg-rose-500/10"
+                                onClick={() => handleDeleteInspection(i.id, i.client?.name || 'Client')}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            )}
+                            {i.status === 'COMPLETED' ? (
+                              <Button 
+                                variant="ghost" 
+                                className="h-9 px-3 rounded-xl text-xs font-bold text-muted-foreground hover:bg-muted/10 flex items-center gap-1"
+                                onClick={async () => {
+                                  setSelectedInspection(i);
+                                  await fetchSingleInspection(i.id);
+                                  setUploadedPhotoUrls(parseRemarksPhotos(i.remarks));
+                                  setOpenVisit(true);
+                                }}
+                              >
+                                Review Checklist
+                              </Button>
+                            ) : (
+                              <Button 
+                                variant="ghost" 
+                                className="h-9 px-4 rounded-xl text-xs font-bold text-blue-600 hover:bg-blue-500/10"
+                                onClick={async () => {
+                                  setSelectedInspection(i);
+                                  await fetchSingleInspection(i.id);
+                                  setUploadedPhotoUrls(parseRemarksPhotos(i.remarks));
+                                  setOpenVisit(true);
+                                }}
+                              >
+                                {i.status === 'REJECTED' ? 'Update Checklist' : 'Start Visit'} <ChevronRight className="w-4 h-4 ml-1" />
+                              </Button>
+                            )}
+                          </>
                         )}
                       </div>
                     </td>
