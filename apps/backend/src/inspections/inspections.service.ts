@@ -204,7 +204,10 @@ export class InspectionsService {
           items: { orderBy: { sort_order: 'asc' } },
           expenditures: true,
         },
-        orderBy: { scheduled_date: 'desc' },
+        orderBy: [
+          { created_at: 'desc' },
+          { scheduled_date: 'desc' },
+        ],
       });
     } catch (e: any) {
       if (e?.code === 'P2021') {
@@ -218,7 +221,10 @@ export class InspectionsService {
             items: { orderBy: { sort_order: 'asc' } },
             expenditures: true,
           },
-          orderBy: { scheduled_date: 'desc' },
+          orderBy: [
+            { created_at: 'desc' },
+            { scheduled_date: 'desc' },
+          ],
         });
       }
       throw e;
@@ -763,7 +769,10 @@ export class InspectionsService {
         items: { orderBy: { sort_order: 'asc' } },
         expenditures: true,
       },
-      orderBy: { scheduled_date: 'asc' },
+      orderBy: [
+        { created_at: 'desc' },
+        { scheduled_date: 'desc' },
+      ],
     });
   }
 
