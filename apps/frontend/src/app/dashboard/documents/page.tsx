@@ -1110,7 +1110,7 @@ export default function DocumentVaultPage() {
                                       <p className="text-[11px] text-muted-foreground mt-0.5">
                                         {(projectNode as any).is_general || projectNode.project_id === 'general'
                                           ? 'Certificates stored directly under client without specific project assignment'
-                                          : (projectNode.description || 'Institutional safety inspection project')}
+                                          : (stripHtml(projectNode.description) || 'Institutional safety inspection project')}
                                       </p>
                                     </div>
                                   </div>

@@ -94,6 +94,26 @@ export default function OperationsPage() {
   const router = useRouter();
   const token = useAuthStore((state) => state.token);
 
+  const renderDescription = (desc?: string | null, fallback?: string) => {
+    if (!desc || !desc.trim()) {
+      return <p className="text-muted-foreground text-sm max-w-2xl leading-relaxed font-medium">{fallback || ""}</p>;
+    }
+    const isHtml = /<[a-z][\s\S]*>/i.test(desc);
+    if (isHtml) {
+      return (
+        <div 
+          className="text-muted-foreground text-sm max-w-2xl leading-relaxed font-medium prose prose-sm dark:prose-invert max-w-none [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-0.5 [&_p]:my-1"
+          dangerouslySetInnerHTML={{ __html: desc }}
+        />
+      );
+    }
+    return (
+      <p className="text-muted-foreground text-sm max-w-2xl leading-relaxed font-medium whitespace-pre-line">
+        {desc}
+      </p>
+    );
+  };
+
   const [projects, setProjects] = useState<Project[]>([]);
   const [clients, setClients] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
@@ -651,7 +671,7 @@ export default function OperationsPage() {
                           </button>
                         </div>
 
-                        <p className="text-muted-foreground text-sm max-w-2xl leading-relaxed font-medium">{proj.description || `Operations project for ${proj.client?.name || 'Client'}.`}</p>
+                        {renderDescription(proj.description, `Operations project for ${proj.client?.name || 'Client'}.`)}
                         
                         {/* Meta Tags */}
                         <div className="flex flex-wrap items-center gap-6 pt-1">

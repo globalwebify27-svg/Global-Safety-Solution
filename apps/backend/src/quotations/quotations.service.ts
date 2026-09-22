@@ -520,7 +520,7 @@ export class QuotationsService {
               client_id: clientId,
               quotation_id: id,
               name: `Project: ${quotation.quote_number}`,
-              description: `Automatically created from Quotation ${quotation.quote_number}. ${quotation.notes || ''}`,
+              description: quotation.notes && quotation.notes.trim() ? quotation.notes.trim() : `Automatically created from Quotation ${quotation.quote_number}`,
               contract_value: quotation.total_amount,
               stage: 'PROJECT_CREATED',
               status: 'PENDING',
